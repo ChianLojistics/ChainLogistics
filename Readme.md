@@ -451,7 +451,7 @@ This project is excellent for learning:
 
 ## 🔗 Links & Resources
 
-- **GitHub**: [github.com/ChainLojistics/ChainLojistics](https://github.com)
+- **GitHub**: [github.com/ChainLojistics/ChainLogistics](https://github.com)
 - **Website**: [chainlojistic.com](https://chainlojistic.com) (coming soon)
 - **Demo**: [demo.chainlojistic.com](https://demo.chainlojistic.com) (coming soon)
 - **Docs**: [docs.chainlojistic.com](https://docs.chainlojistic.com) (coming soon)
