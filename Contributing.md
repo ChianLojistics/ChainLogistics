@@ -84,36 +84,155 @@ npm run dev  # http://localhost:3001
 ---
 
 ## 📁 Project Structure
-
 ```
 ChainLojistic/
-├── contracts/                    # Soroban Smart Contracts
-│   ├── src/lib.rs               # Main contract (Product, Events)
+├── contracts/                           # Soroban Smart Contracts
+│   ├── src/
+│   │   ├── lib.rs                      # Contract entry point & exports
+│   │   ├── contract.rs                 # Main contract implementation
+│   │   ├── types.rs                    # Data structures (Product, Event)
+│   │   ├── storage.rs                  # Storage keys & helpers
+│   │   ├── error.rs                    # Custom error types
+│   │   ├── events.rs                   # Event emission
+│   │   ├── validation.rs               # Input validation logic
+│   │   └── test/
+│   │       ├── mod.rs                  # Test module exports
+│   │       ├── setup.rs                # Test utilities & fixtures
+│   │       ├── product_tests.rs        # Product function tests
+│   │       ├── event_tests.rs          # Event tracking tests
+│   │       ├── access_tests.rs         # Authorization tests
+│   │       └── integration_tests.rs    # Full workflow tests
 │   ├── Cargo.toml
 │   └── README.md
 │
-├── frontend/                     # Next.js App
+├── frontend/                            # Next.js Application
 │   ├── app/
-│   │   ├── page.tsx             # Homepage
-│   │   ├── register/            # Product registration
-│   │   ├── track/               # Tracking pages
-│   │   └── verify/              # Verification
+│   │   ├── layout.tsx                  # Root layout
+│   │   ├── page.tsx                    # Homepage (EXISTS)
+│   │   ├── globals.css                 # Global styles
+│   │   ├── register/
+│   │   │   └── page.tsx               # Product registration
+│   │   ├── products/
+│   │   │   ├── page.tsx               # Products list
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx           # Product detail
+│   │   │       └── add-event/
+│   │   │           └── page.tsx       # Add tracking event
+│   │   ├── verify/
+│   │   │   └── [id]/
+│   │   │       └── page.tsx           # QR verification page
+│   │   └── analytics/
+│   │       └── page.tsx               # Analytics dashboard
 │   ├── components/
-│   │   ├── wallet/              # Wallet connection
-│   │   ├── tracking/            # Timeline, events
-│   │   └── ui/                  # Reusable components
+│   │   ├── wallet/
+│   │   │   ├── WalletConnect.tsx      # Wallet connection button
+│   │   │   └── WalletStatus.tsx       # Wallet status indicator
+│   │   ├── forms/
+│   │   │   ├── ProductForm.tsx        # Product registration form
+│   │   │   ├── EventForm.tsx          # Event tracking form
+│   │   │   └── FormInput.tsx          # Reusable form input
+│   │   ├── tracking/
+│   │   │   ├── Timeline.tsx           # Event timeline
+│   │   │   ├── EventCard.tsx          # Single event display
+│   │   │   └── EventFilters.tsx       # Filter events
+│   │   ├── products/
+│   │   │   ├── ProductCard.tsx        # Product card
+│   │   │   ├── ProductList.tsx        # Products grid
+│   │   │   └── ProductDetails.tsx     # Product info display
+│   │   ├── qr/
+│   │   │   ├── QRGenerator.tsx        # Generate QR codes
+│   │   │   └── QRScanner.tsx          # Scan QR codes
+│   │   ├── charts/
+│   │   │   ├── EventsChart.tsx        # Events visualization
+│   │   │   └── OriginChart.tsx        # Origin distribution
+│   │   └── ui/
+│   │       ├── Button.tsx             # Reusable button
+│   │       ├── Card.tsx               # Reusable card
+│   │       ├── Input.tsx              # Reusable input
+│   │       ├── Modal.tsx              # Modal component
+│   │       └── LoadingSpinner.tsx     # Loading state
 │   ├── lib/
-│   │   ├── stellar.ts           # Soroban interaction
-│   │   └── types.ts             # TypeScript types
-│   └── package.json
+│   │   ├── stellar/
+│   │   │   ├── client.ts              # Stellar RPC client
+│   │   │   ├── contract.ts            # Contract interaction
+│   │   │   ├── wallet.ts              # Wallet utilities
+│   │   │   └── types.ts               # Stellar types
+│   │   ├── utils/
+│   │   │   ├── format.ts              # Formatting helpers
+│   │   │   ├── validation.ts          # Client-side validation
+│   │   │   └── constants.ts           # Constants
+│   │   └── hooks/
+│   │       ├── useContract.ts         # Contract interaction hook
+│   │       ├── useProducts.ts         # Product data hook
+│   │       ├── useEvents.ts           # Events data hook
+│   │       └── useWallet.ts           # Wallet hook
+│   ├── contexts/
+│   │   ├── WalletContext.tsx          # Wallet state
+│   │   └── ContractContext.tsx        # Contract state
+│   ├── types/
+│   │   ├── product.ts                 # Product types
+│   │   ├── event.ts                   # Event types
+│   │   └── api.ts                     # API types
+│   ├── public/
+│   │   ├── images/
+│   │   └── icons/
+│   ├── tests/
+│   │   ├── unit/                      # Unit tests
+│   │   └── e2e/                       # E2E tests
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── tailwind.config.ts
+│   └── next.config.ts
 │
-└── backend/                      # API Server
-    ├── src/
-    │   ├── index.ts             # Express app
-    │   ├── routes/              # API routes
-    │   └── services/            # Business logic
-    └── package.json
-```
+├── backend/                             # API Server (Optional)
+│   ├── src/
+│   │   ├── index.ts                   # Server entry point
+│   │   ├── routes/
+│   │   │   ├── products.ts            # Product routes
+│   │   │   ├── events.ts              # Event routes
+│   │   │   └── analytics.ts           # Analytics routes
+│   │   ├── services/
+│   │   │   ├── contractService.ts     # Contract interactions
+│   │   │   ├── cacheService.ts        # Redis caching
+│   │   │   └── webhookService.ts      # Webhook handling
+│   │   ├── middleware/
+│   │   │   ├── auth.ts                # Authentication
+│   │   │   ├── rateLimiter.ts         # Rate limiting
+│   │   │   └── validation.ts          # Request validation
+│   │   ├── utils/
+│   │   │   ├── logger.ts              # Logging
+│   │   │   └── errors.ts              # Error handling
+│   │   └── types/
+│   │       └── index.ts               # TypeScript types
+│   ├── tests/
+│   │   ├── unit/
+│   │   └── integration/
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── .env.example
+│
+├── docs/                                # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── API.md
+│   ├── DEPLOYMENT.md
+│   └── images/
+│
+├── .github/                             # GitHub configs
+│   ├── workflows/
+│   │   ├── contracts-ci.yml           # Contract CI/CD
+│   │   ├── frontend-ci.yml            # Frontend CI/CD
+│   │   └── backend-ci.yml             # Backend CI/CD
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   ├── feature_request.md
+│   │   └── good_first_issue.md
+│   └── pull_request_template.md
+│
+├── .gitignore
+├── README.md
+├── CONTRIBUTING.md
+├── LICENSE
+└── package.json                         # Root workspace config
 
 ---
 
