@@ -9,4 +9,8 @@ pub enum Error {
     Unauthorized = 3,
     InvalidInput = 4,
     EventNotFound = 5,
+    NotAuthorized = 6,
+    AlreadyAuthorized = 7,
+    CannotRemoveSelf = 8,
+    ActorNotFound = 9,
 }

@@ -1,4 +1,5 @@
-rust#![no_std]
+#![no_std]
+#![allow(unexpected_cfgs)]
 
 mod contract;
 mod types;
@@ -12,3 +13,4 @@ mod test;
 pub use contract::*;
 pub use types::*;
 pub use error::*;
+pub use storage::*;
