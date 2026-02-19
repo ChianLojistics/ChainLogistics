@@ -1,4 +1,4 @@
-rust#![no_std]
+#![no_std]
 
 mod contract;
 mod types;
