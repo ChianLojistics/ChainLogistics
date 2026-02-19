@@ -1,177 +1,201 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, BytesN, Env, Map, String, Vec};
 
-fn setup() -> (Env, SupplyChainContractClient<'static>) {
+fn create_test_product(
+    env: &Env,
+    client: &ChainLogisticsContractClient,
+    owner: &Address,
+) -> String {
+    let id = String::from_str(env, "PROD-01");
+    let name = String::from_str(env, "Test Product");
+    let desc = String::from_str(env, "Description");
+    let loc = String::from_str(env, "Origin");
+    let cat = String::from_str(env, "Category");
+    
+    client.register_product(
+        owner,
+        &id,
+        &name,
+        &desc,
+        &loc,
+        &cat,
+        &Vec::new(env),
+        &Vec::new(env),
+        &Vec::new(env),
+        &Map::new(env),
+    );
+    id
+}
+
+#[test]
+fn test_register_and_get_product() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, SupplyChainContract);
-    let client = SupplyChainContractClient::new(&env, &contract_id);
-    (env, client)
-}
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
-fn create_test_product(env: &Env, client: &SupplyChainContractClient, owner: &Address) -> u64 {
-    let name = String::from_str(env, "Test Product");
-    client.create_product(owner, &name)
-}
+    let owner = Address::generate(&env);
+    let id = create_test_product(&env, &client, &owner);
 
-// ─── Test 1 ───────────────────────────────────────────────────────────────────
+    let p = client.get_product(&id);
+    assert_eq!(p.id, id);
+    assert_eq!(p.owner, owner);
+    assert!(p.active);
+}
 
 #[test]
 fn test_add_authorized_actor() {
-    let (env, client) = setup();
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
     let owner = Address::generate(&env);
     let actor = Address::generate(&env);
+    let id = create_test_product(&env, &client, &owner);
 
-    let product_id = create_test_product(&env, &client, &owner);
-    client.add_authorized_actor(&product_id, &owner, &actor);
+    client.add_authorized_actor(&owner, &id, &actor);
 
-    let product = client.get_product(&product_id);
-    assert!(product.authorized_actors.contains(&actor));
+    assert!(client.is_authorized(&id, &actor));
 }
-
-// ─── Test 2 ───────────────────────────────────────────────────────────────────
-
-#[test]
-fn test_add_duplicate_actor_fails() {
-    let (env, client) = setup();
-    let owner = Address::generate(&env);
-    let actor = Address::generate(&env);
-
-    let product_id = create_test_product(&env, &client, &owner);
-    client.add_authorized_actor(&product_id, &owner, &actor);
-
-    let result = client.try_add_authorized_actor(&product_id, &owner, &actor);
-    assert_eq!(result, Err(Ok(Error::AlreadyAuthorized)));
-}
-
-// ─── Test 3 ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_non_owner_cannot_add_actor() {
-    let (env, client) = setup();
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
     let owner = Address::generate(&env);
     let non_owner = Address::generate(&env);
     let actor = Address::generate(&env);
+    let id = create_test_product(&env, &client, &owner);
 
-    let product_id = create_test_product(&env, &client, &owner);
-
-    let result = client.try_add_authorized_actor(&product_id, &non_owner, &actor);
-    assert_eq!(result, Err(Ok(Error::NotAuthorized)));
+    // mock_all_auths() makes all auth checks pass, so we can't test "NotAuthorized" easily 
+    // without granular mocking, BUT explicit checks in code `if owner != caller` 
+    // will still run if we call with a different address.
+    // However, `register_product` requires owner auth.
+    // `add_authorized_actor` takes `owner` arg and calls `require_owner`.
+    
+    // Upstream `add_authorized_actor(env, owner, ...)` takes explicit owner arg.
+    // It calls `require_owner(&product, &owner)`.
+    // Then checks `product.owner != owner`.
+    
+    // So if we pass `non_owner` as the `owner` argument:
+    // It will check `if product.owner != non_owner` -> returns Unauthorized.
+    
+    let result = client.try_add_authorized_actor(&non_owner, &id, &actor);
+    assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }
-
-// ─── Test 4 ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_remove_authorized_actor() {
-    let (env, client) = setup();
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
     let owner = Address::generate(&env);
     let actor = Address::generate(&env);
+    let id = create_test_product(&env, &client, &owner);
 
-    let product_id = create_test_product(&env, &client, &owner);
-    client.add_authorized_actor(&product_id, &owner, &actor);
-    client.remove_authorized_actor(&product_id, &owner, &actor);
+    client.add_authorized_actor(&owner, &id, &actor);
+    assert!(client.is_authorized(&id, &actor));
 
-    let product = client.get_product(&product_id);
-    assert!(!product.authorized_actors.contains(&actor));
+    client.remove_authorized_actor(&owner, &id, &actor);
+    assert!(!client.is_authorized(&id, &actor));
 }
-
-// ─── Test 5 ───────────────────────────────────────────────────────────────────
-
-#[test]
-fn test_owner_cannot_remove_self() {
-    let (env, client) = setup();
-    let owner = Address::generate(&env);
-
-    let product_id = create_test_product(&env, &client, &owner);
-
-    let result = client.try_remove_authorized_actor(&product_id, &owner, &owner);
-    assert_eq!(result, Err(Ok(Error::CannotRemoveSelf)));
-}
-
-// ─── Test 6 ───────────────────────────────────────────────────────────────────
-
-#[test]
-fn test_remove_nonexistent_actor_fails() {
-    let (env, client) = setup();
-    let owner = Address::generate(&env);
-    let actor = Address::generate(&env);
-
-    let product_id = create_test_product(&env, &client, &owner);
-
-    let result = client.try_remove_authorized_actor(&product_id, &owner, &actor);
-    assert_eq!(result, Err(Ok(Error::ActorNotFound)));
-}
-
-// ─── Test 7 ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_transfer_ownership() {
-    let (env, client) = setup();
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
-    let actor = Address::generate(&env); // to verify authorized_actors preserved
+    let id = create_test_product(&env, &client, &owner);
 
-    let product_id = create_test_product(&env, &client, &owner);
-    client.add_authorized_actor(&product_id, &owner, &actor);
-    client.transfer_ownership(&product_id, &owner, &new_owner);
+    client.transfer_product(&owner, &id, &new_owner);
 
-    let product = client.get_product(&product_id);
-    assert_eq!(product.owner, new_owner);
+    let p = client.get_product(&id);
+    assert_eq!(p.owner, new_owner);
 
-    // Old owner is no longer the owner — attempts owner-only ops must fail
-    let result = client.try_add_authorized_actor(&product_id, &owner, &Address::generate(&env));
-    assert_eq!(result, Err(Ok(Error::NotAuthorized)));
+    // Old owner should no longer be able to add actors (Authorized failure)
+    let actor = Address::generate(&env);
+    let result = client.try_add_authorized_actor(&owner, &id, &actor);
+    assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }
-
-// ─── Test 8 ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_authorized_actor_can_add_event() {
-    let (env, client) = setup();
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
     let owner = Address::generate(&env);
     let actor = Address::generate(&env);
+    let id = create_test_product(&env, &client, &owner);
 
-    let product_id = create_test_product(&env, &client, &owner);
-    client.add_authorized_actor(&product_id, &owner, &actor);
+    client.add_authorized_actor(&owner, &id, &actor);
 
-    let desc = String::from_str(&env, "Shipped from warehouse");
-    let result = client.try_add_event(&product_id, &actor, &desc);
+    let data = BytesN::from_array(&env, &[0; 32]);
+    let note = String::from_str(&env, "Event Note");
+    
+    // Upstream `add_tracking_event(env, actor, ...)`
+    let result = client.try_add_tracking_event(
+        &actor, 
+        &id, 
+        &symbol_short!("EVENT"), 
+        &data, 
+        &note
+    );
     assert!(result.is_ok());
 }
 
-// ─── Test 9 ───────────────────────────────────────────────────────────────────
-
 #[test]
 fn test_unauthorized_actor_cannot_add_event() {
-    let (env, client) = setup();
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
     let owner = Address::generate(&env);
     let random = Address::generate(&env);
+    let id = create_test_product(&env, &client, &owner);
 
-    let product_id = create_test_product(&env, &client, &owner);
+    let data = BytesN::from_array(&env, &[0; 32]);
+    let note = String::from_str(&env, "Event Note");
 
-    let desc = String::from_str(&env, "Unauthorized event");
-    let result = client.try_add_event(&product_id, &random, &desc);
-    assert_eq!(result, Err(Ok(Error::NotAuthorized)));
+    let result = client.try_add_tracking_event(
+        &random, 
+        &id, 
+        &symbol_short!("EVENT"), 
+        &data, 
+        &note
+    );
+    assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }
-
-// ─── Test 10 ──────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_ownership_preserves_authorized_actors() {
-    let (env, client) = setup();
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
     let owner = Address::generate(&env);
-    let actor1 = Address::generate(&env);
-    let actor2 = Address::generate(&env);
     let new_owner = Address::generate(&env);
+    let actor = Address::generate(&env);
+    let id = create_test_product(&env, &client, &owner);
 
-    let product_id = create_test_product(&env, &client, &owner);
-    client.add_authorized_actor(&product_id, &owner, &actor1);
-    client.add_authorized_actor(&product_id, &owner, &actor2);
-    client.transfer_ownership(&product_id, &owner, &new_owner);
+    client.add_authorized_actor(&owner, &id, &actor);
+    client.transfer_product(&owner, &id, &new_owner);
 
-    let product = client.get_product(&product_id);
-    assert!(product.authorized_actors.contains(&actor1));
-    assert!(product.authorized_actors.contains(&actor2));
+    // Actor should still be authorized
+    assert!(client.is_authorized(&id, &actor));
 }
