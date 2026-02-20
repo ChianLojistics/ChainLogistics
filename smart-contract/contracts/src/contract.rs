@@ -5,10 +5,17 @@ use crate::{storage, validation, Error, EventIdPage, Origin, Product, ProductReg
 #[contract]
 pub struct ChainLogisticsContract;
 
+/// Reads a product from persistent storage.
+/// 
+/// Returns an error if the product doesn't exist.
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
 }
 
+/// Writes a product to persistent storage.
+/// 
+/// Products are stored using Soroban's persistent storage API,
+/// ensuring they persist across contract calls and ledger entries.
 fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
@@ -144,6 +151,9 @@ fn upper_bound(ts: &Vec<u64>, target: u64) -> u32 {
 
 #[contractimpl]
 impl ChainLogisticsContract {
+    /// Registers a new product and stores it in persistent storage.
+    /// Products persist across contract calls using Soroban's persistent storage API.
+    /// Returns ProductAlreadyExists if the product ID already exists.
     pub fn register_product(
         env: Env,
         owner: Address,
@@ -259,6 +269,8 @@ impl ChainLogisticsContract {
         Ok(product)
     }
 
+    /// Retrieves a product from persistent storage by ID.
+    /// Returns ProductNotFound if the product doesn't exist.
     pub fn get_product(env: Env, id: String) -> Result<Product, Error> {
         read_product(&env, &id)
     }
