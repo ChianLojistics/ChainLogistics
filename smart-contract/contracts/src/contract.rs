@@ -1,6 +1,6 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
-use crate::{storage, validation, Error, Origin, Product, ProductRegistrationInput, TrackingEvent, TrackingEventInput};
+use crate::{storage, validation, Error, EventIdPage, Origin, Product, ProductRegistrationInput, TrackingEvent, TrackingEventInput};
 
 #[contract]
 pub struct ChainLogisticsContract;
@@ -52,6 +52,101 @@ fn require_can_add_event_internal(
 
 fn require_can_add_event(env: &Env, product_id: &String, product: &Product, caller: &Address) -> Result<(), Error> {
     require_can_add_event_internal(env, product_id, product, caller, true)
+}
+
+fn page_from_vec(env: &Env, ids: &Vec<u64>, cursor: u32, limit: u32) -> EventIdPage {
+    if limit == 0 {
+        return EventIdPage {
+            ids: Vec::new(env),
+            next_cursor: cursor,
+        };
+    }
+
+    let len: u32 = ids.len();
+    if cursor >= len {
+        return EventIdPage {
+            ids: Vec::new(env),
+            next_cursor: len,
+        };
+    }
+
+    let end = if cursor.saturating_add(limit) > len {
+        len
+    } else {
+        cursor + limit
+    };
+
+    let mut out: Vec<u64> = Vec::new(env);
+    for i in cursor..end {
+        out.push_back(ids.get_unchecked(i));
+    }
+
+    EventIdPage {
+        ids: out,
+        next_cursor: end,
+    }
+}
+
+fn page_recent_from_vec(env: &Env, ids: &Vec<u64>, cursor: u32, limit: u32) -> EventIdPage {
+    if limit == 0 {
+        return EventIdPage {
+            ids: Vec::new(env),
+            next_cursor: cursor,
+        };
+    }
+
+    let len: u32 = ids.len();
+    if cursor >= len {
+        return EventIdPage {
+            ids: Vec::new(env),
+            next_cursor: len,
+        };
+    }
+
+    let start_from_end = cursor;
+    let remaining = len - start_from_end;
+    let take = if limit > remaining { remaining } else { limit };
+
+    let mut out: Vec<u64> = Vec::new(env);
+    for j in 0..take {
+        let idx = (len - 1) - (start_from_end + j);
+        out.push_back(ids.get_unchecked(idx));
+    }
+
+    EventIdPage {
+        ids: out,
+        next_cursor: cursor + take,
+    }
+}
+
+fn lower_bound(ts: &Vec<u64>, target: u64) -> u32 {
+    let mut lo: u32 = 0;
+    let mut hi: u32 = ts.len();
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        let v = ts.get_unchecked(mid);
+        if v < target {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    lo
+}
+
+fn upper_bound(ts: &Vec<u64>, target: u64) -> u32 {
+    let mut lo: u32 = 0;
+    let mut hi: u32 = ts.len();
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        let v = ts.get_unchecked(mid);
+        if v <= target {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    lo
 }
 
 #[contractimpl]
@@ -167,6 +262,7 @@ impl ChainLogisticsContract {
 
         write_product(&env, &product);
         storage::put_product_event_ids(&env, &id, &Vec::new(&env));
+        storage::put_product_event_timestamps(&env, &id, &Vec::new(&env));
         storage::set_auth(&env, &id, &owner, true);
 
         env.events().publish((Symbol::new(&env, "product_registered"), id.clone()), product.clone());
@@ -182,6 +278,88 @@ impl ChainLogisticsContract {
     pub fn get_product_event_ids(env: Env, id: String) -> Result<Vec<u64>, Error> {
         let _ = read_product(&env, &id)?;
         Ok(storage::get_product_event_ids(&env, &id))
+    }
+
+    pub fn get_product_event_ids_page(env: Env, id: String, cursor: u32, limit: u32) -> Result<EventIdPage, Error> {
+        let _ = read_product(&env, &id)?;
+        let ids = storage::get_product_event_ids(&env, &id);
+        Ok(page_from_vec(&env, &ids, cursor, limit))
+    }
+
+    pub fn get_product_event_ids_rcnt_page(env: Env, id: String, cursor: u32, limit: u32) -> Result<EventIdPage, Error> {
+        let _ = read_product(&env, &id)?;
+        let ids = storage::get_product_event_ids(&env, &id);
+        Ok(page_recent_from_vec(&env, &ids, cursor, limit))
+    }
+
+    pub fn get_evt_ids_type_page(env: Env, id: String, event_type: Symbol, cursor: u32, limit: u32) -> Result<EventIdPage, Error> {
+        let _ = read_product(&env, &id)?;
+        let ids = storage::get_product_event_ids_by_type(&env, &id, &event_type);
+        Ok(page_from_vec(&env, &ids, cursor, limit))
+    }
+
+    pub fn get_evt_ids_actr_page(env: Env, id: String, actor: Address, cursor: u32, limit: u32) -> Result<EventIdPage, Error> {
+        let _ = read_product(&env, &id)?;
+        let ids = storage::get_product_event_ids_by_actor(&env, &id, &actor);
+        Ok(page_from_vec(&env, &ids, cursor, limit))
+    }
+
+    pub fn get_evt_ids_date_page(
+        env: Env,
+        id: String,
+        start_ts: u64,
+        end_ts: u64,
+        cursor: u32,
+        limit: u32,
+    ) -> Result<EventIdPage, Error> {
+        let _ = read_product(&env, &id)?;
+        if start_ts > end_ts {
+            return Ok(EventIdPage {
+                ids: Vec::new(&env),
+                next_cursor: 0,
+            });
+        }
+
+        let ts = storage::get_product_event_timestamps(&env, &id);
+        let ids = storage::get_product_event_ids(&env, &id);
+        if ts.len() != ids.len() {
+            return Err(Error::InvalidInput);
+        }
+
+        let start_i = lower_bound(&ts, start_ts);
+        let end_i = upper_bound(&ts, end_ts);
+        if start_i >= end_i {
+            return Ok(EventIdPage {
+                ids: Vec::new(&env),
+                next_cursor: 0,
+            });
+        }
+
+        let range_len = end_i - start_i;
+        if cursor >= range_len {
+            return Ok(EventIdPage {
+                ids: Vec::new(&env),
+                next_cursor: range_len,
+            });
+        }
+
+        let take = if limit == 0 {
+            0
+        } else if cursor.saturating_add(limit) > range_len {
+            range_len - cursor
+        } else {
+            limit
+        };
+
+        let mut out: Vec<u64> = Vec::new(&env);
+        for j in 0..take {
+            out.push_back(ids.get_unchecked(start_i + cursor + j));
+        }
+
+        Ok(EventIdPage {
+            ids: out,
+            next_cursor: cursor + take,
+        })
     }
 
     pub fn add_authorized_actor(env: Env, owner: Address, product_id: String, actor: Address) -> Result<(), Error> {
@@ -238,6 +416,18 @@ impl ChainLogisticsContract {
         let mut ids = storage::get_product_event_ids(&env, &product_id);
         ids.push_back(event_id);
         storage::put_product_event_ids(&env, &product_id, &ids);
+
+        let mut ts = storage::get_product_event_timestamps(&env, &product_id);
+        ts.push_back(event.timestamp);
+        storage::put_product_event_timestamps(&env, &product_id, &ts);
+
+        let mut by_type = storage::get_product_event_ids_by_type(&env, &product_id, &event.event_type);
+        by_type.push_back(event_id);
+        storage::put_product_event_ids_by_type(&env, &product_id, &event.event_type, &by_type);
+
+        let mut by_actor = storage::get_product_event_ids_by_actor(&env, &product_id, &event.actor);
+        by_actor.push_back(event_id);
+        storage::put_product_event_ids_by_actor(&env, &product_id, &event.actor, &by_actor);
         Ok(event_id)
     }
 
@@ -364,6 +554,7 @@ impl ChainLogisticsContract {
 
             write_product(&env, &product);
             storage::put_product_event_ids(&env, &product.id, &Vec::new(&env));
+            storage::put_product_event_timestamps(&env, &product.id, &Vec::new(&env));
             storage::set_auth(&env, &product.id, &owner, true);
             env.events().publish((Symbol::new(&env, "product_registered"), product.id.clone()), product.clone());
             products.push_back(product);
@@ -392,7 +583,14 @@ impl ChainLogisticsContract {
             require_can_add_event_internal(&env, &inp.product_id, &product, &actor, false)?;
         }
 
+        let now = env.ledger().timestamp();
+
         let mut event_ids: Vec<u64> = Vec::new(&env);
+        let mut per_product_ids: Map<String, Vec<u64>> = Map::new(&env);
+        let mut per_product_ts: Map<String, Vec<u64>> = Map::new(&env);
+        let mut per_product_type: Map<(String, Symbol), Vec<u64>> = Map::new(&env);
+        let mut per_product_actor: Map<(String, Address), Vec<u64>> = Map::new(&env);
+
         for i in 0..n {
             let inp = inputs.get(i).unwrap();
             let event_id = storage::next_event_id(&env);
@@ -400,7 +598,7 @@ impl ChainLogisticsContract {
                 event_id,
                 product_id: inp.product_id.clone(),
                 actor: actor.clone(),
-                timestamp: env.ledger().timestamp(),
+                timestamp: now,
                 event_type: inp.event_type.clone(),
                 data_hash: inp.data_hash.clone(),
                 note: inp.note.clone(),
@@ -409,9 +607,63 @@ impl ChainLogisticsContract {
             storage::put_event(&env, &event);
             event_ids.push_back(event_id);
 
-            let mut ids = storage::get_product_event_ids(&env, &inp.product_id);
+            // Timeline IDs
+            let mut ids = per_product_ids
+                .get(inp.product_id.clone())
+                .unwrap_or(storage::get_product_event_ids(&env, &inp.product_id));
             ids.push_back(event_id);
-            storage::put_product_event_ids(&env, &inp.product_id, &ids);
+            per_product_ids.set(inp.product_id.clone(), ids);
+
+            // Timestamps aligned with timeline
+            let mut ts = per_product_ts
+                .get(inp.product_id.clone())
+                .unwrap_or(storage::get_product_event_timestamps(&env, &inp.product_id));
+            ts.push_back(now);
+            per_product_ts.set(inp.product_id.clone(), ts);
+
+            // By type
+            let k_type = (inp.product_id.clone(), inp.event_type.clone());
+            let mut by_type = per_product_type
+                .get(k_type.clone())
+                .unwrap_or(storage::get_product_event_ids_by_type(&env, &inp.product_id, &inp.event_type));
+            by_type.push_back(event_id);
+            per_product_type.set(k_type, by_type);
+
+            // By actor
+            let k_actor = (inp.product_id.clone(), actor.clone());
+            let mut by_actor = per_product_actor
+                .get(k_actor.clone())
+                .unwrap_or(storage::get_product_event_ids_by_actor(&env, &inp.product_id, &actor));
+            by_actor.push_back(event_id);
+            per_product_actor.set(k_actor, by_actor);
+        }
+
+        let product_keys = per_product_ids.keys();
+        for i in 0..product_keys.len() {
+            let pid = product_keys.get_unchecked(i);
+            let ids = per_product_ids.get_unchecked(pid.clone());
+            storage::put_product_event_ids(&env, &pid, &ids);
+        }
+
+        let ts_keys = per_product_ts.keys();
+        for i in 0..ts_keys.len() {
+            let pid = ts_keys.get_unchecked(i);
+            let ts = per_product_ts.get_unchecked(pid.clone());
+            storage::put_product_event_timestamps(&env, &pid, &ts);
+        }
+
+        let type_keys = per_product_type.keys();
+        for i in 0..type_keys.len() {
+            let k = type_keys.get_unchecked(i);
+            let ids = per_product_type.get_unchecked(k.clone());
+            storage::put_product_event_ids_by_type(&env, &k.0, &k.1, &ids);
+        }
+
+        let actor_keys = per_product_actor.keys();
+        for i in 0..actor_keys.len() {
+            let k = actor_keys.get_unchecked(i);
+            let ids = per_product_actor.get_unchecked(k.clone());
+            storage::put_product_event_ids_by_actor(&env, &k.0, &k.1, &ids);
         }
 
         Ok(event_ids)

@@ -7,6 +7,17 @@ fn default_register_args(env: &Env) -> (Vec<String>, Vec<BytesN<32>>, Vec<BytesN
     (Vec::new(env), Vec::new(env), Vec::new(env), Map::new(env))
 }
 
+fn add_event(client: &ChainLogisticsContractClient, env: &Env, actor: &Address, product_id: &str, t: Symbol) -> u64 {
+    let h = BytesN::from_array(env, &[0; 32]);
+    client.add_tracking_event(
+        actor,
+        &String::from_str(env, product_id),
+        &t,
+        &h,
+        &String::from_str(env, ""),
+    )
+}
+
 fn id_for_i(i: u32) -> &'static str {
     match i {
         0 => "P-0",
@@ -211,6 +222,88 @@ fn test_add_tracking_events_batch_success() {
 
     let stored = client.get_product_event_ids(&String::from_str(&env, "P1"));
     assert_eq!(stored.len(), 5);
+}
+
+#[test]
+fn test_event_query_indexes_and_pagination() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.budget().reset_unlimited();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let actor1 = Address::generate(&env);
+    let actor2 = Address::generate(&env);
+
+    register_one(&client, &env, &owner, "P1");
+    client.add_authorized_actor(&owner, &String::from_str(&env, "P1"), &actor1);
+    client.add_authorized_actor(&owner, &String::from_str(&env, "P1"), &actor2);
+
+    // Add 6 events: PROC, SHIP alternating, actor1 adds 4, actor2 adds 2
+    let _e0 = add_event(&client, &env, &actor1, "P1", symbol_short!("PROC"));
+    let _e1 = add_event(&client, &env, &actor1, "P1", symbol_short!("SHIP"));
+    let _e2 = add_event(&client, &env, &actor2, "P1", symbol_short!("PROC"));
+    let _e3 = add_event(&client, &env, &actor1, "P1", symbol_short!("SHIP"));
+    let _e4 = add_event(&client, &env, &actor2, "P1", symbol_short!("SHIP"));
+    let _e5 = add_event(&client, &env, &actor1, "P1", symbol_short!("PROC"));
+
+    // All events paginated
+    let p1 = client.get_product_event_ids_page(&String::from_str(&env, "P1"), &0u32, &2u32);
+    assert_eq!(p1.ids.len(), 2);
+    let p2 = client.get_product_event_ids_page(&String::from_str(&env, "P1"), &p1.next_cursor, &10u32);
+    assert_eq!(p2.ids.len(), 4);
+
+    // Recent (reverse) pagination
+    let r1 = client.get_product_event_ids_rcnt_page(&String::from_str(&env, "P1"), &0u32, &3u32);
+    assert_eq!(r1.ids.len(), 3);
+    let r2 = client.get_product_event_ids_rcnt_page(&String::from_str(&env, "P1"), &r1.next_cursor, &10u32);
+    assert_eq!(r2.ids.len(), 3);
+
+    // By type
+    let proc = client.get_evt_ids_type_page(&String::from_str(&env, "P1"), &symbol_short!("PROC"), &0u32, &10u32);
+    assert_eq!(proc.ids.len(), 3);
+    let ship = client.get_evt_ids_type_page(&String::from_str(&env, "P1"), &symbol_short!("SHIP"), &0u32, &10u32);
+    assert_eq!(ship.ids.len(), 3);
+
+    // By actor
+    let a1 = client.get_evt_ids_actr_page(&String::from_str(&env, "P1"), &actor1, &0u32, &10u32);
+    assert_eq!(a1.ids.len(), 4);
+    let a2 = client.get_evt_ids_actr_page(&String::from_str(&env, "P1"), &actor2, &0u32, &10u32);
+    assert_eq!(a2.ids.len(), 2);
+
+    // Date range: since all events share the same ledger timestamp in this test env,
+    // querying that exact timestamp should return all events.
+    let ts = env.ledger().timestamp();
+    let d = client.get_evt_ids_date_page(&String::from_str(&env, "P1"), &ts, &ts, &0u32, &100u32);
+    assert_eq!(d.ids.len(), 6);
+}
+
+#[test]
+fn test_event_query_1000_events_recent_page() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.budget().reset_unlimited();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let actor = Address::generate(&env);
+    register_one(&client, &env, &owner, "P1");
+    client.add_authorized_actor(&owner, &String::from_str(&env, "P1"), &actor);
+
+    for i in 0..1000u32 {
+        let t = if i % 2 == 0 { symbol_short!("PROC") } else { symbol_short!("SHIP") };
+        let _ = add_event(&client, &env, &actor, "P1", t);
+    }
+
+    let first = client.get_product_event_ids_rcnt_page(&String::from_str(&env, "P1"), &0u32, &50u32);
+    assert_eq!(first.ids.len(), 50);
+    let second = client.get_product_event_ids_rcnt_page(&String::from_str(&env, "P1"), &first.next_cursor, &50u32);
+    assert_eq!(second.ids.len(), 50);
+
+    let proc = client.get_evt_ids_type_page(&String::from_str(&env, "P1"), &symbol_short!("PROC"), &0u32, &1000u32);
+    assert_eq!(proc.ids.len(), 500);
 }
 
 #[test]

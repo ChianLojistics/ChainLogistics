@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Env, String, Vec};
+use soroban_sdk::{contracttype, Address, Env, String, Symbol, Vec};
 
 use crate::{Product, TrackingEvent};
 
@@ -13,6 +13,9 @@ pub enum DataKey {
     Product(String),
     /// Stores a vector of event IDs associated with a product
     ProductEventIds(String),
+    ProductEventTimestamps(String),
+    ProductEventIdsByType(String, Symbol),
+    ProductEventIdsByActor(String, Address),
 
     /// Stores a TrackingEvent by event ID
     Event(u64),
@@ -93,11 +96,53 @@ pub fn get_product_event_ids(env: &Env, product_id: &String) -> Vec<u64> {
         .unwrap_or(Vec::new(env))
 }
 
+<<<<<<< feature/issue-8-event-querying
+pub fn put_product_event_timestamps(env: &Env, product_id: &String, ts: &Vec<u64>) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::ProductEventTimestamps(product_id.clone()), ts);
+}
+
+pub fn get_product_event_timestamps(env: &Env, product_id: &String) -> Vec<u64> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::ProductEventTimestamps(product_id.clone()))
+        .unwrap_or(Vec::new(env))
+}
+
+pub fn put_product_event_ids_by_type(env: &Env, product_id: &String, event_type: &Symbol, ids: &Vec<u64>) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::ProductEventIdsByType(product_id.clone(), event_type.clone()), ids);
+}
+
+pub fn get_product_event_ids_by_type(env: &Env, product_id: &String, event_type: &Symbol) -> Vec<u64> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::ProductEventIdsByType(product_id.clone(), event_type.clone()))
+        .unwrap_or(Vec::new(env))
+}
+
+pub fn put_product_event_ids_by_actor(env: &Env, product_id: &String, actor: &Address, ids: &Vec<u64>) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::ProductEventIdsByActor(product_id.clone(), actor.clone()), ids);
+}
+
+pub fn get_product_event_ids_by_actor(env: &Env, product_id: &String, actor: &Address) -> Vec<u64> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::ProductEventIdsByActor(product_id.clone(), actor.clone()))
+        .unwrap_or(Vec::new(env))
+}
+
+=======
 /// Stores a tracking event in persistent storage.
 /// 
 /// # Arguments
 /// * `env` - The contract environment
 /// * `event` - The TrackingEvent to store
+>>>>>>> main
 pub fn put_event(env: &Env, event: &TrackingEvent) {
     env.storage()
         .persistent()

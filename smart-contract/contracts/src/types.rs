@@ -57,3 +57,10 @@ pub struct TrackingEventInput {
     pub data_hash: BytesN<32>,
     pub note: String,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EventIdPage {
+    pub ids: Vec<u64>,
+    pub next_cursor: u32,
+}
