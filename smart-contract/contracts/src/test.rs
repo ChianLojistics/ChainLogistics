@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+use crate::{ChainLogisticsContract, ChainLogisticsContractClient, Error};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 use soroban_sdk::{symbol_short, Address, BytesN, Env, Map, String, Symbol, Vec};
 use soroban_sdk::testutils::Address as _;
 
@@ -93,6 +95,19 @@ fn test_event_pagination() {
     let owner = Address::generate(&env);
     let id = setup_product(&env, &client, &owner);
 
+    for _ in 0..10 {
+        client.register_product(&owner, &origin, &metadata);
+    }
+
+    let page1 = client.get_all_products(&0, &5);
+    assert_eq!(page1.len(), 5);
+    assert_eq!(page1.get(0).unwrap().id, 1);
+    assert_eq!(page1.get(4).unwrap().id, 5);
+
+    let page2 = client.get_all_products(&5, &5);
+    assert_eq!(page2.len(), 5);
+    assert_eq!(page2.get(0).unwrap().id, 6);
+    assert_eq!(page2.get(4).unwrap().id, 10);
     let h = BytesN::from_array(&env, &[0; 32]);
     let metadata: Map<Symbol, String> = Map::new(&env);
     
@@ -132,10 +147,27 @@ fn test_event_pagination() {
 fn test_filter_events_by_type() {
     let env = Env::default();
     env.mock_all_auths();
-
     let contract_id = env.register_contract(None, ChainLogisticsContract);
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
+    let owner1 = Address::generate(&env);
+    let owner2 = Address::generate(&env);
+    let origin1 = String::from_str(&env, "China");
+    let origin2 = String::from_str(&env, "Germany");
+
+    client.register_product(&owner1, &origin1, &String::from_str(&env, "P1")); // ID 1
+    client.register_product(&owner2, &origin2, &String::from_str(&env, "P2")); // ID 2
+    client.register_product(&owner1, &origin2, &String::from_str(&env, "P3")); // ID 3
+
+    let owner1_products = client.get_products_by_owner(&owner1, &0, &10);
+    assert_eq!(owner1_products.len(), 2);
+    assert_eq!(owner1_products.get(0).unwrap().id, 1);
+    assert_eq!(owner1_products.get(1).unwrap().id, 3);
+
+    let origin2_products = client.get_products_by_origin(&origin2, &0, &10);
+    assert_eq!(origin2_products.len(), 2);
+    assert_eq!(origin2_products.get(0).unwrap().id, 2);
+    assert_eq!(origin2_products.get(1).unwrap().id, 3);
     let owner = Address::generate(&env);
     let id = setup_product(&env, &client, &owner);
 
@@ -195,6 +227,13 @@ fn test_filter_events_by_time_range() {
     // Add events at the current ledger timestamp
     let current_time = env.ledger().timestamp();
     
+    let stats = client.get_stats();
+    assert_eq!(stats.total_products, 2);
+    assert_eq!(stats.active_products, 2);
+}
+
+#[test]
+fn test_add_authorized_actor() {
     client.add_tracking_event(
         &owner,
         &id,
@@ -303,6 +342,18 @@ fn test_authorized_actor_can_add_event() {
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
     let owner = Address::generate(&env);
+    let actor = Address::generate(&env);
+    let origin = String::from_str(&env, "Nigeria");
+    let metadata = String::from_str(&env, "Metadata");
+    let id = client.register_product(&owner, &origin, &metadata);
+
+    client.add_authorized_actor(&owner, &id, &actor);
+    assert!(client.is_authorized(&id, &actor));
+    assert!(!client.is_authorized(&id, &Address::generate(&env)));
+}
+
+#[test]
+fn test_non_owner_cannot_add_actor() {
     let processor = Address::generate(&env);
 
     let id = setup_product(&env, &client, &owner);
@@ -366,6 +417,21 @@ fn test_inactive_product_cannot_add_event() {
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
     let owner = Address::generate(&env);
+    let non_owner = Address::generate(&env);
+    let actor = Address::generate(&env);
+    
+    let origin = String::from_str(&env, "Nigeria");
+    let metadata = String::from_str(&env, "Metadata");
+    let id = client.register_product(&owner, &origin, &metadata);
+
+    // Call add_authorized_actor, passing non_owner as the required caller.
+    // The implementation should verify: `if product.owner != caller.owner`
+    let result = client.try_add_authorized_actor(&non_owner, &id, &actor);
+    assert_eq!(result, Err(Ok(Error::Unauthorized)));
+}
+
+#[test]
+fn test_remove_authorized_actor() {
     let id = setup_product(&env, &client, &owner);
 
     client.set_product_active(&owner, &id, &false);
@@ -441,6 +507,21 @@ fn test_coffee_supply_chain_scenario() {
     let contract_id = env.register_contract(None, ChainLogisticsContract);
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
+    let owner = Address::generate(&env);
+    let actor = Address::generate(&env);
+    let origin = String::from_str(&env, "Nigeria");
+    let metadata = String::from_str(&env, "Metadata");
+    let id = client.register_product(&owner, &origin, &metadata);
+
+    client.add_authorized_actor(&owner, &id, &actor);
+    assert!(client.is_authorized(&id, &actor));
+
+    client.remove_authorized_actor(&owner, &id, &actor);
+    assert!(!client.is_authorized(&id, &actor));
+}
+
+#[test]
+fn test_transfer_ownership() {
     let farmer = Address::generate(&env);
     let processor = Address::generate(&env);
     let shipper = Address::generate(&env);
@@ -621,6 +702,27 @@ fn test_duplicate_product_rejected() {
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
     let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let origin = String::from_str(&env, "Nigeria");
+    let metadata = String::from_str(&env, "Metadata");
+    let id = client.register_product(&owner, &origin, &metadata);
+
+    client.transfer_product(&owner, &id, &new_owner);
+
+    let p = client.get_product(&id).unwrap();
+    assert_eq!(p.owner, new_owner);
+
+    // Old owner shouldn't be authorized anymore
+    assert!(!client.is_authorized(&id, &owner));
+    
+    // Old owner shouldn't be able to add actors
+    let actor = Address::generate(&env);
+    let result = client.try_add_authorized_actor(&owner, &id, &actor);
+    assert_eq!(result, Err(Ok(Error::Unauthorized)));
+}
+
+#[test]
+fn test_ownership_preserves_authorized_actors() {
     let id = setup_product(&env, &client, &owner);
 
     let tags: Vec<String> = Vec::new(&env);
@@ -686,6 +788,17 @@ fn test_register_rejects_empty_origin() {
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
     let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let actor = Address::generate(&env);
+    let origin = String::from_str(&env, "Nigeria");
+    let metadata = String::from_str(&env, "Metadata");
+    let id = client.register_product(&owner, &origin, &metadata);
+
+    client.add_authorized_actor(&owner, &id, &actor);
+    client.transfer_product(&owner, &id, &new_owner);
+
+    // Actor should still be authorized
+    assert!(client.is_authorized(&id, &actor));
 
     let tags: Vec<String> = Vec::new(&env);
     let certs: Vec<BytesN<32>> = Vec::new(&env);
