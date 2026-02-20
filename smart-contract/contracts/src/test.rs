@@ -674,6 +674,73 @@ fn test_register_rejects_too_many_custom_fields() {
 }
 
 #[test]
+fn test_product_storage() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let product_id = String::from_str(&env, "TEST-PRODUCT-001");
+    let (tags, certs, media, custom) = default_register_args(&env);
+
+    // Register a product
+    let created = client.register_product(
+        &owner,
+        &product_id,
+        &String::from_str(&env, "Test Product"),
+        &String::from_str(&env, "Test description"),
+        &String::from_str(&env, "Test Origin"),
+        &String::from_str(&env, "Test Category"),
+        &tags,
+        &certs,
+        &media,
+        &custom,
+    );
+
+    // Verify product was stored and can be retrieved
+    let retrieved = client.get_product(&product_id);
+    assert_eq!(retrieved.id, created.id);
+    assert_eq!(retrieved.name, created.name);
+    assert_eq!(retrieved.owner, owner);
+    assert_eq!(retrieved.description, created.description);
+    assert_eq!(retrieved.origin.location, created.origin.location);
+    assert_eq!(retrieved.category, created.category);
+    assert!(retrieved.active);
+
+    // Verify product persists across separate contract calls
+    let retrieved_again = client.get_product(&product_id);
+    assert_eq!(retrieved_again.id, product_id);
+    assert_eq!(retrieved_again.owner, owner);
+
+    // Verify duplicate product ID is rejected
+    let duplicate_result = client.try_register_product(
+        &owner,
+        &product_id,
+        &String::from_str(&env, "Duplicate Product"),
+        &String::from_str(&env, ""),
+        &String::from_str(&env, "Another Origin"),
+        &String::from_str(&env, "Another Category"),
+        &tags,
+        &certs,
+        &media,
+        &custom,
+    );
+    match duplicate_result {
+        Err(Ok(e)) => assert_eq!(e, Error::ProductAlreadyExists),
+        _ => panic!("expected ProductAlreadyExists error for duplicate ID"),
+    }
+
+    // Verify non-existent product returns error
+    let non_existent_id = String::from_str(&env, "NON-EXISTENT-001");
+    let missing_result = client.try_get_product(&non_existent_id);
+    match missing_result {
+        Err(Ok(e)) => assert_eq!(e, Error::ProductNotFound),
+        _ => panic!("expected ProductNotFound error for missing product"),
+    }
+}
+
+#[test]
 fn test_register_rejects_custom_field_value_too_long() {
     let env = Env::default();
     env.mock_all_auths();

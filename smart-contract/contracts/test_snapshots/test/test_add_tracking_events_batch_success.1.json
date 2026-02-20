@@ -1157,6 +1157,7 @@
         {
           "contract_data": {
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+<<<<<<< feature/issue-8-event-querying
             "key": {
               "vec": [
                 {
@@ -1352,6 +1353,8 @@
         {
           "contract_data": {
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+=======
+>>>>>>> main
             "key": "ledger_key_contract_instance",
             "durability": "persistent"
           }
