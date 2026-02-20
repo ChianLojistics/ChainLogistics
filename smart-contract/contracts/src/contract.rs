@@ -253,7 +253,7 @@ impl ChainLogisticsContract {
             }
             seen.set(inp.id.clone(), true);
 
-            // Reuse existing single-item validation by calling it inline (duplicated checks).
+            // Reuse existing single-item validation by calling it inline.
             // Keep limits consistent with register_product.
             const MAX_ID_LEN: u32 = 64;
             const MAX_NAME_LEN: u32 = 128;
