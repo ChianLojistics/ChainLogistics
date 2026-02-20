@@ -63,6 +63,11 @@ body {
   }
 }
 
+/* Scroll offset for fixed navbar */
+section[id] {
+  scroll-margin-top: 5rem; /* 80px to account for navbar height + padding */
+}
+
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,

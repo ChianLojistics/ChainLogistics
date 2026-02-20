@@ -14,6 +14,23 @@ export function Navigation() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith("#")) {
+      e.preventDefault();
+      const element = document.querySelector(href);
+      if (element) {
+        const offset = 80; // navbar height + padding
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        });
+      }
+    }
+  };
+
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -33,18 +50,21 @@ export function Navigation() {
           <div className="hidden md:flex md:items-center md:gap-8">
             <Link
               href="#features"
+              onClick={(e) => handleNavClick(e, "#features")}
               className="text-sm font-medium text-gray-700 hover:text-[#0066FF] transition-colors duration-200"
             >
               Features
             </Link>
             <Link
               href="#how-it-works"
+              onClick={(e) => handleNavClick(e, "#how-it-works")}
               className="text-sm font-medium text-gray-700 hover:text-[#0066FF] transition-colors duration-200"
             >
               How It Works
             </Link>
             <Link
               href="#use-cases"
+              onClick={(e) => handleNavClick(e, "#use-cases")}
               className="text-sm font-medium text-gray-700 hover:text-[#0066FF] transition-colors duration-200"
             >
               Use Cases
