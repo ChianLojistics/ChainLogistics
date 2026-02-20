@@ -28,4 +28,8 @@ pub enum Error {
 
     TooManyCustomFields = 19,
     CustomFieldValueTooLong = 20,
+
+    EmptyBatch = 21,
+    BatchTooLarge = 22,
+    DuplicateProductIdInBatch = 23,
 }
