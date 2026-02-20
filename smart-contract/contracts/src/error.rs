@@ -9,8 +9,23 @@ pub enum Error {
     Unauthorized = 3,
     InvalidInput = 4,
     EventNotFound = 5,
-    NotAuthorized = 6,
-    AlreadyAuthorized = 7,
-    CannotRemoveSelf = 8,
-    ActorNotFound = 9,
+
+    InvalidProductId = 6,
+    InvalidProductName = 7,
+    InvalidOrigin = 8,
+    InvalidCategory = 9,
+
+    ProductIdTooLong = 10,
+    ProductNameTooLong = 11,
+    OriginTooLong = 12,
+    CategoryTooLong = 13,
+    DescriptionTooLong = 14,
+
+    TooManyTags = 15,
+    TagTooLong = 16,
+    TooManyCertifications = 17,
+    TooManyMediaHashes = 18,
+
+    TooManyCustomFields = 19,
+    CustomFieldValueTooLong = 20,
 }
