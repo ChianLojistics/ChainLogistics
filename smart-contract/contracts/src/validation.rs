@@ -1,4 +1,5 @@
- use soroban_sdk::String;
+ #![allow(dead_code)]
+use soroban_sdk::String;
  
  pub fn non_empty(s: &String) -> bool {
      s.len() > 0
