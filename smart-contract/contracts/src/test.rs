@@ -1,9 +1,43 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
-use soroban_sdk::{symbol_short, Address, BytesN, Env, Map, String, Symbol, Vec};
-use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, BytesN, Env, Map, String, Symbol, Vec};
+
+fn default_register_args(env: &Env) -> (Vec<String>, Vec<BytesN<32>>, Vec<BytesN<32>>, Map<Symbol, String>) {
+    (Vec::new(env), Vec::new(env), Vec::new(env), Map::new(env))
+}
+
+fn id_for_i(i: u32) -> &'static str {
+    match i {
+        0 => "P-0",
+        1 => "P-1",
+        2 => "P-2",
+        3 => "P-3",
+        4 => "P-4",
+        5 => "P-5",
+        6 => "P-6",
+        7 => "P-7",
+        8 => "P-8",
+        9 => "P-9",
+        _ => "P-X",
+    }
+}
+
+fn register_one(client: &ChainLogisticsContractClient, env: &Env, owner: &Address, id: &str) {
+    let (tags, certs, media, custom) = default_register_args(env);
+    let _ = client.register_product(
+        owner,
+        &String::from_str(env, id),
+        &String::from_str(env, "Name"),
+        &String::from_str(env, ""),
+        &String::from_str(env, "Origin"),
+        &String::from_str(env, "Category"),
+        &tags,
+        &certs,
+        &media,
+        &custom,
+    );
+}
 
 #[test]
 fn test_register_and_get_product() {
@@ -14,31 +48,9 @@ fn test_register_and_get_product() {
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
     let owner = Address::generate(&env);
-    let origin = String::from_str(&env, "Nigeria");
-    let metadata = String::from_str(&env, "Product 1 Metadata");
-
-    let product_id = client.register_product(&owner, &origin, &metadata);
-    assert_eq!(product_id, 1);
-
-    let product = client.get_product(&1).unwrap();
-    assert_eq!(product.id, 1);
-    assert_eq!(product.owner, owner);
-    assert_eq!(product.origin, origin);
-    assert_eq!(product.metadata, metadata);
-    assert!(product.active);
-}
-
-#[test]
-fn test_pagination() {
-    let env = Env::default();
-    env.mock_all_auths();
 
     let id = String::from_str(&env, "COFFEE-ETH-001");
-
-    let tags: Vec<String> = Vec::new(&env);
-    let certs: Vec<BytesN<32>> = Vec::new(&env);
-    let media: Vec<BytesN<32>> = Vec::new(&env);
-    let custom: Map<Symbol, String> = Map::new(&env);
+    let (tags, certs, media, custom) = default_register_args(&env);
 
     let created = client.register_product(
         &owner,
@@ -57,10 +69,10 @@ fn test_pagination() {
     assert_eq!(created.owner, owner);
     assert!(created.active);
 
-    let p = client.get_product(&id);
-    assert_eq!(p.id, id);
-    assert_eq!(p.owner, owner);
-    assert!(p.active);
+    let product = client.get_product(&id);
+    assert_eq!(product.id, id);
+    assert_eq!(product.owner, owner);
+    assert!(product.active);
 }
 
 #[test]
@@ -71,97 +83,12 @@ fn test_duplicate_product_rejected() {
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
 
     let owner = Address::generate(&env);
-    let origin = String::from_str(&env, "USA");
-    let metadata = String::from_str(&env, "Metadata");
+    register_one(&client, &env, &owner, "COFFEE-ETH-001");
 
-    // Register 10 products
-    for _ in 0..10 {
-        client.register_product(&owner, &origin, &metadata);
-    }
-
-    // Get first 5
-    let page1 = client.get_all_products(&0, &5);
-    assert_eq!(page1.len(), 5);
-    assert_eq!(page1.get(0).unwrap().id, 1);
-    assert_eq!(page1.get(4).unwrap().id, 5);
-
-    // Get next 5
-    let page2 = client.get_all_products(&5, &5);
-    assert_eq!(page2.len(), 5);
-    assert_eq!(page2.get(0).unwrap().id, 6);
-    assert_eq!(page2.get(4).unwrap().id, 10);
-}
-
-#[test]
-fn test_filtering() {
-    let env = Env::default();
-    env.mock_all_auths();
-
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
-
-    let owner1 = Address::generate(&env);
-    let owner2 = Address::generate(&env);
-    let origin1 = String::from_str(&env, "China");
-    let origin2 = String::from_str(&env, "Germany");
-
-    client.register_product(&owner1, &origin1, &String::from_str(&env, "P1")); // ID 1
-    client.register_product(&owner2, &origin2, &String::from_str(&env, "P2")); // ID 2
-    client.register_product(&owner1, &origin2, &String::from_str(&env, "P3")); // ID 3
-
-    // Filter by Owner 1
-    let owner1_products = client.get_products_by_owner(&owner1, &0, &10);
-    assert_eq!(owner1_products.len(), 2);
-    // Note: Order depends on implementation details, but registration order is preserved in our logic
-    assert_eq!(owner1_products.get(0).unwrap().id, 1);
-    assert_eq!(owner1_products.get(1).unwrap().id, 3);
-
-    // Filter by Origin 2 ("Germany")
-    let origin2_products = client.get_products_by_origin(&origin2, &0, &10);
-    assert_eq!(origin2_products.len(), 2);
-    assert_eq!(origin2_products.get(0).unwrap().id, 2);
-    assert_eq!(origin2_products.get(1).unwrap().id, 3);
-}
-
-#[test]
-fn test_stats() {
-    let env = Env::default();
-    env.mock_all_auths();
-    
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
-    
-    let owner = Address::generate(&env);
-    let origin = String::from_str(&env, "A");
-    
-    client.register_product(&owner, &origin, &String::from_str(&env, "M"));
-    client.register_product(&owner, &origin, &String::from_str(&env, "M"));
-    
-    let stats = client.get_stats();
-    assert_eq!(stats.total_products, 2);
-    assert_eq!(stats.active_products, 2);
-    let id = String::from_str(&env, "COFFEE-ETH-001");
-    let tags: Vec<String> = Vec::new(&env);
-    let certs: Vec<BytesN<32>> = Vec::new(&env);
-    let media: Vec<BytesN<32>> = Vec::new(&env);
-    let custom: Map<Symbol, String> = Map::new(&env);
-
-    client.register_product(
-        &owner,
-        &id,
-        &String::from_str(&env, "Organic Coffee Beans"),
-        &String::from_str(&env, ""),
-        &String::from_str(&env, "Yirgacheffe, Ethiopia"),
-        &String::from_str(&env, "Coffee"),
-        &tags,
-        &certs,
-        &media,
-        &custom,
-    );
-
+    let (tags, certs, media, custom) = default_register_args(&env);
     let res = client.try_register_product(
         &owner,
-        &id,
+        &String::from_str(&env, "COFFEE-ETH-001"),
         &String::from_str(&env, "Duplicate"),
         &String::from_str(&env, ""),
         &String::from_str(&env, "Somewhere"),
@@ -175,6 +102,115 @@ fn test_stats() {
         Err(Ok(e)) => assert_eq!(e, Error::ProductAlreadyExists),
         _ => panic!("expected ProductAlreadyExists"),
     }
+}
+
+#[test]
+fn test_register_products_batch_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+
+    let (tags, certs, media, custom) = default_register_args(&env);
+
+    let mut inputs: Vec<ProductRegistrationInput> = Vec::new(&env);
+    for i in 0..10u32 {
+        let id = String::from_str(&env, id_for_i(i));
+        inputs.push_back(ProductRegistrationInput {
+            id,
+            name: String::from_str(&env, "Name"),
+            description: String::from_str(&env, ""),
+            origin_location: String::from_str(&env, "Origin"),
+            category: String::from_str(&env, "Category"),
+            tags: tags.clone(),
+            certifications: certs.clone(),
+            media_hashes: media.clone(),
+            custom: custom.clone(),
+        });
+    }
+
+    let res = client.register_products_batch(&owner, &inputs);
+    assert_eq!(res.len(), 10);
+    let p0 = client.get_product(&String::from_str(&env, "P-0"));
+    assert_eq!(p0.owner, owner);
+}
+
+#[test]
+fn test_register_products_batch_atomic_failure() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let (tags, certs, media, custom) = default_register_args(&env);
+
+    let mut inputs: Vec<ProductRegistrationInput> = Vec::new(&env);
+    inputs.push_back(ProductRegistrationInput {
+        id: String::from_str(&env, "OK"),
+        name: String::from_str(&env, "Name"),
+        description: String::from_str(&env, ""),
+        origin_location: String::from_str(&env, "Origin"),
+        category: String::from_str(&env, "Category"),
+        tags: tags.clone(),
+        certifications: certs.clone(),
+        media_hashes: media.clone(),
+        custom: custom.clone(),
+    });
+    inputs.push_back(ProductRegistrationInput {
+        id: String::from_str(&env, ""),
+        name: String::from_str(&env, "Name"),
+        description: String::from_str(&env, ""),
+        origin_location: String::from_str(&env, "Origin"),
+        category: String::from_str(&env, "Category"),
+        tags: tags.clone(),
+        certifications: certs.clone(),
+        media_hashes: media.clone(),
+        custom: custom.clone(),
+    });
+
+    let res = client.try_register_products_batch(&owner, &inputs);
+    match res {
+        Err(Ok(e)) => assert_eq!(e, Error::InvalidProductId),
+        _ => panic!("expected InvalidProductId"),
+    }
+
+    // Atomic: first product must not have been stored.
+    let p = client.try_get_product(&String::from_str(&env, "OK"));
+    assert!(p.is_err());
+}
+
+#[test]
+fn test_add_tracking_events_batch_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let actor = Address::generate(&env);
+
+    register_one(&client, &env, &owner, "P1");
+    client.add_authorized_actor(&owner, &String::from_str(&env, "P1"), &actor);
+
+    let h = BytesN::from_array(&env, &[0; 32]);
+    let mut inputs: Vec<TrackingEventInput> = Vec::new(&env);
+    for _ in 0..5u32 {
+        inputs.push_back(TrackingEventInput {
+            product_id: String::from_str(&env, "P1"),
+            event_type: symbol_short!("PROC"),
+            data_hash: h.clone(),
+            note: String::from_str(&env, ""),
+        });
+    }
+
+    let ids = client.add_tracking_events_batch(&actor, &inputs);
+    assert_eq!(ids.len(), 5);
+
+    let stored = client.get_product_event_ids(&String::from_str(&env, "P1"));
+    assert_eq!(stored.len(), 5);
 }
 
 #[test]
