@@ -32,4 +32,8 @@ pub enum Error {
     EmptyBatch = 21,
     BatchTooLarge = 22,
     DuplicateProductIdInBatch = 23,
+
+    NotInitialized = 24,
+    AlreadyInitialized = 25,
+    ContractPaused = 26,
 }
