@@ -1,4 +1,4 @@
-import { Contract, xdr, rpc } from "@stellar/stellar-sdk";
+import { Contract, xdr, rpc, TransactionBuilder, Networks } from "@stellar/stellar-sdk";
 import type { StellarNetwork } from "./networks";
 import { CONTRACT_CONFIG } from "@/lib/contract/config";
 
@@ -23,13 +23,15 @@ function scValToJs(scVal: xdr.ScVal): any {
     case xdr.ScValType.scvDuration():
       return Number(scVal.duration());
     case xdr.ScValType.scvU128():
-      return Number(scVal.u128().lo());
+      const u128 = scVal.u128();
+      return Number(u128.lo());
     case xdr.ScValType.scvI128():
-      return Number(scVal.i128().lo());
+      const i128 = scVal.i128();
+      return Number(i128.lo());
     case xdr.ScValType.scvU256():
-      return Number(scVal.u256().lo().lo());
+      return 0;
     case xdr.ScValType.scvI256():
-      return Number(scVal.i256().lo().lo());
+      return 0;
     case xdr.ScValType.scvBytes():
       return Buffer.from(scVal.bytes()).toString("base64");
     case xdr.ScValType.scvString():
@@ -113,14 +115,31 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
 
     async get_product_event_ids(productId: string): Promise<number[]> {
       try {
-        const result = await contract.call(
-          rpcServer,
-          "get_product_event_ids",
-          xdr.ScVal.scvString(productId)
-        );
+        const operation = contract.call("get_product_event_ids", xdr.ScVal.scvString(productId));
+        const networkPassphrase = network === "testnet" ? Networks.TESTNET : network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+        const dummyAccount = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+        let sourceAccount: any;
+        try {
+          sourceAccount = await rpcServer.getAccount(dummyAccount);
+        } catch {
+          sourceAccount = {
+            accountId: dummyAccount,
+            sequenceNumber: "0",
+          };
+        }
+        
+        const transaction = new TransactionBuilder(sourceAccount as any, {
+          fee: "100",
+          networkPassphrase,
+        })
+          .addOperation(operation as any)
+          .setTimeout(30)
+          .build();
 
-        if (result && result.retval) {
-          const jsValue = scValToJs(result.retval);
+        const result = await rpcServer.simulateTransaction(transaction);
+
+        if (result && (result as any).retval) {
+          const jsValue = scValToJs((result as any).retval);
           if (Array.isArray(jsValue)) {
             return jsValue.map(Number);
           }
@@ -142,15 +161,32 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
       data_hash?: string;
     } | null> {
       try {
-        const result = await contract.call(
-          rpcServer,
-          "get_event",
-          xdr.ScVal.scvU64(BigInt(eventId))
-        );
+        const operation = contract.call("get_event", xdr.ScVal.scvU64(xdr.Uint64.fromString(eventId.toString())));
+        const networkPassphrase = network === "testnet" ? Networks.TESTNET : network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+        const dummyAccount = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+        let sourceAccount: any;
+        try {
+          sourceAccount = await rpcServer.getAccount(dummyAccount);
+        } catch {
+          sourceAccount = {
+            accountId: dummyAccount,
+            sequenceNumber: "0",
+          };
+        }
+        
+        const transaction = new TransactionBuilder(sourceAccount as any, {
+          fee: "100",
+          networkPassphrase,
+        })
+          .addOperation(operation as any)
+          .setTimeout(30)
+          .build();
 
-        if (!result || !result.retval) return null;
+        const result = await rpcServer.simulateTransaction(transaction);
 
-        const jsValue = scValToJs(result.retval);
+        if (!result || !(result as any).retval) return null;
+
+        const jsValue = scValToJs((result as any).retval);
         if (!jsValue || typeof jsValue !== "object") return null;
 
         return {
