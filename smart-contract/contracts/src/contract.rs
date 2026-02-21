@@ -5,6 +5,22 @@ use crate::{storage, validation, Error, EventIdPage, Origin, Product, ProductReg
 #[contract]
 pub struct ChainLogisticsContract;
 
+fn require_not_paused(env: &Env) -> Result<(), Error> {
+    if storage::is_paused(env) {
+        return Err(Error::ContractPaused);
+    }
+    Ok(())
+}
+
+fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
+    let admin = storage::get_admin(env).ok_or(Error::NotInitialized)?;
+    caller.require_auth();
+    if &admin != caller {
+        return Err(Error::Unauthorized);
+    }
+    Ok(())
+}
+
 /// Reads a product from persistent storage.
 /// 
 /// Returns an error if the product doesn't exist.
@@ -151,6 +167,43 @@ fn upper_bound(ts: &Vec<u64>, target: u64) -> u32 {
 
 #[contractimpl]
 impl ChainLogisticsContract {
+    pub fn init(env: Env, admin: Address) -> Result<(), Error> {
+        if storage::has_admin(&env) {
+            return Err(Error::AlreadyInitialized);
+        }
+        admin.require_auth();
+        storage::set_admin(&env, &admin);
+        storage::set_paused(&env, false);
+        Ok(())
+    }
+
+    pub fn get_admin(env: Env) -> Result<Address, Error> {
+        storage::get_admin(&env).ok_or(Error::NotInitialized)
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        storage::is_paused(&env)
+    }
+
+    pub fn pause(env: Env, admin: Address) -> Result<(), Error> {
+        require_admin(&env, &admin)?;
+        storage::set_paused(&env, true);
+        Ok(())
+    }
+
+    pub fn unpause(env: Env, admin: Address) -> Result<(), Error> {
+        require_admin(&env, &admin)?;
+        storage::set_paused(&env, false);
+        Ok(())
+    }
+
+    pub fn transfer_admin(env: Env, admin: Address, new_admin: Address) -> Result<(), Error> {
+        require_admin(&env, &admin)?;
+        new_admin.require_auth();
+        storage::set_admin(&env, &new_admin);
+        Ok(())
+    }
+
     /// Registers a new product and stores it in persistent storage.
     /// Products persist across contract calls using Soroban's persistent storage API.
     /// Returns ProductAlreadyExists if the product ID already exists.
@@ -167,6 +220,7 @@ impl ChainLogisticsContract {
         media_hashes: Vec<BytesN<32>>,
         custom: Map<Symbol, String>,
     ) -> Result<Product, Error> {
+        require_not_paused(&env)?;
         const MAX_ID_LEN: u32 = 64;
         const MAX_NAME_LEN: u32 = 128;
         const MAX_ORIGIN_LEN: u32 = 256;
@@ -363,6 +417,7 @@ impl ChainLogisticsContract {
     }
 
     pub fn add_authorized_actor(env: Env, owner: Address, product_id: String, actor: Address) -> Result<(), Error> {
+        require_not_paused(&env)?;
         let product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
         storage::set_auth(&env, &product_id, &actor, true);
@@ -370,6 +425,7 @@ impl ChainLogisticsContract {
     }
 
     pub fn remove_authorized_actor(env: Env, owner: Address, product_id: String, actor: Address) -> Result<(), Error> {
+        require_not_paused(&env)?;
         let product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
         storage::set_auth(&env, &product_id, &actor, false);
@@ -377,6 +433,7 @@ impl ChainLogisticsContract {
     }
 
     pub fn transfer_product(env: Env, owner: Address, product_id: String, new_owner: Address) -> Result<(), Error> {
+        require_not_paused(&env)?;
         let mut product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
 
@@ -390,6 +447,7 @@ impl ChainLogisticsContract {
     }
 
     pub fn set_product_active(env: Env, owner: Address, product_id: String, active: bool) -> Result<(), Error> {
+        require_not_paused(&env)?;
         let mut product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
         product.active = active;
@@ -398,6 +456,7 @@ impl ChainLogisticsContract {
     }
 
     pub fn add_tracking_event(env: Env, actor: Address, product_id: String, event_type: Symbol, data_hash: BytesN<32>, note: String) -> Result<u64, Error> {
+        require_not_paused(&env)?;
         let product = read_product(&env, &product_id)?;
         require_can_add_event(&env, &product_id, &product, &actor)?;
 
@@ -432,6 +491,7 @@ impl ChainLogisticsContract {
     }
 
     pub fn register_products_batch(env: Env, owner: Address, inputs: Vec<ProductRegistrationInput>) -> Result<Vec<Product>, Error> {
+        require_not_paused(&env)?;
         const MAX_BATCH: u32 = 100;
 
         let n = inputs.len();
@@ -564,6 +624,7 @@ impl ChainLogisticsContract {
     }
 
     pub fn add_tracking_events_batch(env: Env, actor: Address, inputs: Vec<TrackingEventInput>) -> Result<Vec<u64>, Error> {
+        require_not_paused(&env)?;
         const MAX_BATCH: u32 = 200;
 
         let n = inputs.len();
