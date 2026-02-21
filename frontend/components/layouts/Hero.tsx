@@ -13,11 +13,10 @@ export function Hero() {
     <section className="relative bg-gradient-to-b from-white to-gray-50 pt-32 pb-24 sm:pt-40 sm:pb-32 lg:pt-48 lg:pb-40">
       <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
         <div
-          className={`mx-auto max-w-4xl text-center transition-all duration-1000 ease-out ${
-            mounted
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-10"
-          }`}
+          className={`mx-auto max-w-4xl text-center transition-all duration-1000 ease-out ${mounted
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-10"
+            }`}
         >
           <div className="mb-6 inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-sm font-medium text-[#0066FF]">
             <svg

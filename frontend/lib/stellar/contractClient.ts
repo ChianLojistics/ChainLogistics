@@ -107,7 +107,6 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
 
   const rpcServer = new rpc.Server(rpcUrl, { allowHttp: true });
   const contract = new Contract(contractId);
-
   return {
     async ping(): Promise<string> {
       return "ok";
