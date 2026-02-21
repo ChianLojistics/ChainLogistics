@@ -5,6 +5,7 @@ export type ContractClientConfig = {
   rpcUrl: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function createContractClient(_config: ContractClientConfig) {
   return {
     async ping(): Promise<string> {

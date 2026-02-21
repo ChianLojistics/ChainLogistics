@@ -31,6 +31,13 @@ pub enum Error {
     TooManyCustomFields = 19,
     CustomFieldValueTooLong = 20,
 
+    EmptyBatch = 21,
+    BatchTooLarge = 22,
+    DuplicateProductIdInBatch = 23,
+
+    NotInitialized = 24,
+    AlreadyInitialized = 25,
+    ContractPaused = 26,
     // --- Lifecycle ---
     /// Attempted to add a tracking event to a deactivated product.
     ProductDeactivated = 21,
