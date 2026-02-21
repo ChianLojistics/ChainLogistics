@@ -17,7 +17,6 @@ export function AnimatedSection({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const currentRef = ref.current;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -32,13 +31,13 @@ export function AnimatedSection({
       }
     );
 
-    if (currentRef) {
-      observer.observe(currentRef);
+    if (ref.current) {
+      observer.observe(ref.current);
     }
 
     return () => {
-      if (currentRef) {
-        observer.unobserve(currentRef);
+      if (ref.current) {
+        observer.unobserve(ref.current);
       }
     };
   }, [delay]);
@@ -46,10 +45,11 @@ export function AnimatedSection({
   return (
     <div
       ref={ref}
-      className={`transition-all duration-700 ease-out ${isVisible
+      className={`transition-all duration-700 ease-out ${
+        isVisible
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-8"
-        } ${className}`}
+      } ${className}`}
     >
       {children}
     </div>
