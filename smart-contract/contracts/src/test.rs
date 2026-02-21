@@ -3,6 +3,14 @@
 use super::*;
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, BytesN, Env, Map, String, Symbol, Vec};
 
+fn setup(env: &Env) -> (ChainLogisticsContractClient, Address) {
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(env, &contract_id);
+    let admin = Address::generate(env);
+    client.init(&admin);
+    (client, admin)
+}
+
 fn default_register_args(env: &Env) -> (Vec<String>, Vec<BytesN<32>>, Vec<BytesN<32>>, Map<Symbol, String>) {
     (Vec::new(env), Vec::new(env), Vec::new(env), Map::new(env))
 }
@@ -55,8 +63,7 @@ fn test_register_and_get_product() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
 
@@ -90,8 +97,7 @@ fn test_register_and_get_product() {
 fn test_duplicate_product_rejected() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     register_one(&client, &env, &owner, "COFFEE-ETH-001");
@@ -119,8 +125,7 @@ fn test_duplicate_product_rejected() {
 fn test_register_products_batch_success() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
 
@@ -152,8 +157,7 @@ fn test_register_products_batch_success() {
 fn test_register_products_batch_atomic_failure() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let (tags, certs, media, custom) = default_register_args(&env);
@@ -197,8 +201,7 @@ fn test_register_products_batch_atomic_failure() {
 fn test_add_tracking_events_batch_success() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let actor = Address::generate(&env);
@@ -229,8 +232,7 @@ fn test_event_query_indexes_and_pagination() {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let actor1 = Address::generate(&env);
@@ -284,8 +286,7 @@ fn test_event_query_1000_events_recent_page() {
     let env = Env::default();
     env.mock_all_auths();
     env.budget().reset_unlimited();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let actor = Address::generate(&env);
@@ -310,8 +311,7 @@ fn test_event_query_1000_events_recent_page() {
 fn test_authorize_add_event_transfer() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let farmer = Address::generate(&env);
     let processor = Address::generate(&env);
@@ -360,8 +360,7 @@ fn test_authorize_add_event_transfer() {
 fn test_register_rejects_empty_id() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "");
@@ -393,8 +392,7 @@ fn test_register_rejects_empty_id() {
 fn test_register_rejects_empty_origin() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
@@ -426,8 +424,7 @@ fn test_register_rejects_empty_origin() {
 fn test_unauthorized_cannot_add_authorized_actor() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let attacker = Address::generate(&env);
@@ -463,8 +460,7 @@ fn test_unauthorized_cannot_add_authorized_actor() {
 fn test_register_rejects_empty_name() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
@@ -496,8 +492,7 @@ fn test_register_rejects_empty_name() {
 fn test_register_rejects_empty_category() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
@@ -529,8 +524,7 @@ fn test_register_rejects_empty_category() {
 fn test_register_rejects_too_long_description() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
@@ -563,8 +557,7 @@ fn test_register_rejects_too_long_description() {
 fn test_register_rejects_too_many_tags() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
@@ -599,8 +592,7 @@ fn test_register_rejects_too_many_tags() {
 fn test_register_rejects_tag_too_long() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
@@ -635,8 +627,7 @@ fn test_register_rejects_tag_too_long() {
 fn test_register_rejects_too_many_custom_fields() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
@@ -677,8 +668,7 @@ fn test_register_rejects_too_many_custom_fields() {
 fn test_product_storage() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let product_id = String::from_str(&env, "TEST-PRODUCT-001");
@@ -744,8 +734,7 @@ fn test_product_storage() {
 fn test_register_rejects_custom_field_value_too_long() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = String::from_str(&env, "COFFEE-ETH-001");
