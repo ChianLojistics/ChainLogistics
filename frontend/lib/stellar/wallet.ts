@@ -1,4 +1,4 @@
-import { isConnected, getPublicKey, requestAccess, signTransaction } from "@stellar/freighter-api";
+import { isConnected, getAddress, requestAccess, signTransaction } from "@stellar/freighter-api";
 
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -31,9 +31,9 @@ export async function connectWallet(): Promise<WalletConnectionResult> {
     throw new WalletError("Access denied by user");
   }
 
-  const publicKey = await getPublicKey();
-  if (!publicKey) {
-    throw new WalletError("Failed to retrieve public key");
+  const { address: publicKey, error } = await getAddress();
+  if (error || !publicKey) {
+    throw new WalletError(error || "Failed to retrieve public key");
   }
 
   return { account: { publicKey } };
@@ -46,5 +46,9 @@ export async function disconnectWallet(): Promise<void> {
 }
 
 export async function signWithFreighter(xdr: string, network: string): Promise<string> {
-  return await signTransaction(xdr, { network });
+  const { signedTxXdr, error } = await signTransaction(xdr, { networkPassphrase: network });
+  if (error || !signedTxXdr) {
+    throw new WalletError(error || "Failed to sign transaction");
+  }
+  return signedTxXdr;
 }
