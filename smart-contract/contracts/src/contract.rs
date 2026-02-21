@@ -9,6 +9,28 @@ use crate::{storage, validation};
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
+<<<<<<< nnennaokoye/chainlogistics
+fn require_not_paused(env: &Env) -> Result<(), Error> {
+    if storage::is_paused(env) {
+        return Err(Error::ContractPaused);
+    }
+    Ok(())
+}
+
+fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
+    let admin = storage::get_admin(env).ok_or(Error::NotInitialized)?;
+    caller.require_auth();
+    if &admin != caller {
+        return Err(Error::Unauthorized);
+    }
+    Ok(())
+}
+
+/// Reads a product from persistent storage.
+/// 
+/// Returns an error if the product doesn't exist.
+=======
+>>>>>>> main
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
 }
@@ -80,20 +102,67 @@ pub struct ChainLogisticsContract;
 
 #[contractimpl]
 impl ChainLogisticsContract {
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn init(env: Env, admin: Address) -> Result<(), Error> {
+        if storage::has_admin(&env) {
+            return Err(Error::AlreadyInitialized);
+        }
+        admin.require_auth();
+        storage::set_admin(&env, &admin);
+        storage::set_paused(&env, false);
+        Ok(())
+    }
+
+    pub fn get_admin(env: Env) -> Result<Address, Error> {
+        storage::get_admin(&env).ok_or(Error::NotInitialized)
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        storage::is_paused(&env)
+    }
+
+    pub fn pause(env: Env, admin: Address) -> Result<(), Error> {
+        require_admin(&env, &admin)?;
+        storage::set_paused(&env, true);
+        Ok(())
+    }
+
+    pub fn unpause(env: Env, admin: Address) -> Result<(), Error> {
+        require_admin(&env, &admin)?;
+        storage::set_paused(&env, false);
+        Ok(())
+    }
+
+    pub fn transfer_admin(env: Env, admin: Address, new_admin: Address) -> Result<(), Error> {
+        require_admin(&env, &admin)?;
+        new_admin.require_auth();
+        storage::set_admin(&env, &new_admin);
+        Ok(())
+    }
+
+    /// Registers a new product and stores it in persistent storage.
+    /// Products persist across contract calls using Soroban's persistent storage API.
+    /// Returns ProductAlreadyExists if the product ID already exists.
+=======
     // --- Lifecycle Management ---
     // ═══════════════════════════════════════════════════════════════════════
     // PRODUCT REGISTRATION
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Register a new product.
+>>>>>>> main
     pub fn register_product(
         env: Env,
         owner: Address,
         config: ProductConfig,
     ) -> Result<Product, Error> {
+<<<<<<< nnennaokoye/chainlogistics
+        require_not_paused(&env)?;
+=======
         owner.require_auth();
 
         // --- Validation ---
+>>>>>>> main
         const MAX_ID_LEN: u32 = 64;
         const MAX_NAME_LEN: u32 = 128;
         const MAX_ORIGIN_LEN: u32 = 128;
@@ -339,6 +408,10 @@ impl ChainLogisticsContract {
         }
     }
 
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn add_authorized_actor(env: Env, owner: Address, product_id: String, actor: Address) -> Result<(), Error> {
+        require_not_paused(&env)?;
+=======
     // ═══════════════════════════════════════════════════════════════════════
     // AUTHORIZATION MANAGEMENT
     // ═══════════════════════════════════════════════════════════════════════
@@ -350,12 +423,17 @@ impl ChainLogisticsContract {
         product_id: String,
         actor: Address,
     ) -> Result<(), Error> {
+>>>>>>> main
         let product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
         storage::set_auth(&env, &product_id, &actor, true);
         Ok(())
     }
 
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn remove_authorized_actor(env: Env, owner: Address, product_id: String, actor: Address) -> Result<(), Error> {
+        require_not_paused(&env)?;
+=======
     /// Revoke an actor's authorization to add events to a product.
     pub fn remove_authorized_actor(
         env: Env,
@@ -363,12 +441,17 @@ impl ChainLogisticsContract {
         product_id: String,
         actor: Address,
     ) -> Result<(), Error> {
+>>>>>>> main
         let product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
         storage::set_auth(&env, &product_id, &actor, false);
         Ok(())
     }
 
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn transfer_product(env: Env, owner: Address, product_id: String, new_owner: Address) -> Result<(), Error> {
+        require_not_paused(&env)?;
+=======
     /// Check whether an actor is authorized to add events to a product.
     pub fn is_authorized(env: Env, product_id: String, actor: Address) -> Result<bool, Error> {
         let product = read_product(&env, &product_id)?;
@@ -390,6 +473,7 @@ impl ChainLogisticsContract {
         product_id: String,
         new_owner: Address,
     ) -> Result<(), Error> {
+>>>>>>> main
         let mut product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
 
@@ -399,7 +483,15 @@ impl ChainLogisticsContract {
         storage::set_auth(&env, &product_id, &owner, false);
         storage::set_auth(&env, &product_id, &new_owner, true);
 
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn set_product_active(env: Env, owner: Address, product_id: String, active: bool) -> Result<(), Error> {
+        require_not_paused(&env)?;
+        let mut product = read_product(&env, &product_id)?;
+        require_owner(&product, &owner)?;
+        product.active = active;
+=======
         product.owner = new_owner.clone();
+>>>>>>> main
         write_product(&env, &product);
 
         env.events().publish(
@@ -415,6 +507,10 @@ impl ChainLogisticsContract {
 impl ChainLogisticsContract {
     // --- Tracking Events ---
 
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn add_tracking_event(env: Env, actor: Address, product_id: String, event_type: Symbol, data_hash: BytesN<32>, note: String) -> Result<u64, Error> {
+        require_not_paused(&env)?;
+=======
     /// Add a tracking event to a product.
     pub fn add_tracking_event(
         env: Env,
@@ -426,6 +522,7 @@ impl ChainLogisticsContract {
         note: String,
         metadata: Map<Symbol, String>,
     ) -> Result<u64, Error> {
+>>>>>>> main
         let product = read_product(&env, &product_id)?;
         require_can_add_event(&env, &product_id, &product, &actor)?;
 
@@ -479,10 +576,16 @@ impl ChainLogisticsContract {
         Ok(event_id)
     }
 
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn register_products_batch(env: Env, owner: Address, inputs: Vec<ProductRegistrationInput>) -> Result<Vec<Product>, Error> {
+        require_not_paused(&env)?;
+        const MAX_BATCH: u32 = 100;
+=======
     /// Get a single tracking event by its numeric ID.
     pub fn get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
         storage::get_event(&env, event_id).ok_or(Error::EventNotFound)
     }
+>>>>>>> main
 
     /// Get all events for a product with cursor-based pagination.
     pub fn get_product_events(
@@ -593,6 +696,11 @@ impl ChainLogisticsContract {
         })
     }
 
+<<<<<<< nnennaokoye/chainlogistics
+    pub fn add_tracking_events_batch(env: Env, actor: Address, inputs: Vec<TrackingEventInput>) -> Result<Vec<u64>, Error> {
+        require_not_paused(&env)?;
+        const MAX_BATCH: u32 = 200;
+=======
     /// Get events with composite filter (type + time range + location).
     pub fn get_filtered_events(
         env: Env,
@@ -630,6 +738,7 @@ impl ChainLogisticsContract {
                 if filter.location != empty_loc && event.location != filter.location {
                     matches = false;
                 }
+>>>>>>> main
 
                 if matches {
                     matching_ids.push_back(eid);
