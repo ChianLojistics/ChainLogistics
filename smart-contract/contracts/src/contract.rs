@@ -1,218 +1,13 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
-
-use crate::storage::DataKey;
-use crate::types::{Product, ProductStats};
-use crate::error::Error;
-
-#[contract]
-pub struct ChainLogisticsContract;
-
-#[contractimpl]
-impl ChainLogisticsContract {
-    /// Register a new product
-    pub fn register_product(
-        env: Env,
-        owner: Address,
-        origin: String,
-        metadata: String,
-    ) -> Result<u64, Error> {
-        owner.require_auth();
-
-        let mut total_products: u64 = env
-            .storage()
-            .instance()
-            .get(&DataKey::TotalProducts)
-            .unwrap_or(0);
-        total_products += 1;
-
-        let product = Product {
-            id: total_products,
-            owner: owner.clone(),
-            origin: origin.clone(),
-            active: true,
-            metadata,
-            created_at: env.ledger().timestamp(),
-        };
-
-        // 1. Store Product
-        env.storage()
-            .persistent()
-            .set(&DataKey::Product(total_products), &product);
-
-        // 2. Global Index (Index -> ID)
-        env.storage()
-            .persistent()
-            .set(&DataKey::AllProductsIndex(total_products), &total_products);
-
-        // 3. Owner Index
-        let mut owner_count: u64 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::OwnerProductCount(owner.clone()))
-            .unwrap_or(0);
-        owner_count += 1;
-        env.storage().persistent().set(
-            &DataKey::OwnerProductIndex(owner.clone(), owner_count),
-            &total_products,
-        );
-        env.storage()
-            .persistent()
-            .set(&DataKey::OwnerProductCount(owner.clone()), &owner_count);
-
-        // 4. Origin Index
-        let mut origin_count: u64 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::OriginProductCount(origin.clone()))
-            .unwrap_or(0);
-        origin_count += 1;
-        env.storage().persistent().set(
-            &DataKey::OriginProductIndex(origin.clone(), origin_count),
-            &total_products,
-        );
-        env.storage()
-            .persistent()
-            .set(&DataKey::OriginProductCount(origin.clone()), &origin_count);
-
-        // Update global counters
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalProducts, &total_products);
-
-        let mut active_products: u64 = env
-            .storage()
-            .instance()
-            .get(&DataKey::ActiveProducts)
-            .unwrap_or(0);
-        active_products += 1;
-        env.storage()
-            .instance()
-            .set(&DataKey::ActiveProducts, &active_products);
-
-        Ok(total_products)
-    }
-
-    /// Get a product by ID
-    pub fn get_product(env: Env, id: u64) -> Option<Product> {
-        env.storage().persistent().get(&DataKey::Product(id))
-    }
-
-    /// Get all products with pagination (start is 0-based)
-    pub fn get_all_products(env: Env, start: u64, limit: u64) -> Vec<Product> {
-        let total: u64 = env
-            .storage()
-            .instance()
-            .get(&DataKey::TotalProducts)
-            .unwrap_or(0);
-        let mut products = Vec::new(&env);
-
-        let start_index = start + 1;
-        let end_index = start + limit + 1;
-
-        for i in start_index..end_index {
-            if i > total {
-                break;
-            }
-            if let Some(product_id) = env
-                .storage()
-                .persistent()
-                .get::<DataKey, u64>(&DataKey::AllProductsIndex(i))
-            {
-                if let Some(product) = env
-                    .storage()
-                    .persistent()
-                    .get::<DataKey, Product>(&DataKey::Product(product_id))
-                {
-                    products.push_back(product);
-                }
-            }
-        }
-        products
-    }
-
-    /// Get products by owner with pagination
-    pub fn get_products_by_owner(env: Env, owner: Address, start: u64, limit: u64) -> Vec<Product> {
-        let count: u64 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::OwnerProductCount(owner.clone()))
-            .unwrap_or(0);
-        let mut products = Vec::new(&env);
-
-        let start_index = start + 1;
-        let end_index = start + limit + 1;
-
-        for i in start_index..end_index {
-            if i > count {
-                break;
-            }
-            if let Some(product_id) = env
-                .storage()
-                .persistent()
-                .get::<DataKey, u64>(&DataKey::OwnerProductIndex(owner.clone(), i))
-            {
-                if let Some(product) = env
-                    .storage()
-                    .persistent()
-                    .get::<DataKey, Product>(&DataKey::Product(product_id))
-                {
-                    products.push_back(product);
-                }
-            }
-        }
-        products
-    }
-
-    /// Get products by origin with pagination
-    pub fn get_products_by_origin(env: Env, origin: String, start: u64, limit: u64) -> Vec<Product> {
-        let count: u64 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::OriginProductCount(origin.clone()))
-            .unwrap_or(0);
-        let mut products = Vec::new(&env);
-
-        let start_index = start + 1;
-        let end_index = start + limit + 1;
-
-        for i in start_index..end_index {
-            if i > count {
-                break;
-            }
-            if let Some(product_id) = env
-                .storage()
-                .persistent()
-                .get::<DataKey, u64>(&DataKey::OriginProductIndex(origin.clone(), i))
-            {
-                if let Some(product) = env
-                    .storage()
-                    .persistent()
-                    .get::<DataKey, Product>(&DataKey::Product(product_id))
-                {
-                    products.push_back(product);
-                }
-            }
-        }
-        products
-    }
-
-    /// Get product stats
-    pub fn get_stats(env: Env) -> ProductStats {
-        ProductStats {
-            total_products: env
-                .storage()
-                .instance()
-                .get(&DataKey::TotalProducts)
-                .unwrap_or(0),
-            active_products: env
-                .storage()
-                .instance()
-                .get(&DataKey::ActiveProducts)
-                .unwrap_or(0),
-        }
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
-use crate::{storage, validation, Error, Origin, Product, TrackingEvent, EventPage, EventFilter};
+use crate::types::{
+    DeactInfo, Origin, Product, ProductConfig, ProductStats, TrackingEvent,
+    TrackingEventFilter, TrackingEventPage,
+};
+use crate::error::Error;
+use crate::{storage, validation};
+
+// ─── Internal helpers ────────────────────────────────────────────────────────
 
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
@@ -222,6 +17,7 @@ fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
 
+/// Require that `caller` is the product owner (also calls `require_auth()`).
 fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     caller.require_auth();
     if &product.owner != caller {
@@ -230,195 +26,340 @@ fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
-fn require_can_add_event(env: &Env, product_id: &String, product: &Product, caller: &Address) -> Result<(), Error> {
+/// Verify that an actor is allowed to add events:
+///  - product must be active
+///  - caller must be the owner or an explicitly authorized actor
+fn require_can_add_event(
+    env: &Env,
+    product_id: &String,
+    product: &Product,
+    caller: &Address,
+) -> Result<(), Error> {
     caller.require_auth();
+
+    // Deactivated products reject all new events
     if !product.active {
-        return Err(Error::InvalidInput);
+        return Err(Error::ProductDeactivated);
     }
+
+    // Owner always has permission
     if &product.owner == caller {
         return Ok(());
     }
+
+    // Check explicit authorization
     if !storage::is_authorized(env, product_id, caller) {
         return Err(Error::Unauthorized);
     }
 
-    /// Transfer ownership of a product
-    pub fn transfer_product(
+    Ok(())
+}
+
+// ─── Contract ────────────────────────────────────────────────────────────────
+
 #[contract]
 pub struct ChainLogisticsContract;
 
 #[contractimpl]
 impl ChainLogisticsContract {
-    /// Register a new product with rich metadata
+    // --- Lifecycle Management ---
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRODUCT REGISTRATION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Register a new product.
     pub fn register_product(
         env: Env,
         owner: Address,
-        product_id: u64,
-        new_owner: Address,
-    ) -> Result<(), Error> {
-        let mut product: Product = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Product(product_id))
-            .ok_or(Error::ProductNotFound)?;
-        
+        config: ProductConfig,
+    ) -> Result<Product, Error> {
         owner.require_auth();
-        if product.owner != owner {
-            return Err(Error::Unauthorized);
+
+        // --- Validation ---
+        const MAX_ID_LEN: u32 = 64;
+        const MAX_NAME_LEN: u32 = 128;
+        const MAX_ORIGIN_LEN: u32 = 128;
+        const MAX_CATEGORY_LEN: u32 = 64;
+        const MAX_DESC_LEN: u32 = 512;
+        const MAX_TAGS: u32 = 20;
+        const MAX_TAG_LEN: u32 = 64;
+        const MAX_CERTS: u32 = 50;
+        const MAX_MEDIA: u32 = 50;
+        const MAX_CUSTOM: u32 = 20;
+        const MAX_CUSTOM_VAL_LEN: u32 = 256;
+
+        if !validation::non_empty(&config.id) {
+            return Err(Error::InvalidProductId);
+        }
+        if !validation::max_len(&config.id, MAX_ID_LEN) {
+            return Err(Error::ProductIdTooLong);
+        }
+        if !validation::non_empty(&config.name) {
+            return Err(Error::InvalidProductName);
+        }
+        if !validation::max_len(&config.name, MAX_NAME_LEN) {
+            return Err(Error::ProductNameTooLong);
+        }
+        if !validation::non_empty(&config.origin_location) {
+            return Err(Error::InvalidOrigin);
+        }
+        if !validation::max_len(&config.origin_location, MAX_ORIGIN_LEN) {
+            return Err(Error::OriginTooLong);
+        }
+        if !validation::non_empty(&config.category) {
+            return Err(Error::InvalidCategory);
+        }
+        if !validation::max_len(&config.category, MAX_CATEGORY_LEN) {
+            return Err(Error::CategoryTooLong);
+        }
+        if !validation::max_len(&config.description, MAX_DESC_LEN) {
+            return Err(Error::DescriptionTooLong);
+        }
+        if config.tags.len() > MAX_TAGS {
+            return Err(Error::TooManyTags);
+        }
+        for i in 0..config.tags.len() {
+            if !validation::max_len(&config.tags.get_unchecked(i), MAX_TAG_LEN) {
+                return Err(Error::TagTooLong);
+            }
+        }
+        if config.certifications.len() > MAX_CERTS {
+            return Err(Error::TooManyCertifications);
+        }
+        if config.media_hashes.len() > MAX_MEDIA {
+            return Err(Error::TooManyMediaHashes);
+        }
+        if config.custom.len() > MAX_CUSTOM {
+            return Err(Error::TooManyCustomFields);
+        }
+        let custom_keys = config.custom.keys();
+        for i in 0..custom_keys.len() {
+            let k = custom_keys.get_unchecked(i);
+            let v = config.custom.get_unchecked(k);
+            if !validation::max_len(&v, MAX_CUSTOM_VAL_LEN) {
+                return Err(Error::CustomFieldValueTooLong);
+            }
+        }
+
+        // --- Duplicate check ---
+        if storage::has_product(&env, &config.id) {
+            return Err(Error::ProductAlreadyExists);
         }
 
         let product = Product {
-            id: id.clone(),
-            name,
-            description,
+            id: config.id.clone(),
+            name: config.name,
+            description: config.description,
             origin: Origin {
-                location: origin_location,
+                location: config.origin_location,
             },
             owner: owner.clone(),
             created_at: env.ledger().timestamp(),
             active: true,
-            category,
-            tags,
-            certifications,
-            media_hashes,
-            custom,
+            category: config.category,
+            tags: config.tags,
+            certifications: config.certifications,
+            media_hashes: config.media_hashes,
+            custom: config.custom,
+            deactivation_info: Vec::new(&env),
         };
 
         write_product(&env, &product);
-        storage::put_product_event_ids(&env, &id, &Vec::new(&env));
-        storage::set_auth(&env, &id, &owner, true);
+        storage::put_product_event_ids(&env, &config.id, &Vec::new(&env));
+        // Owner is implicitly authorized — store explicit auth entry for lookup convenience
+        storage::set_auth(&env, &config.id, &owner, true);
 
-        env.events().publish((Symbol::new(&env, "product_registered"), id.clone()), product.clone());
+        // Update global counters
+        let total = storage::get_total_products(&env) + 1;
+        storage::set_total_products(&env, total);
+
+        let active = storage::get_active_products(&env) + 1;
+        storage::set_active_products(&env, active);
+
+        env.events().publish(
+            (Symbol::new(&env, "product_registered"), config.id.clone()),
+            product.clone(),
+        );
+
         Ok(product)
     }
 
-    /// Get a product by ID
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRODUCT LIFECYCLE — DEACTIVATION & REACTIVATION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Deactivate a product.
+    pub fn deactivate_product(
+        env: Env,
+        owner: Address,
+        product_id: String,
+        reason: String,
+    ) -> Result<(), Error> {
+        let mut product = read_product(&env, &product_id)?;
+        require_owner(&product, &owner)?;
+
+        if !product.active {
+            return Err(Error::ProductDeactivated);
+        }
+
+        if !validation::non_empty(&reason) {
+            return Err(Error::DeactivationReasonRequired);
+        }
+
+        product.active = false;
+        let mut info = Vec::new(&env);
+        info.push_back(DeactInfo {
+            reason: reason.clone(),
+            deactivated_at: env.ledger().timestamp(),
+            deactivated_by: owner.clone(),
+        });
+        product.deactivation_info = info;
+
+        write_product(&env, &product);
+
+        // Decrement active counter
+        let active = storage::get_active_products(&env).saturating_sub(1);
+        storage::set_active_products(&env, active);
+
+        env.events().publish(
+            (Symbol::new(&env, "product_deactivated"), product_id.clone()),
+            (owner, reason),
+        );
+
+        Ok(())
+    }
+
+    /// Reactivate a product.
+    pub fn reactivate_product(
+        env: Env,
+        owner: Address,
+        product_id: String,
+    ) -> Result<(), Error> {
+        let mut product = read_product(&env, &product_id)?;
+        require_owner(&product, &owner)?;
+
+        if product.active {
+            return Err(Error::ProductAlreadyActive);
+        }
+
+        product.active = true;
+        product.deactivation_info = Vec::new(&env);
+
+        write_product(&env, &product);
+
+        // Increment active counter
+        let active = storage::get_active_products(&env) + 1;
+        storage::set_active_products(&env, active);
+
+        env.events().publish(
+            (Symbol::new(&env, "product_reactivated"), product_id.clone()),
+            owner,
+        );
+
+        Ok(())
+    }
+}
+
+#[contractimpl]
+impl ChainLogisticsContract {
+    // --- Product Queries ---
+
+    /// Get a product by its string ID.
     pub fn get_product(env: Env, id: String) -> Result<Product, Error> {
         read_product(&env, &id)
     }
 
-    /// Get all event IDs for a product (for backwards compatibility)
+    /// Returns all event IDs associated with a product.
     pub fn get_product_event_ids(env: Env, id: String) -> Result<Vec<u64>, Error> {
         let _ = read_product(&env, &id)?;
         Ok(storage::get_product_event_ids(&env, &id))
     }
 
-    /// Add an authorized actor who can add events to a product
-    pub fn add_authorized_actor(env: Env, owner: Address, product_id: String, actor: Address) -> Result<(), Error> {
+    /// Get global product statistics.
+    pub fn get_stats(env: Env) -> ProductStats {
+        ProductStats {
+            total_products: storage::get_total_products(&env),
+            active_products: storage::get_active_products(&env),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // AUTHORIZATION MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Grant an actor the right to add tracking events to a product.
+    pub fn add_authorized_actor(
+        env: Env,
+        owner: Address,
+        product_id: String,
+        actor: Address,
+    ) -> Result<(), Error> {
         let product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
         storage::set_auth(&env, &product_id, &actor, true);
         Ok(())
     }
 
-    /// Remove an authorized actor
-    pub fn remove_authorized_actor(env: Env, owner: Address, product_id: String, actor: Address) -> Result<(), Error> {
+    /// Revoke an actor's authorization to add events to a product.
+    pub fn remove_authorized_actor(
+        env: Env,
+        owner: Address,
+        product_id: String,
+        actor: Address,
+    ) -> Result<(), Error> {
         let product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
         storage::set_auth(&env, &product_id, &actor, false);
         Ok(())
     }
 
-    /// Transfer product ownership
-    pub fn transfer_product(env: Env, owner: Address, product_id: String, new_owner: Address) -> Result<(), Error> {
+    /// Check whether an actor is authorized to add events to a product.
+    pub fn is_authorized(env: Env, product_id: String, actor: Address) -> Result<bool, Error> {
+        let product = read_product(&env, &product_id)?;
+        if product.owner == actor {
+            return Ok(true);
+        }
+        Ok(storage::is_authorized(&env, &product_id, &actor))
+    }
+}
+
+#[contractimpl]
+impl ChainLogisticsContract {
+    // --- Authorization & Transfer ---
+
+    /// Transfer product ownership to a new address.
+    pub fn transfer_product(
+        env: Env,
+        owner: Address,
+        product_id: String,
+        new_owner: Address,
+    ) -> Result<(), Error> {
         let mut product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
 
         new_owner.require_auth();
 
-        // Transfer authorization
-        env.storage()
-            .persistent()
-            .remove(&DataKey::Auth(product_id, product.owner.clone()));
-            
+        // Remove old owner's explicit auth entry, add new owner's
+        storage::set_auth(&env, &product_id, &owner, false);
+        storage::set_auth(&env, &product_id, &new_owner, true);
+
         product.owner = new_owner.clone();
-        
-        env.storage()
-            .persistent()
-            .set(&DataKey::Product(product_id), &product);
-            
-        env.storage()
-            .persistent()
-            .set(&DataKey::Auth(product_id, new_owner), &true);
-            
-        Ok(())
-    }
-
-    /// Add an authorized actor
-    pub fn add_authorized_actor(
-        env: Env,
-        owner: Address,
-        product_id: u64,
-        actor: Address,
-    ) -> Result<(), Error> {
-        let product: Product = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Product(product_id))
-            .ok_or(Error::ProductNotFound)?;
-
-        owner.require_auth();
-        if product.owner != owner {
-            return Err(Error::Unauthorized);
-        }
-
-        env.storage()
-            .persistent()
-            .set(&DataKey::Auth(product_id, actor), &true);
-            
-        Ok(())
-    }
-
-    /// Remove an authorized actor
-    pub fn remove_authorized_actor(
-        env: Env,
-        owner: Address,
-        product_id: u64,
-        actor: Address,
-    ) -> Result<(), Error> {
-        let product: Product = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Product(product_id))
-            .ok_or(Error::ProductNotFound)?;
-
-        owner.require_auth();
-        if product.owner != owner {
-            return Err(Error::Unauthorized);
-        }
-
-        env.storage()
-            .persistent()
-            .remove(&DataKey::Auth(product_id, actor));
-            
-        Ok(())
-    }
-
-    /// Check if an actor is authorized
-    pub fn is_authorized(env: Env, product_id: u64, actor: Address) -> bool {
-        if let Some(product) = env.storage().persistent().get::<DataKey, Product>(&DataKey::Product(product_id)) {
-            if product.owner == actor {
-                return true;
-            }
-    /// Set product active/inactive
-    pub fn set_product_active(env: Env, owner: Address, product_id: String, active: bool) -> Result<(), Error> {
-        let mut product = read_product(&env, &product_id)?;
-        require_owner(&product, &owner)?;
-        product.active = active;
         write_product(&env, &product);
+
+        env.events().publish(
+            (Symbol::new(&env, "product_transferred"), product_id),
+            (owner, new_owner),
+        );
+
         Ok(())
     }
+}
 
-    /// Add a tracking event to a product
-    /// 
-    /// # Arguments
-    /// * `actor` - Address adding the event (must be owner or authorized)
-    /// * `product_id` - Product identifier
-    /// * `event_type` - Type of event (e.g., "HARVEST", "SHIP", "RECEIVE")
-    /// * `location` - Where the event occurred
-    /// * `data_hash` - Hash of off-chain data (IPFS, etc.)
-    /// * `note` - Human-readable note
-    /// * `metadata` - Flexible key-value metadata
+#[contractimpl]
+impl ChainLogisticsContract {
+    // --- Tracking Events ---
+
+    /// Add a tracking event to a product.
     pub fn add_tracking_event(
         env: Env,
         actor: Address,
@@ -435,11 +376,11 @@ impl ChainLogisticsContract {
         // Validate metadata limits
         const MAX_METADATA_FIELDS: u32 = 20;
         const MAX_METADATA_VALUE_LEN: u32 = 256;
-        
+
         if metadata.len() > MAX_METADATA_FIELDS {
             return Err(Error::TooManyCustomFields);
         }
-        
+
         let meta_keys = metadata.keys();
         for i in 0..meta_keys.len() {
             let k = meta_keys.get_unchecked(i);
@@ -463,98 +404,97 @@ impl ChainLogisticsContract {
         };
 
         storage::put_event(&env, &event);
-        
-        // Update product event list
+
+        // Append to the product's ordered event list
         let mut ids = storage::get_product_event_ids(&env, &product_id);
         ids.push_back(event_id);
         storage::put_product_event_ids(&env, &product_id, &ids);
-        
-        // Index by event type for efficient filtering
+
+        // Index by event type for efficient type-based filtering
         storage::index_event_by_type(&env, &product_id, &event_type, event_id);
 
         env.events().publish(
-            (Symbol::new(&env, "tracking_event"), product_id.clone(), event_id),
+            (
+                Symbol::new(&env, "tracking_event"),
+                product_id.clone(),
+                event_id,
+            ),
             event.clone(),
         );
-        
+
         Ok(event_id)
     }
 
-    /// Get a single event by ID
+    /// Get a single tracking event by its numeric ID.
     pub fn get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
         storage::get_event(&env, event_id).ok_or(Error::EventNotFound)
     }
 
-    /// Get all events for a product with pagination
-    /// 
-    /// # Arguments
-    /// * `product_id` - Product identifier
-    /// * `offset` - Number of events to skip (for pagination)
-    /// * `limit` - Maximum events to return
+    /// Get all events for a product with cursor-based pagination.
     pub fn get_product_events(
         env: Env,
         product_id: String,
         offset: u64,
         limit: u64,
-    ) -> Result<EventPage, Error> {
+    ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
-        
+
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let total_count = all_ids.len() as u64;
-        
-        let event_ids = storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
-        
+
+        let event_ids =
+            storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
+
         let mut events = Vec::new(&env);
         for i in 0..event_ids.len() {
-            let event_id = event_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, event_id) {
+            let eid = event_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
                 events.push_back(event);
             }
         }
-        
+
         let has_more = offset + (event_ids.len() as u64) < total_count;
-        
-        Ok(EventPage {
+
+        Ok(TrackingEventPage {
             events,
             total_count,
             has_more,
         })
     }
 
-    /// Get events filtered by type with pagination
+    /// Get events for a product filtered by event type, with pagination.
     pub fn get_events_by_type(
         env: Env,
         product_id: String,
         event_type: Symbol,
         offset: u64,
         limit: u64,
-    ) -> Result<EventPage, Error> {
+    ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
-        
-        let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
-        let event_ids = storage::get_event_ids_by_type(&env, &product_id, &event_type, offset, limit);
-        
+
+        let total_count =
+            storage::get_event_count_by_type(&env, &product_id, &event_type);
+        let event_ids =
+            storage::get_event_ids_by_type(&env, &product_id, &event_type, offset, limit);
+
         let mut events = Vec::new(&env);
         for i in 0..event_ids.len() {
-            let event_id = event_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, event_id) {
+            let eid = event_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
                 events.push_back(event);
             }
         }
-        
+
         let has_more = offset + (event_ids.len() as u64) < total_count;
-        
-        Ok(EventPage {
+
+        Ok(TrackingEventPage {
             events,
             total_count,
             has_more,
         })
     }
 
-    /// Get events filtered by time range with pagination
-    /// 
-    /// Note: This performs a linear scan through events. For products with
-    /// many events, prefer using type-based filtering when possible.
+    /// Get events filtered by time range with pagination.
     pub fn get_events_by_time_range(
         env: Env,
         product_id: String,
@@ -562,147 +502,121 @@ impl ChainLogisticsContract {
         end_time: u64,
         offset: u64,
         limit: u64,
-    ) -> Result<EventPage, Error> {
+    ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
-        
+
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let mut matching_ids = Vec::new(&env);
-        
-        // Collect matching event IDs
+
         for i in 0..all_ids.len() {
-            let event_id = all_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, event_id) {
+            let eid = all_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
                 if event.timestamp >= start_time && event.timestamp <= end_time {
-                    matching_ids.push_back(event_id);
+                    matching_ids.push_back(eid);
                 }
             }
         }
-        
+
         let total_count = matching_ids.len() as u64;
-        
-        // Apply pagination
+
         let mut events = Vec::new(&env);
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(matching_ids.len());
-        
+
         for i in start..end {
-            let event_id = matching_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, event_id) {
+            let eid = matching_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
                 events.push_back(event);
             }
         }
-        
+
         let has_more = offset + (events.len() as u64) < total_count;
-        
-        Ok(EventPage {
+
+        Ok(TrackingEventPage {
             events,
             total_count,
             has_more,
         })
     }
 
-    /// Get events with flexible filtering
-    /// 
-    /// Filter supports: event_type, time range, location
+    /// Get events with composite filter (type + time range + location).
     pub fn get_filtered_events(
         env: Env,
         product_id: String,
-        filter: EventFilter,
+        filter: TrackingEventFilter,
         offset: u64,
         limit: u64,
-    ) -> Result<EventPage, Error> {
+    ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
-        
+
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let mut matching_ids = Vec::new(&env);
-        
-        // Collect matching event IDs based on filter criteria
+
+        let empty_sym = Symbol::new(&env, "");
+        let empty_loc = String::from_str(&env, "");
+
         for i in 0..all_ids.len() {
-            let event_id = all_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, event_id) {
+            let eid = all_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
                 let mut matches = true;
-                
-                // Check event type filter (non-empty symbol means filter active)
-                let empty_sym = Symbol::new(&env, "");
-                if filter.event_type != empty_sym {
-                    if event.event_type != filter.event_type {
-                        matches = false;
-                    }
+
+                // Event type filter
+                if filter.event_type != empty_sym && event.event_type != filter.event_type {
+                    matches = false;
                 }
-                
-                // Check time range filters
-                // start_time > 0 means filter active
-                if filter.start_time > 0 {
-                    if event.timestamp < filter.start_time {
-                        matches = false;
-                    }
+                // Time lower bound
+                if filter.start_time > 0 && event.timestamp < filter.start_time {
+                    matches = false;
                 }
-                
-                // end_time < u64::MAX means filter active
-                if filter.end_time < u64::MAX {
-                    if event.timestamp > filter.end_time {
-                        matches = false;
-                    }
+                // Time upper bound
+                if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
+                    matches = false;
                 }
-                
-                // Check location filter (non-empty string means filter active)
-                let empty_loc = String::from_str(&env, "");
-                if filter.location != empty_loc {
-                    if event.location != filter.location {
-                        matches = false;
-                    }
+                // Location filter
+                if filter.location != empty_loc && event.location != filter.location {
+                    matches = false;
                 }
-                
+
                 if matches {
-                    matching_ids.push_back(event_id);
+                    matching_ids.push_back(eid);
                 }
             }
         }
-        
+
         let total_count = matching_ids.len() as u64;
-        
-        // Apply pagination
+
         let mut events = Vec::new(&env);
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(matching_ids.len());
-        
+
         for i in start..end {
-            let event_id = matching_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, event_id) {
+            let eid = matching_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
                 events.push_back(event);
             }
         }
-        
+
         let has_more = offset + (events.len() as u64) < total_count;
-        
-        Ok(EventPage {
+
+        Ok(TrackingEventPage {
             events,
             total_count,
             has_more,
         })
     }
 
-    /// Check if an actor is authorized to add events to a product
-    pub fn is_authorized(env: Env, product_id: String, actor: Address) -> Result<bool, Error> {
-        let product = read_product(&env, &product_id)?;
-        if product.owner == actor {
-            return Ok(true);
-        }
-        
-        env.storage()
-            .persistent()
-            .get(&DataKey::Auth(product_id, actor))
-            .unwrap_or(false)
-    }
+    // ═══════════════════════════════════════════════════════════════════════
+    // EVENT COUNT HELPERS
+    // ═══════════════════════════════════════════════════════════════════════
 
-    /// Get event count for a product
+    /// Get total event count for a product.
     pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
         let _ = read_product(&env, &product_id)?;
         let ids = storage::get_product_event_ids(&env, &product_id);
         Ok(ids.len() as u64)
     }
 
-    /// Get event count by type for a product
+    /// Get event count for a specific event type on a product.
     pub fn get_event_count_by_type(
         env: Env,
         product_id: String,
@@ -712,4 +626,3 @@ impl ChainLogisticsContract {
         Ok(storage::get_event_count_by_type(&env, &product_id, &event_type))
     }
 }
-

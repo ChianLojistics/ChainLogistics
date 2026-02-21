@@ -1,9 +1,33 @@
 use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Vec};
 
+/// Information captured when a product is deactivated
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeactInfo {
+    pub reason: String,
+    pub deactivated_at: u64,
+    pub deactivated_by: Address,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Origin {
     pub location: String,
+}
+
+/// Input for product registration to avoid too many function arguments
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProductConfig {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub origin_location: String,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub certifications: Vec<BytesN<32>>,
+    pub media_hashes: Vec<BytesN<32>>,
+    pub custom: Map<Symbol, String>,
 }
 
 #[contracttype]
@@ -21,10 +45,9 @@ pub struct Product {
     pub certifications: Vec<BytesN<32>>,
     pub media_hashes: Vec<BytesN<32>>,
     pub custom: Map<Symbol, String>,
+    pub deactivation_info: Vec<DeactInfo>, // Use Vec as a safer Option alternative
 }
 
-/// Enhanced tracking event for supply chain events
-/// Supports rich metadata for various industries (coffee, pharma, etc.)
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrackingEvent {
@@ -36,19 +59,12 @@ pub struct TrackingEvent {
     pub location: String,
     pub data_hash: BytesN<32>,
     pub note: String,
-    /// Flexible metadata as key-value pairs
-    /// Examples:
-    /// - temperature: "2.5" (for cold chain)
-    /// - quality_score: "95"
-    /// - gps_coords: "6.5244,38.4356"
-    /// - batch_number: "B2024-001"
     pub metadata: Map<Symbol, String>,
 }
 
-/// Paginated result for events
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EventPage {
+pub struct TrackingEventPage {
     pub events: Vec<TrackingEvent>,
     pub total_count: u64,
     pub has_more: bool,
@@ -62,13 +78,12 @@ pub enum DataKey {
     Event(u64),
     EventSeq,
     Auth(String, Address),
-    /// Index for events by type: (ProductId, EventType, Index) -> EventId
     EventTypeIndex(String, Symbol, u64),
-    /// Count of events by type: (ProductId, EventType) -> Count
     EventTypeCount(String, Symbol),
+    TotalProducts,
+    ActiveProducts,
 }
 
-/// Product statistics
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProductStats {
@@ -76,15 +91,9 @@ pub struct ProductStats {
     pub active_products: u64,
 }
 
-/// Event filter criteria for querying events
-/// Uses sentinel values to indicate "no filter":
-/// - event_type: empty Symbol means any type
-/// - location: empty String means any location  
-/// - start_time: 0 means no lower bound
-/// - end_time: u64::MAX means no upper bound
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EventFilter {
+pub struct TrackingEventFilter {
     pub event_type: Symbol,
     pub start_time: u64,
     pub end_time: u64,
