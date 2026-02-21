@@ -45,11 +45,24 @@ fn test_register_and_get_product() {
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
 
+<<<<<<< nnennaokoye/chainlogistics
+fn setup(env: &Env) -> (ChainLogisticsContractClient, Address) {
+    let contract_id = env.register_contract(None, ChainLogisticsContract);
+    let client = ChainLogisticsContractClient::new(env, &contract_id);
+    let admin = Address::generate(env);
+    client.init(&admin);
+    (client, admin)
+}
+
+fn default_register_args(env: &Env) -> (Vec<String>, Vec<BytesN<32>>, Vec<BytesN<32>>, Map<Symbol, String>) {
+    (Vec::new(env), Vec::new(env), Vec::new(env), Map::new(env))
+=======
     let p = client.get_product(&id);
     assert_eq!(p.id, id);
     assert_eq!(p.owner, owner);
     assert!(p.active, "new products must be active");
     assert!(p.deactivation_info.is_empty(), "no deactivation info on new product");
+>>>>>>> main
 }
 
 #[test]
@@ -123,6 +136,7 @@ fn test_register_rejects_empty_id() {
     assert_eq!(res, Err(Ok(Error::InvalidProductId)));
 }
 
+    let (client, _admin) = setup(&env);
 #[test]
 fn test_register_rejects_empty_origin() {
     let env = Env::default();
@@ -179,8 +193,7 @@ fn test_owner_can_deactivate_product() {
 fn test_deactivation_updates_active_counter() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -204,8 +217,7 @@ fn test_deactivation_updates_active_counter() {
 fn test_non_owner_cannot_deactivate() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let attacker = Address::generate(&env);
@@ -239,8 +251,7 @@ fn test_deactivate_nonexistent_product() {
 fn test_deactivate_requires_nonempty_reason() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -286,8 +297,7 @@ fn test_deactivate_already_inactive_product() {
 fn test_owner_can_reactivate_product() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -313,8 +323,13 @@ fn test_owner_can_reactivate_product() {
 fn test_reactivation_updates_active_counter() {
     let env = Env::default();
     env.mock_all_auths();
+<<<<<<< nnennaokoye/chainlogistics
+    env.budget().reset_unlimited();
+    let (client, _admin) = setup(&env);
+=======
     let contract_id = env.register_contract(None, ChainLogisticsContract);
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
+>>>>>>> main
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -366,8 +381,13 @@ fn test_reactivate_already_active_product() {
 fn test_deactivated_product_cannot_receive_events() {
     let env = Env::default();
     env.mock_all_auths();
+<<<<<<< nnennaokoye/chainlogistics
+    env.budget().reset_unlimited();
+    let (client, _admin) = setup(&env);
+=======
     let contract_id = env.register_contract(None, ChainLogisticsContract);
     let client = ChainLogisticsContractClient::new(&env, &contract_id);
+>>>>>>> main
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -401,8 +421,7 @@ fn test_deactivated_product_cannot_receive_events() {
 fn test_authorized_actor_blocked_on_deactivated_product() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let actor = Address::generate(&env);
@@ -481,8 +500,7 @@ fn test_deactivated_product_remains_readable() {
 fn test_reactivated_product_can_receive_events() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -516,8 +534,7 @@ fn test_reactivated_product_can_receive_events() {
 fn test_product_reaches_final_destination() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let farmer = Address::generate(&env);
     let distributor = Address::generate(&env);
@@ -568,8 +585,7 @@ fn test_product_reaches_final_destination() {
 fn test_product_recalled_scenario() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let manufacturer = Address::generate(&env);
     let id = register_test_product(&env, &client, &manufacturer);
@@ -610,8 +626,7 @@ fn test_product_recalled_scenario() {
 fn test_multiple_products_stats_tracking() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
 
@@ -667,8 +682,7 @@ fn test_multiple_products_stats_tracking() {
 fn test_authorized_actor_can_add_event() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let processor = Address::generate(&env);
@@ -697,8 +711,7 @@ fn test_authorized_actor_can_add_event() {
 fn test_unauthorized_actor_cannot_add_event() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let attacker = Address::generate(&env);
@@ -723,8 +736,7 @@ fn test_unauthorized_actor_cannot_add_event() {
 fn test_non_owner_cannot_add_authorized_actor() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let non_owner = Address::generate(&env);
@@ -801,8 +813,7 @@ fn test_old_owner_cannot_add_actors_after_transfer() {
 fn test_authorized_actors_persist_across_transfer() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let new_owner = Address::generate(&env);
@@ -902,8 +913,7 @@ fn test_event_pagination() {
 fn test_filter_events_by_type() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -941,8 +951,7 @@ fn test_filter_events_by_type() {
 fn test_filter_events_by_time_range() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
@@ -1029,8 +1038,7 @@ fn test_flexible_filter_by_location() {
 fn test_event_count_functions() {
     let env = Env::default();
     env.mock_all_auths();
-    let contract_id = env.register_contract(None, ChainLogisticsContract);
-    let client = ChainLogisticsContractClient::new(&env, &contract_id);
+    let (client, _admin) = setup(&env);
 
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);

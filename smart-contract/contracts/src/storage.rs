@@ -1,3 +1,42 @@
+use soroban_sdk::{contracttype, Address, Env, String, Symbol, Vec};
+
+use crate::{Product, TrackingEvent};
+
+/// Storage keys for persistent data on the blockchain.
+/// 
+/// Uses Soroban's persistent storage API which ensures data persists
+/// across contract invocations and ledger entries.
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    /// Stores a Product struct by product ID
+    Product(String),
+    /// Stores a vector of event IDs associated with a product
+    ProductEventIds(String),
+    ProductEventTimestamps(String),
+    ProductEventIdsByType(String, Symbol),
+    ProductEventIdsByActor(String, Address),
+
+    Admin,
+    Paused,
+
+    /// Stores a TrackingEvent by event ID
+    Event(u64),
+    /// Sequence counter for generating unique event IDs
+    EventSeq,
+
+    /// Authorization mapping: (product_id, actor_address) -> bool
+    Auth(String, Address),
+}
+
+/// Checks if a product exists in persistent storage.
+/// 
+/// # Arguments
+/// * `env` - The contract environment
+/// * `product_id` - The unique identifier for the product
+/// 
+/// # Returns
+/// `true` if the product exists, `false` otherwise
 use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
 use crate::types::{DataKey, Product, TrackingEvent};
@@ -37,6 +76,11 @@ pub fn get_product_event_ids(env: &Env, product_id: &String) -> Vec<u64> {
         .unwrap_or(Vec::new(env))
 }
 
+pub fn put_product_event_timestamps(env: &Env, product_id: &String, ts: &Vec<u64>) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::ProductEventTimestamps(product_id.clone()), ts);
+}
 /// Returns a paginated slice of event IDs for a product.
 pub fn get_product_event_ids_paginated(
     env: &Env,
@@ -63,6 +107,11 @@ pub fn get_product_event_ids_paginated(
     result
 }
 
+/// Stores a tracking event in persistent storage.
+/// 
+/// # Arguments
+/// * `env` - The contract environment
+/// * `event` - The TrackingEvent to store
 // ─── Events ─────────────────────────────────────────────────────────────────
 
 pub fn put_event(env: &Env, event: &TrackingEvent) {
@@ -165,6 +214,24 @@ pub fn is_authorized(env: &Env, product_id: &String, actor: &Address) -> bool {
         .unwrap_or(false)
 }
 
+pub fn has_admin(env: &Env) -> bool {
+    env.storage().persistent().has(&DataKey::Admin)
+}
+
+pub fn get_admin(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::Admin)
+}
+
+pub fn set_admin(env: &Env, admin: &Address) {
+    env.storage().persistent().set(&DataKey::Admin, admin);
+}
+
+pub fn is_paused(env: &Env) -> bool {
+    env.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
+}
+
+pub fn set_paused(env: &Env, paused: bool) {
+    env.storage().persistent().set(&DataKey::Paused, &paused);
 // ─── Global counters ─────────────────────────────────────────────────────────
 
 pub fn get_total_products(env: &Env) -> u64 {

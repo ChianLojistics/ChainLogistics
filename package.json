@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@stellar/freighter-api": "^6.0.1",
+    "lucide-react": "^0.575.0"
+  }
+}
