@@ -428,7 +428,12 @@ fn test_authorized_actor_blocked_on_deactivated_product() {
         &String::from_str(&env, "Port"),
         &h,
         &String::from_str(&env, ""),
-        &metadata,
+        &String::from_str(&env, "Yirgacheffe, Ethiopia"),
+        &String::from_str(&env, "Coffee"),
+        &tags,
+        &certs,
+        &media,
+        &custom,
     );
     assert_eq!(res, Err(Ok(Error::ProductDeactivated)));
 }

@@ -13,6 +13,10 @@ fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
 }
 
+/// Writes a product to persistent storage.
+/// 
+/// Products are stored using Soroban's persistent storage API,
+/// ensuring they persist across contract calls and ledger entries.
 fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
@@ -50,6 +54,20 @@ fn require_can_add_event(
     // Check explicit authorization
     if !storage::is_authorized(env, product_id, caller) {
         return Err(Error::Unauthorized);
+    }
+    Ok(())
+}
+
+fn require_can_add_event(env: &Env, product_id: &String, product: &Product, caller: &Address) -> Result<(), Error> {
+    require_can_add_event_internal(env, product_id, product, caller, true)
+}
+
+fn page_from_vec(env: &Env, ids: &Vec<u64>, cursor: u32, limit: u32) -> EventIdPage {
+    if limit == 0 {
+        return EventIdPage {
+            ids: Vec::new(env),
+            next_cursor: cursor,
+        };
     }
 
     Ok(())
@@ -145,6 +163,44 @@ impl ChainLogisticsContract {
         if storage::has_product(&env, &config.id) {
             return Err(Error::ProductAlreadyExists);
         }
+        if !validation::max_len(&description, MAX_DESCRIPTION_LEN) {
+            return Err(Error::DescriptionTooLong);
+        }
+
+        if tags.len() > MAX_TAGS {
+            return Err(Error::TooManyTags);
+        }
+        for i in 0..tags.len() {
+            let t = tags.get_unchecked(i);
+            if !validation::max_len(&t, MAX_TAG_LEN) {
+                return Err(Error::TagTooLong);
+            }
+        }
+
+        if certifications.len() > MAX_CERTIFICATIONS {
+            return Err(Error::TooManyCertifications);
+        }
+        if media_hashes.len() > MAX_MEDIA_HASHES {
+            return Err(Error::TooManyMediaHashes);
+        }
+
+        if custom.len() > MAX_CUSTOM_FIELDS {
+            return Err(Error::TooManyCustomFields);
+        }
+        let custom_keys = custom.keys();
+        for i in 0..custom_keys.len() {
+            let k = custom_keys.get_unchecked(i);
+            let v = custom.get_unchecked(k);
+            if !validation::max_len(&v, MAX_CUSTOM_VALUE_LEN) {
+                return Err(Error::CustomFieldValueTooLong);
+            }
+        }
+
+        if storage::has_product(&env, &id) {
+            return Err(Error::ProductAlreadyExists);
+        }
+
+        owner.require_auth();
 
         let product = Product {
             id: config.id.clone(),
@@ -394,13 +450,11 @@ impl ChainLogisticsContract {
         let event = TrackingEvent {
             event_id,
             product_id: product_id.clone(),
-            actor: actor.clone(),
+            actor,
             timestamp: env.ledger().timestamp(),
-            event_type: event_type.clone(),
-            location: location.clone(),
+            event_type,
             data_hash,
-            note: note.clone(),
-            metadata: metadata.clone(),
+            note,
         };
 
         storage::put_event(&env, &event);

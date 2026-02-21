@@ -56,7 +56,6 @@ pub struct TrackingEvent {
     pub actor: Address,
     pub timestamp: u64,
     pub event_type: Symbol,
-    pub location: String,
     pub data_hash: BytesN<32>,
     pub note: String,
     pub metadata: Map<Symbol, String>,
@@ -86,9 +85,11 @@ pub enum DataKey {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProductStats {
-    pub total_products: u64,
-    pub active_products: u64,
+pub struct TrackingEventInput {
+    pub product_id: String,
+    pub event_type: Symbol,
+    pub data_hash: BytesN<32>,
+    pub note: String,
 }
 
 #[contracttype]
