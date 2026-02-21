@@ -8,3 +8,4 @@ export { TrustBlockchain } from "./TrustBlockchain";
 export { CTA } from "./CTA";
 export { Footer } from "./Footer";
 export { AnimatedSection } from "./AnimatedSection";
+export * from "./NavBar";
