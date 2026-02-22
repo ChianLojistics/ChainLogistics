@@ -4,6 +4,10 @@
 
 ChainLojistic is an open-source, blockchain-based supply chain provenance tracker built on Stellar's Soroban platform. It enables transparent, tamper-proof tracking of products from origin to consumer, solving trust and verification issues in global supply chains.
 
+## Contract Address
+
+CBUWSKT2UGOAXK4ZREVDJV5XHSYB42PZ3CERU2ZFUTUMAZLJEHNZIECA
+
 ## 🎯 The Problem
 
 Modern supply chains face critical trust challenges:
