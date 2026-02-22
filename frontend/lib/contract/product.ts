@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { TransactionBuilder, Networks, BASE_FEE, Asset, Operation } from "@stellar/stellar-sdk";
 import { signWithFreighter } from "../stellar/wallet";
 
