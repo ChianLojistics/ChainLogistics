@@ -18,35 +18,41 @@ export class WalletError extends Error {
 }
 
 export async function connectWallet(): Promise<WalletConnectionResult> {
-  const installed = await isConnected();
-  if (!installed) {
-    throw new WalletError("Freighter wallet not installed");
+  const { isConnected: connected, error: connError } = await isConnected();
+  if (connError) throw new WalletError(connError);
+  if (!connected) {
+    throw new WalletError("Freighter wallet is not installed");
   }
 
-  const access = await requestAccess();
-  if (!access) {
-    // requestAccess returns a boolean or the public key depending on version
-    // Usually it returns a boolean or throws if rejected.
-    // If it returns false or empty, user denied access.
-    throw new WalletError("Access denied by user");
+  const { address, error } = await requestAccess();
+  if (error || !address) {
+    throw new WalletError(error || "Access denied by user");
   }
 
-  const { address: publicKey, error } = await getAddress();
-  if (error || !publicKey) {
-    throw new WalletError(error || "Failed to retrieve public key");
-  }
-
-  return { account: { publicKey } };
+  return { account: { publicKey: address } };
 }
 
 export async function disconnectWallet(): Promise<void> {
-  // Freighter doesn't have a programmatic disconnect that clears permissions in the extension,
-  // but we can clear our local state.
+  // Freighter doesn't support programmatic disconnect; local state is cleared by the store.
   return;
 }
 
-export async function signWithFreighter(xdr: string, network: string): Promise<string> {
-  const { signedTxXdr, error } = await signTransaction(xdr, { networkPassphrase: network });
+/**
+ * Returns the currently active address if the user has previously authorized
+ * the app, or null if not connected / not authorized.
+ */
+export async function getCurrentAddress(): Promise<string | null> {
+  try {
+    const { address, error } = await getAddress();
+    if (error || !address) return null;
+    return address;
+  } catch {
+    return null;
+  }
+}
+
+export async function signWithFreighter(xdr: string, networkPassphrase: string): Promise<string> {
+  const { signedTxXdr, error } = await signTransaction(xdr, { networkPassphrase });
   if (error || !signedTxXdr) {
     throw new WalletError(error || "Failed to sign transaction");
   }
