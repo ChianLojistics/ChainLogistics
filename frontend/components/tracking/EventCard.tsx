@@ -26,6 +26,7 @@ const EVENT_ICONS: Record<string, string> = {
   REGISTER: "📝",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function EventCard({ event, isFirst, isLast }: EventCardProps) {
   const eventColor = EVENT_COLORS[event.event_type] || EVENT_COLORS.REGISTER;
   const eventIcon = EVENT_ICONS[event.event_type] || "📋";

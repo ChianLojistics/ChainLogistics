@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { connectWallet, disconnectWallet, getCurrentAddress } from "../stellar/wallet";

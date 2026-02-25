@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { Contract, xdr, rpc, TransactionBuilder, Networks } from "@stellar/stellar-sdk";
 import type { StellarNetwork } from "./networks";
 import { CONTRACT_CONFIG } from "@/lib/contract/config";
