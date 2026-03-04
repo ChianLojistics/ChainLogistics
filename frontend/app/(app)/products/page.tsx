@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/lib/hooks/useWallet";
 import { getProductsByOwner } from "@/lib/contract/products";
 import type { Product } from "@/lib/types/product";
@@ -21,34 +21,38 @@ export default function ProductsPage() {
     dateTo: "",
   });
 
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // For now, if no wallet is connected, we'll fetch from a default owner
+      // In production, you might want to fetch from multiple owners or use an indexer
+      const owner = publicKey || "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+
+      // TODO: In production, fetch from multiple owners or use an indexer
+      // For now, we'll fetch from the connected wallet's address
+      const fetchedProducts = await getProductsByOwner(owner);
+
+      // If we have a connected wallet, only show their products by default
+      // Otherwise, show all products (when indexer is implemented)
+      setProducts(fetchedProducts);
+    } catch (err) {
+      console.error("Error fetching products:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch products. Please check your connection and try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [publicKey]);
+
   // Fetch products
   useEffect(() => {
-    async function fetchProducts() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // For now, if no wallet is connected, we'll fetch from a default owner
-        // In production, you might want to fetch from multiple owners or use an indexer
-        const owner = publicKey || "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-        
-        // TODO: In production, fetch from multiple owners or use an indexer
-        // For now, we'll fetch from the connected wallet's address
-        const fetchedProducts = await getProductsByOwner(owner);
-        
-        // If we have a connected wallet, only show their products by default
-        // Otherwise, show all products (when indexer is implemented)
-        setProducts(fetchedProducts);
-      } catch (err) {
-        console.error("Error fetching products:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch products");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     fetchProducts();
-  }, [publicKey]);
+  }, [fetchProducts]);
 
   // Extract unique categories and owners for filter dropdowns
   const availableCategories = useMemo(() => {
@@ -72,7 +76,18 @@ export default function ProductsPage() {
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800 text-sm">{error}</p>
+          <p className="text-red-800 text-sm font-medium">Unable to load products</p>
+          <p className="text-red-700 text-sm mt-1">{error}</p>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={fetchProducts}
+              disabled={isLoading}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
