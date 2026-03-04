@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { TimelineEvent } from "@/lib/types/tracking";
 import { fetchProductEvents } from "@/lib/contract/events";
 import { EventCard } from "./EventCard";
@@ -14,24 +14,28 @@ export function Timeline({ productId }: TimelineProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadEvents() {
-      try {
-        setLoading(true);
-        setError(null);
-        const fetchedEvents = await fetchProductEvents(productId);
-        // Sort by timestamp descending (newest first)
-        const sorted = fetchedEvents.sort((a, b) => b.timestamp - a.timestamp);
-        setEvents(sorted);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load events");
-      } finally {
-        setLoading(false);
-      }
+  const loadEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const fetchedEvents = await fetchProductEvents(productId);
+      // Sort by timestamp descending (newest first)
+      const sorted = fetchedEvents.sort((a, b) => b.timestamp - a.timestamp);
+      setEvents(sorted);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load events. Please check your connection and try again."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    loadEvents();
   }, [productId]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   if (loading) {
     return <TimelineSkeleton />;
@@ -44,6 +48,16 @@ export function Timeline({ productId }: TimelineProps) {
           Failed to load events
         </p>
         <p className="mt-1 text-xs text-red-600">{error}</p>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={loadEvents}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
