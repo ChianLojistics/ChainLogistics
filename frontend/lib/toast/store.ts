@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { v4 as uuidv4 } from 'uuid';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -37,8 +36,8 @@ export const useToastStore = create<ToastStore>((set, get) => ({
   toasts: [],
   position: 'top-right',
   
-  addToast: (toast) => {
-    const id = uuidv4();
+  addToast: (toast: Omit<Toast, 'id'>) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const newToast: Toast = {
       id,
       duration: 5000,
