@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import type { Product } from "@/lib/types/product";
 import type { FilterState } from "./ProductFilters";
 import { ProductCard } from "./ProductCard";
+import { Skeleton } from "@/components/ui";
 
 export type SortOption = "newest" | "oldest" | "name";
 
@@ -98,10 +99,38 @@ export function ProductList({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-zinc-600">Loading products...</p>
+      <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {Array.from({ length: 6 }, (_, idx) => (
+            <div
+              key={idx}
+              className="rounded-xl border bg-white shadow overflow-hidden"
+              aria-hidden="true"
+            >
+              <div className="p-6 pb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+              </div>
+              <div className="px-6 pb-4 space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-4/6" />
+                <Skeleton className="h-4 w-3/6" />
+              </div>
+              <div className="px-6 pt-4 pb-6 border-t border-zinc-100 flex items-center justify-between gap-3">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-8 w-24" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
