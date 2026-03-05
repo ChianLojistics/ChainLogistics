@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { WalletConnect } from "../wallet";
+import { WalletStatus } from "../wallet";
 
 export function NavBar() {
     return (
@@ -18,7 +18,7 @@ export function NavBar() {
                         <Link href="/tracking" className="hover:text-blue-600 transition-colors">Tracking</Link>
                     </div>
 
-                    <WalletConnect />
+                    <WalletStatus />
                 </div>
             </div>
         </nav>

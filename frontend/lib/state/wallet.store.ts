@@ -1,14 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { connectWallet, disconnectWallet, getCurrentAddress } from "../stellar/wallet";
+import { connectWallet, disconnectWallet, getCurrentAddress, getFreighterNetwork } from "../stellar/wallet";
 
 export type WalletState = {
   status: "disconnected" | "connecting" | "connected" | "error";
   publicKey: string | null;
+  network: "testnet" | "mainnet" | "futurenet" | null;
   error: string | null;
   setStatus: (status: WalletState["status"]) => void;
   setPublicKey: (publicKey: string | null) => void;
+  setNetwork: (network: WalletState["network"]) => void;
   setError: (error: string | null) => void;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
@@ -55,23 +57,48 @@ export const useWalletStore = create<WalletState>()(
     (set, get) => ({
       status: "disconnected",
       publicKey: null,
+      network: null,
       error: null,
       setStatus: (status) => set({ status }),
       setPublicKey: (publicKey) => set({ publicKey }),
+      setNetwork: (network) => set({ network }),
       setError: (error) => set({ error }),
 
       connect: async () => {
         set({ status: "connecting", error: null });
         try {
-          const result = await connectWallet();
+          const result = await Promise.race([
+            connectWallet(),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      "Wallet connection timed out. Check that Freighter is installed/unlocked and that your browser didn't block the popup."
+                    )
+                  ),
+                20000
+              )
+            ),
+          ]);
+          const detectedNetwork = await getFreighterNetwork();
+          console.info("[wallet] detected freighter network:", detectedNetwork);
           set({
             status: "connected",
             publicKey: result.account.publicKey,
+            network: detectedNetwork,
             error: null,
           });
           startAccountWatcher(get, set);
         } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Failed to connect wallet";
+          console.error("[wallet] connect failed", err);
+
+          let message = err instanceof Error ? err.message : "Failed to connect wallet";
+          if (message.toLowerCase().includes("timed out")) {
+            message =
+              "Wallet connection timed out. Check that Freighter is installed/unlocked and that your browser didn't block the popup.";
+          }
+
           set({ status: "error", error: message });
           throw err;
         }
@@ -80,22 +107,34 @@ export const useWalletStore = create<WalletState>()(
       disconnect: async () => {
         stopAccountWatcher();
         await disconnectWallet();
-        set({ status: "disconnected", publicKey: null, error: null });
+        set({ status: "disconnected", publicKey: null, network: null, error: null });
       },
 
       initialize: async () => {
         const { status, publicKey } = get();
+
+        // If the page refreshed mid-connection, persisted state can be stuck at "connecting".
+        // Reset to a safe state on boot so the UI doesn't spin forever.
+        if (status === "connecting") {
+          set({ status: "disconnected", publicKey: null, network: null, error: null });
+          return;
+        }
+
         if (status !== "connected") return;
 
         // Verify the persisted connection is still valid
         const currentAddress = await getCurrentAddress();
         if (!currentAddress) {
-          set({ status: "disconnected", publicKey: null, error: null });
+          set({ status: "disconnected", publicKey: null, network: null, error: null });
           return;
         }
         if (currentAddress !== publicKey) {
           set({ publicKey: currentAddress });
         }
+
+        const detectedNetwork = await getFreighterNetwork();
+        console.info("[wallet] detected freighter network (init):", detectedNetwork);
+        set({ network: detectedNetwork });
 
         startAccountWatcher(get, set);
       },
