@@ -3,21 +3,15 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { FormStepIndicator } from "./FormStepIndicator";
 import { useWalletStore } from "@/lib/state/wallet.store";
-import { registerProductOnChain, ProductData } from "@/lib/contract/product";
+import { registerProductOnChain } from "@/lib/contract/product";
 import { Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 
-const productSchema = z.object({
-    id: z.string().min(1, "Product ID is required").max(64).regex(/^[a-zA-Z0-9-_]+$/, "Only alphanumeric, dashes, and underscores allowed"),
-    name: z.string().min(1, "Name is required").max(128),
-    origin: z.string().min(1, "Origin is required").max(256),
-    description: z.string().max(2048).optional(),
-    category: z.string().min(1, "Category is required").max(64),
-});
-
-type ProductFormValues = z.infer<typeof productSchema>;
+import {
+    productRegistrationSchema,
+    type ProductRegistrationValues,
+} from "@/lib/validation";
 
 const STEPS = [
     { id: 1, name: "Basic Info" },
@@ -38,15 +32,15 @@ export function ProductRegistrationForm() {
         trigger,
         getValues,
         formState: { errors },
-    } = useForm<ProductFormValues>({
-        resolver: zodResolver(productSchema),
+    } = useForm<ProductRegistrationValues>({
+        resolver: zodResolver(productRegistrationSchema),
         defaultValues: {
             category: "Electronics",
         },
     });
 
     const nextStep = async () => {
-        let fieldsToValidate: (keyof ProductFormValues)[] = [];
+        let fieldsToValidate: (keyof ProductRegistrationValues)[] = [];
         if (step === 1) fieldsToValidate = ["id", "name"];
         if (step === 2) fieldsToValidate = ["origin", "category", "description"];
 
@@ -56,7 +50,7 @@ export function ProductRegistrationForm() {
 
     const prevStep = () => setStep((s) => s - 1);
 
-    const onSubmit = async (data: ProductFormValues) => {
+    const onSubmit = async (data: ProductRegistrationValues) => {
         if (walletStatus !== "connected" || !publicKey) {
             alert("Please connect your wallet first");
             return;
