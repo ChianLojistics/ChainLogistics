@@ -7,6 +7,7 @@ mod storage;
 mod error;
 mod validation;
 mod authorization;
+mod product_transfer;
 
 // #[cfg(test)]
 // mod test;
@@ -15,5 +16,6 @@ mod test_auth;
 
 pub use contract::*;
 pub use authorization::*;
+pub use product_transfer::*;
 pub use types::*;
 pub use error::*;
