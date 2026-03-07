@@ -110,7 +110,7 @@ export function EventTypeBadge({
   label,
   className,
   ...props
-}: EventTypeBadgeProps) {
+}: Readonly<EventTypeBadgeProps>) {
   const meta = getEventTypeBadgeMeta(eventType);
 
   const Icon = meta.icon;

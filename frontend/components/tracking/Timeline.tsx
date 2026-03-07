@@ -9,7 +9,7 @@ interface TimelineProps {
   productId: string;
 }
 
-export function Timeline({ productId }: TimelineProps) {
+export function Timeline({ productId }: Readonly<TimelineProps>) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export function Timeline({ productId }: TimelineProps) {
       setError(null);
       const fetchedEvents = await fetchProductEvents(productId);
       // Sort by timestamp descending (newest first)
-      const sorted = fetchedEvents.sort((a, b) => b.timestamp - a.timestamp);
+      const sorted = fetchedEvents.toSorted((a, b) => b.timestamp - a.timestamp);
       setEvents(sorted);
     } catch (err) {
       setError(

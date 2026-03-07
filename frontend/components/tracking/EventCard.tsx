@@ -6,8 +6,7 @@ import { shortenPublicKey } from "@/lib/utils/format";
 
 import { EventTypeBadge, getEventTypeBadgeMeta } from "./EventTypeBadge";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function EventCard({ event, isFirst, isLast }: EventCardProps) {
+export function EventCard({ event, isLast }: Readonly<EventCardProps>) {
   const meta = getEventTypeBadgeMeta(event.event_type);
   const Icon = meta.icon;
 
@@ -38,7 +37,7 @@ export function EventCard({ event, isFirst, isLast }: EventCardProps) {
               </div>
 
               {event.note && (
-                <p className="mb-3 text-sm text-gray-700 break-words">{event.note}</p>
+                <p className="mb-3 text-sm text-gray-700 wrap-break-word">{event.note}</p>
               )}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center text-xs text-gray-500">
