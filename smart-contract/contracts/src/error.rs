@@ -4,45 +4,40 @@ use soroban_sdk::contracterror;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Error {
-    // --- Core ---
+    // --- Core (1-10) ---
     ProductAlreadyExists = 1,
     ProductNotFound = 2,
     Unauthorized = 3,
     InvalidInput = 4,
     EventNotFound = 5,
+    NotInitialized = 6,
+    AlreadyInitialized = 7,
+    ContractPaused = 8,
 
-    // --- Validation ---
-    InvalidProductId = 6,
-    InvalidProductName = 7,
-    InvalidOrigin = 8,
-    InvalidCategory = 9,
+    // --- Validation (10-30) ---
+    InvalidProductId = 10,
+    InvalidProductName = 11,
+    InvalidOrigin = 12,
+    InvalidCategory = 13,
+    ProductIdTooLong = 14,
+    ProductNameTooLong = 15,
+    OriginTooLong = 16,
+    CategoryTooLong = 17,
+    DescriptionTooLong = 18,
+    TooManyTags = 19,
+    TagTooLong = 20,
+    TooManyCertifications = 21,
+    TooManyMediaHashes = 22,
+    TooManyCustomFields = 23,
+    CustomFieldValueTooLong = 24,
 
-    ProductIdTooLong = 10,
-    ProductNameTooLong = 11,
-    OriginTooLong = 12,
-    CategoryTooLong = 13,
-    DescriptionTooLong = 14,
+    // --- Batch (30-40) ---
+    EmptyBatch = 30,
+    BatchTooLarge = 31,
+    DuplicateProductIdInBatch = 32,
 
-    TooManyTags = 15,
-    TagTooLong = 16,
-    TooManyCertifications = 17,
-    TooManyMediaHashes = 18,
-
-    TooManyCustomFields = 19,
-    CustomFieldValueTooLong = 20,
-
-    EmptyBatch = 21,
-    BatchTooLarge = 22,
-    DuplicateProductIdInBatch = 23,
-
-    NotInitialized = 24,
-    AlreadyInitialized = 25,
-    ContractPaused = 26,
-    // --- Lifecycle ---
-    /// Attempted to add a tracking event to a deactivated product.
-    ProductDeactivated = 21,
-    /// Deactivation reason string is empty.
-    DeactivationReasonRequired = 22,
-    /// Attempted to reactivate a product that is already active.
-    ProductAlreadyActive = 23,
+    // --- Lifecycle (40-50) ---
+    ProductDeactivated = 40,
+    DeactivationReasonRequired = 41,
+    ProductAlreadyActive = 42,
 }
