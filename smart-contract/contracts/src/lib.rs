@@ -11,6 +11,7 @@ mod product_transfer;
 mod admin;
 mod product_query;
 mod tracking;
+mod stats;
 
 // #[cfg(test)]
 // mod test;
@@ -23,5 +24,6 @@ pub use product_transfer::*;
 pub use admin::*;
 pub use product_query::*;
 pub use tracking::*;
+pub use stats::*;
 pub use types::*;
 pub use error::*;
