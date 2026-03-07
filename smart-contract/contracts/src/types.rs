@@ -1,6 +1,5 @@
 use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Vec};
 
-/// Information captured when a product is deactivated
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeactInfo {
@@ -15,7 +14,6 @@ pub struct Origin {
     pub location: String,
 }
 
-/// Input for product registration to avoid too many function arguments
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProductConfig {
@@ -45,7 +43,7 @@ pub struct Product {
     pub certifications: Vec<BytesN<32>>,
     pub media_hashes: Vec<BytesN<32>>,
     pub custom: Map<Symbol, String>,
-    pub deactivation_info: Vec<DeactInfo>, // Use Vec as a safer Option alternative
+    pub deactivation_info: Vec<DeactInfo>,
 }
 
 #[contracttype]
@@ -56,6 +54,7 @@ pub struct TrackingEvent {
     pub actor: Address,
     pub timestamp: u64,
     pub event_type: Symbol,
+    pub location: String, // Added missing location field
     pub data_hash: BytesN<32>,
     pub note: String,
     pub metadata: Map<Symbol, String>,
@@ -71,14 +70,27 @@ pub struct TrackingEventPage {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProductStats {
+    pub total_products: u64,
+    pub active_products: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Product(String),
     ProductEventIds(String),
+    ProductEventTimestamps(String),
+    ProductEventIdsByType(String, Symbol),
+    ProductEventIdsByActor(String, Address),
     Event(u64),
     EventSeq,
-    Auth(String, Address),
     EventTypeIndex(String, Symbol, u64),
     EventTypeCount(String, Symbol),
+    Auth(String, Address),
+    Admin,
+    Paused,
+    AuthContract, // Added for cross-contract delegation
     TotalProducts,
     ActiveProducts,
 }

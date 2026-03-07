@@ -1,45 +1,14 @@
-use soroban_sdk::{contracttype, Address, Env, String, Symbol, Vec};
-
-use crate::{Product, TrackingEvent};
-
-/// Storage keys for persistent data on the blockchain.
-/// 
-/// Uses Soroban's persistent storage API which ensures data persists
-/// across contract invocations and ledger entries.
-#[contracttype]
-#[derive(Clone)]
-pub enum DataKey {
-    /// Stores a Product struct by product ID
-    Product(String),
-    /// Stores a vector of event IDs associated with a product
-    ProductEventIds(String),
-    ProductEventTimestamps(String),
-    ProductEventIdsByType(String, Symbol),
-    ProductEventIdsByActor(String, Address),
-
-    Admin,
-    Paused,
-
-    /// Stores a TrackingEvent by event ID
-    Event(u64),
-    /// Sequence counter for generating unique event IDs
-    EventSeq,
-
-    /// Authorization mapping: (product_id, actor_address) -> bool
-    Auth(String, Address),
-}
-
-/// Checks if a product exists in persistent storage.
-/// 
-/// # Arguments
-/// * `env` - The contract environment
-/// * `product_id` - The unique identifier for the product
-/// 
-/// # Returns
-/// `true` if the product exists, `false` otherwise
 use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
 use crate::types::{DataKey, Product, TrackingEvent};
+
+pub fn get_auth_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::AuthContract)
+}
+
+pub fn set_auth_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&DataKey::AuthContract, address);
+}
 
 // ─── Product ────────────────────────────────────────────────────────────────
 
@@ -76,12 +45,6 @@ pub fn get_product_event_ids(env: &Env, product_id: &String) -> Vec<u64> {
         .unwrap_or(Vec::new(env))
 }
 
-pub fn put_product_event_timestamps(env: &Env, product_id: &String, ts: &Vec<u64>) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::ProductEventTimestamps(product_id.clone()), ts);
-}
-/// Returns a paginated slice of event IDs for a product.
 pub fn get_product_event_ids_paginated(
     env: &Env,
     product_id: &String,
@@ -107,11 +70,6 @@ pub fn get_product_event_ids_paginated(
     result
 }
 
-/// Stores a tracking event in persistent storage.
-/// 
-/// # Arguments
-/// * `env` - The contract environment
-/// * `event` - The TrackingEvent to store
 // ─── Events ─────────────────────────────────────────────────────────────────
 
 pub fn put_event(env: &Env, event: &TrackingEvent) {
@@ -137,7 +95,6 @@ pub fn next_event_id(env: &Env) -> u64 {
 
 // ─── Event type index ────────────────────────────────────────────────────────
 
-/// Index an event ID under its event_type for efficient filtering.
 pub fn index_event_by_type(
     env: &Env,
     product_id: &String,
@@ -153,7 +110,6 @@ pub fn index_event_by_type(
     env.storage().persistent().set(&index_key, &event_id);
 }
 
-/// Returns paginated event IDs for a given product + event_type.
 pub fn get_event_ids_by_type(
     env: &Env,
     product_id: &String,
@@ -170,7 +126,7 @@ pub fn get_event_ids_by_type(
         return result;
     }
 
-    let start = offset + 1; // 1-based
+    let start = offset + 1;
     let end = (start + limit).min(total + 1);
 
     for i in start..end {
@@ -187,7 +143,6 @@ pub fn get_event_ids_by_type(
     result
 }
 
-/// Returns the total number of events of a given type for a product.
 pub fn get_event_count_by_type(env: &Env, product_id: &String, event_type: &Symbol) -> u64 {
     let count_key = DataKey::EventTypeCount(product_id.clone(), event_type.clone());
     env.storage().persistent().get(&count_key).unwrap_or(0)
@@ -214,6 +169,8 @@ pub fn is_authorized(env: &Env, product_id: &String, actor: &Address) -> bool {
         .unwrap_or(false)
 }
 
+// ─── Global Management ───────────────────────────────────────────────────────
+
 pub fn has_admin(env: &Env) -> bool {
     env.storage().persistent().has(&DataKey::Admin)
 }
@@ -232,6 +189,8 @@ pub fn is_paused(env: &Env) -> bool {
 
 pub fn set_paused(env: &Env, paused: bool) {
     env.storage().persistent().set(&DataKey::Paused, &paused);
+}
+
 // ─── Global counters ─────────────────────────────────────────────────────────
 
 pub fn get_total_products(env: &Env) -> u64 {
