@@ -13,6 +13,7 @@ pub enum Error {
     NotInitialized = 6,
     AlreadyInitialized = 7,
     ContractPaused = 8,
+    ContractNotPaused = 9,
 
     // --- Validation (10-30) ---
     InvalidProductId = 10,
