@@ -12,6 +12,7 @@ mod admin;
 mod product_query;
 mod tracking;
 mod stats;
+mod event_query;
 
 // #[cfg(test)]
 // mod test;
@@ -25,5 +26,6 @@ pub use admin::*;
 pub use product_query::*;
 pub use tracking::*;
 pub use stats::*;
+pub use event_query::*;
 pub use types::*;
 pub use error::*;
