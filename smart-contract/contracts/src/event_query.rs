@@ -1,6 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
+use crate::storage;
 use crate::types::{DataKey, TrackingEvent, TrackingEventFilter, TrackingEventPage};
 use crate::ChainLogisticsContractClient;
 
@@ -47,11 +48,29 @@ impl EventQueryContract {
             _ => return Err(Error::ProductNotFound),
         }
         
-        // Call main contract for paginated events
-        match main_client.try_get_product_events(&product_id, &offset, &limit) {
-            Ok(Ok(page)) => Ok(page),
-            Ok(Err(_)) | Err(_) => Err(Error::ProductNotFound),
+        // Get all event IDs for the product
+        let all_ids = storage::get_product_event_ids(&env, &product_id);
+        let total_count = all_ids.len() as u64;
+
+        // Get paginated event IDs
+        let event_ids = storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
+
+        // Fetch actual events
+        let mut events = Vec::new(&env);
+        for i in 0..event_ids.len() {
+            let eid = event_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
+                events.push_back(event);
+            }
         }
+
+        let has_more = offset + (event_ids.len() as u64) < total_count;
+
+        Ok(TrackingEventPage {
+            events,
+            total_count,
+            has_more,
+        })
     }
 
     /// Get events filtered by type with pagination.
@@ -71,11 +90,28 @@ impl EventQueryContract {
             _ => return Err(Error::ProductNotFound),
         }
         
-        // Call main contract for type-filtered events
-        match main_client.try_get_events_by_type(&product_id, &event_type, &offset, &limit) {
-            Ok(Ok(page)) => Ok(page),
-            Ok(Err(_)) | Err(_) => Err(Error::ProductNotFound),
+        // Get total count for this type
+        let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
+        
+        // Get event IDs by type
+        let event_ids = storage::get_event_ids_by_type(&env, &product_id, &event_type, offset, limit);
+
+        // Fetch actual events
+        let mut events = Vec::new(&env);
+        for i in 0..event_ids.len() {
+            let eid = event_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
+                events.push_back(event);
+            }
         }
+
+        let has_more = offset + (event_ids.len() as u64) < total_count;
+
+        Ok(TrackingEventPage {
+            events,
+            total_count,
+            has_more,
+        })
     }
 
     /// Get events within a time range with pagination.
@@ -96,11 +132,41 @@ impl EventQueryContract {
             _ => return Err(Error::ProductNotFound),
         }
         
-        // Call main contract for time-range filtered events
-        match main_client.try_get_events_by_time_range(&product_id, &start_time, &end_time, &offset, &limit) {
-            Ok(Ok(page)) => Ok(page),
-            Ok(Err(_)) | Err(_) => Err(Error::ProductNotFound),
+        // Get all event IDs for the product
+        let all_ids = storage::get_product_event_ids(&env, &product_id);
+        let mut matching_ids = Vec::new(&env);
+
+        // Filter by time range
+        for i in 0..all_ids.len() {
+            let eid = all_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
+                if event.timestamp >= start_time && event.timestamp <= end_time {
+                    matching_ids.push_back(eid);
+                }
+            }
         }
+
+        let total_count = matching_ids.len() as u64;
+
+        // Apply pagination
+        let mut events = Vec::new(&env);
+        let start = offset as u32;
+        let end = ((offset + limit) as u32).min(matching_ids.len());
+
+        for i in start..end {
+            let eid = matching_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
+                events.push_back(event);
+            }
+        }
+
+        let has_more = offset + (events.len() as u64) < total_count;
+
+        Ok(TrackingEventPage {
+            events,
+            total_count,
+            has_more,
+        })
     }
 
     /// Get events with composite filtering (type, time range, location).
@@ -121,11 +187,59 @@ impl EventQueryContract {
             _ => return Err(Error::ProductNotFound),
         }
         
-        // Call main contract for filtered events
-        match main_client.try_get_filtered_events(&product_id, &filter, &offset, &limit) {
-            Ok(Ok(page)) => Ok(page),
-            Ok(Err(_)) | Err(_) => Err(Error::ProductNotFound),
+        // Get all event IDs for the product
+        let all_ids = storage::get_product_event_ids(&env, &product_id);
+        let mut matching_ids = Vec::new(&env);
+
+        let empty_sym = Symbol::new(&env, "");
+        let empty_loc = String::from_str(&env, "");
+
+        // Apply composite filters
+        for i in 0..all_ids.len() {
+            let eid = all_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
+                let mut matches = true;
+
+                if filter.event_type != empty_sym && event.event_type != filter.event_type {
+                    matches = false;
+                }
+                if filter.start_time > 0 && event.timestamp < filter.start_time {
+                    matches = false;
+                }
+                if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
+                    matches = false;
+                }
+                if filter.location != empty_loc && event.location != filter.location {
+                    matches = false;
+                }
+
+                if matches {
+                    matching_ids.push_back(eid);
+                }
+            }
         }
+
+        let total_count = matching_ids.len() as u64;
+
+        // Apply pagination
+        let mut events = Vec::new(&env);
+        let start = offset as u32;
+        let end = ((offset + limit) as u32).min(matching_ids.len());
+
+        for i in start..end {
+            let eid = matching_ids.get_unchecked(i);
+            if let Some(event) = storage::get_event(&env, eid) {
+                events.push_back(event);
+            }
+        }
+
+        let has_more = offset + (events.len() as u64) < total_count;
+
+        Ok(TrackingEventPage {
+            events,
+            total_count,
+            has_more,
+        })
     }
 
     /// Get total event count for a product.
@@ -133,11 +247,14 @@ impl EventQueryContract {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         
-        // Verify product exists and get count
-        match main_client.try_get_event_count(&product_id) {
-            Ok(Ok(count)) => Ok(count),
-            Ok(Err(_)) | Err(_) => Err(Error::ProductNotFound),
+        // Verify product exists
+        match main_client.try_get_product(&product_id) {
+            Ok(Ok(_)) => {},
+            _ => return Err(Error::ProductNotFound),
         }
+        
+        let ids = storage::get_product_event_ids(&env, &product_id);
+        Ok(ids.len() as u64)
     }
 
     /// Get event count by type for a product.
@@ -149,11 +266,13 @@ impl EventQueryContract {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         
-        // Verify product exists and get count by type
-        match main_client.try_get_event_count_by_type(&product_id, &event_type) {
-            Ok(Ok(count)) => Ok(count),
-            Ok(Err(_)) | Err(_) => Err(Error::ProductNotFound),
+        // Verify product exists
+        match main_client.try_get_product(&product_id) {
+            Ok(Ok(_)) => {},
+            _ => return Err(Error::ProductNotFound),
         }
+        
+        Ok(storage::get_event_count_by_type(&env, &product_id, &event_type))
     }
 }
 
