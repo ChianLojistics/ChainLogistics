@@ -45,7 +45,7 @@ pub struct AdminContract;
 impl AdminContract {
     /// Initialize the contract with an admin address.
     /// Can only be called once.
-    pub fn init(env: Env, admin: Address) -> Result<(), Error> {
+    pub fn admin_init(env: Env, admin: Address) -> Result<(), Error> {
         if has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
@@ -141,7 +141,7 @@ mod test_admin {
         let admin = Address::generate(env);
 
         // Initialize the contract
-        client.init(&admin);
+        client.admin_init(&admin);
 
         (client, admin)
     }
@@ -156,7 +156,7 @@ mod test_admin {
         let admin = Address::generate(&env);
 
         // Initialize should succeed
-        client.init(&admin);
+        client.admin_init(&admin);
 
         // Verify admin is set
         let retrieved_admin = client.get_admin();
@@ -175,7 +175,7 @@ mod test_admin {
         let new_admin = Address::generate(&env);
 
         // Second init should fail
-        let res = client.try_init(&new_admin);
+        let res = client.try_admin_init(&new_admin);
         assert_eq!(res, Err(Ok(Error::AlreadyInitialized)));
     }
 

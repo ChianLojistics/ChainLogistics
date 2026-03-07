@@ -2,6 +2,7 @@
 #![no_std]
 
 mod contract;
+mod product_registry;
 mod types;
 mod storage;
 mod error;
@@ -11,12 +12,13 @@ mod product_transfer;
 mod admin;
 mod product_query;
 
-// #[cfg(test)]
-// mod test;
+#[cfg(test)]
+mod test;
 #[cfg(test)]
 mod test_auth;
 
 pub use contract::*;
+pub use product_registry::*;
 pub use authorization::*;
 pub use product_transfer::*;
 pub use admin::*;
