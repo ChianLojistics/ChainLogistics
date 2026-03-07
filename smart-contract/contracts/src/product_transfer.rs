@@ -1,7 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
 
 use crate::error::Error;
-use crate::{AuthorizationContractClient, ChainLogisticsContractClient};
+use crate::{AuthorizationContractClient, ProductRegistryContractClient};
 use crate::types::DataKey;
 
 // ─── Storage helpers for ProductTransferContract ─────────────────────────────
@@ -30,7 +30,7 @@ pub struct ProductTransferContract;
 #[contractimpl]
 impl ProductTransferContract {
     /// Initialize the ProductTransferContract with required contract addresses.
-    pub fn init(env: Env, main_contract: Address, auth_contract: Address) -> Result<(), Error> {
+    pub fn pt_init(env: Env, main_contract: Address, auth_contract: Address) -> Result<(), Error> {
         if get_auth_contract(&env).is_some() || get_main_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
@@ -56,11 +56,11 @@ impl ProductTransferContract {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let auth_contract = get_auth_contract(&env).ok_or(Error::NotInitialized)?;
 
-        // Create client to interact with main contract
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        // Create client to interact with ProductRegistryContract
+        let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
 
         // Verify product exists and get current product info
-        let product = match main_client.try_get_product(&product_id) {
+        let product = match pr_client.try_get_product(&product_id) {
             Ok(Ok(p)) => p,
             Ok(Err(_)) => return Err(Error::ProductNotFound),
             Err(_) => return Err(Error::ProductNotFound),
@@ -87,8 +87,8 @@ impl ProductTransferContract {
     /// Get the current owner of a product.
     pub fn get_product_owner(env: Env, product_id: String) -> Result<Address, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        let product = match main_client.try_get_product(&product_id) {
+        let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
+        let product = match pr_client.try_get_product(&product_id) {
             Ok(Ok(p)) => p,
             Ok(Err(_)) => return Err(Error::ProductNotFound),
             Err(_) => return Err(Error::ProductNotFound),
@@ -103,8 +103,8 @@ impl ProductTransferContract {
         address: Address,
     ) -> Result<bool, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        let product = match main_client.try_get_product(&product_id) {
+        let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
+        let product = match pr_client.try_get_product(&product_id) {
             Ok(Ok(p)) => p,
             Ok(Err(_)) => return Err(Error::ProductNotFound),
             Err(_) => return Err(Error::ProductNotFound),
@@ -131,7 +131,7 @@ impl ProductTransferContract {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let auth_contract = get_auth_contract(&env).ok_or(Error::NotInitialized)?;
 
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
         let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
 
         let mut transferred_count: u32 = 0;
@@ -140,7 +140,7 @@ impl ProductTransferContract {
             let product_id = product_ids.get_unchecked(i);
 
             // Verify ownership for each product
-            let product = match main_client.try_get_product(&product_id) {
+            let product = match pr_client.try_get_product(&product_id) {
                 Ok(Ok(p)) => p,
                 Ok(Err(_)) | Err(_) => continue, // Skip non-existent products or errors
             };
@@ -171,31 +171,30 @@ mod test_product_transfer {
     use soroban_sdk::{testutils::Address as _, Address, Env, Map, String, Vec};
     use crate::{
         AuthorizationContract, AuthorizationContractClient,
-        ChainLogisticsContract, ChainLogisticsContractClient,
+        ProductRegistryContract, ProductRegistryContractClient,
         ProductConfig,
     };
 
-    fn setup(env: &Env) -> (ChainLogisticsContractClient, AuthorizationContractClient, Address, ProductTransferContractClient, Address) {
+    fn setup(env: &Env) -> (ProductRegistryContractClient, AuthorizationContractClient, Address, ProductTransferContractClient, Address) {
         let auth_id = env.register_contract(None, AuthorizationContract);
-        let cl_id = env.register_contract(None, ChainLogisticsContract);
+        let pr_id = env.register_contract(None, ProductRegistryContract);
         let transfer_id = env.register_contract(None, ProductTransferContract);
 
-        let cl_client = ChainLogisticsContractClient::new(env, &cl_id);
+        let pr_client = ProductRegistryContractClient::new(env, &pr_id);
         let auth_client = AuthorizationContractClient::new(env, &auth_id);
         let transfer_client = ProductTransferContractClient::new(env, &transfer_id);
 
         let admin = Address::generate(env);
-        // Initialize ChainLogisticsContract with the address of AuthorizationContract
-        cl_client.init(&admin, &auth_id);
-        // Initialize ProductTransferContract with both contract addresses
-        transfer_client.init(&cl_id, &auth_id);
+        // Initialize ProductTransferContract with ProductRegistryContract and AuthorizationContract
+        transfer_client.pt_init(&pr_id, &auth_id);
 
-        (cl_client, auth_client, admin, transfer_client, cl_id)
+        (pr_client, auth_client, admin, transfer_client, pr_id)
     }
 
     fn register_test_product(
         env: &Env,
-        client: &ChainLogisticsContractClient,
+        client: &ProductRegistryContractClient,
+        auth_client: &AuthorizationContractClient,
         owner: &Address,
     ) -> String {
         let id = String::from_str(env, "PROD1");
@@ -213,6 +212,8 @@ mod test_product_transfer {
                 custom: Map::new(env),
             },
         );
+        // Also init auth so ProductTransferContract can delegate
+        auth_client.init_product_owner(&id, owner);
         id
     }
 
@@ -221,23 +222,18 @@ mod test_product_transfer {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _auth_client, _admin, transfer_client, _cl_id) = setup(&env);
+        let (pr_client, _auth_client, _admin, transfer_client, _pr_id) = setup(&env);
 
-        // Use ChainLogisticsContract for product registration
         let owner = Address::generate(&env);
         let new_owner = Address::generate(&env);
-        let id = register_test_product(&env, &cl_client, &owner);
+        let id = register_test_product(&env, &pr_client, &_auth_client, &owner);
 
         // Verify initial owner
-        let p = cl_client.get_product(&id);
+        let p = pr_client.get_product(&id);
         assert_eq!(p.owner, owner);
 
         // Transfer ownership
         transfer_client.transfer_product(&owner, &id, &new_owner);
-
-        // Verify new owner - product ownership updated via AuthorizationContract
-        // The actual product owner in ChainLogisticsContract remains the same
-        // but auth is updated in AuthorizationContract
     }
 
     #[test]
@@ -245,12 +241,12 @@ mod test_product_transfer {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _auth_client, _admin, transfer_client, _cl_id) = setup(&env);
+        let (pr_client, _auth_client, _admin, transfer_client, _pr_id) = setup(&env);
 
         let owner = Address::generate(&env);
         let attacker = Address::generate(&env);
         let new_owner = Address::generate(&env);
-        let id = register_test_product(&env, &cl_client, &owner);
+        let id = register_test_product(&env, &pr_client, &_auth_client, &owner);
 
         // Non-owner attempt should fail
         let res = transfer_client.try_transfer_product(&attacker, &id, &new_owner);
@@ -262,18 +258,18 @@ mod test_product_transfer {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _auth_client, _admin, transfer_client, _cl_id) = setup(&env);
+        let (pr_client, _auth_client, _admin, transfer_client, _pr_id) = setup(&env);
 
         let owner = Address::generate(&env);
         let new_owner = Address::generate(&env);
-        let id = register_test_product(&env, &cl_client, &owner);
+        let id = register_test_product(&env, &pr_client, &_auth_client, &owner);
 
         // Both parties authenticated via mock_all_auths, transfer should succeed
         transfer_client.transfer_product(&owner, &id, &new_owner);
 
         // Verify transfer succeeded by checking product owner
         let result_owner = transfer_client.get_product_owner(&id);
-        assert_eq!(result_owner, owner); // Owner in main contract unchanged, auth updated in auth contract
+        assert_eq!(result_owner, owner); // Owner in registry unchanged, auth updated in auth contract
     }
 
     #[test]
@@ -284,17 +280,11 @@ mod test_product_transfer {
         let transfer_id = env.register_contract(None, ProductTransferContract);
         let transfer_client = ProductTransferContractClient::new(&env, &transfer_id);
 
-        // Need to initialize the contracts first
         let auth_id = env.register_contract(None, AuthorizationContract);
-        let main_id = env.register_contract(None, ChainLogisticsContract);
-        let main_client = ChainLogisticsContractClient::new(&env, &main_id);
-        
-        // Initialize the main contract
-        let admin = Address::generate(&env);
-        main_client.init(&admin, &auth_id);
-        
+        let pr_id = env.register_contract(None, ProductRegistryContract);
+
         // Initialize the transfer contract
-        transfer_client.init(&main_id, &auth_id);
+        transfer_client.pt_init(&pr_id, &auth_id);
 
         let owner = Address::generate(&env);
         let new_owner = Address::generate(&env);
@@ -309,16 +299,13 @@ mod test_product_transfer {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _auth_client, _admin, transfer_client, _cl_id) = setup(&env);
+        let (pr_client, _auth_client, _admin, transfer_client, _pr_id) = setup(&env);
 
         let owner = Address::generate(&env);
         let non_owner = Address::generate(&env);
-        let id = register_test_product(&env, &cl_client, &owner);
+        let id = register_test_product(&env, &pr_client, &_auth_client, &owner);
 
-        // Owner check
         assert!(transfer_client.is_product_owner(&id, &owner));
-
-        // Non-owner check
         assert!(!transfer_client.is_product_owner(&id, &non_owner));
     }
 
@@ -327,15 +314,15 @@ mod test_product_transfer {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _auth_client, _admin, transfer_client, _cl_id) = setup(&env);
+        let (pr_client, _auth_client, _admin, transfer_client, _pr_id) = setup(&env);
 
         let owner = Address::generate(&env);
         let new_owner = Address::generate(&env);
 
         // Register multiple products
-        let id1 = register_test_product(&env, &cl_client, &owner);
+        let id1 = register_test_product(&env, &pr_client, &_auth_client, &owner);
         let id2 = String::from_str(&env, "PROD2");
-        cl_client.register_product(
+        pr_client.register_product(
             &owner,
             &ProductConfig {
                 id: id2.clone(),
@@ -349,6 +336,7 @@ mod test_product_transfer {
                 custom: Map::new(&env),
             },
         );
+        _auth_client.init_product_owner(&id2, &owner);
 
         // Batch transfer
         let mut product_ids = Vec::new(&env);
@@ -367,10 +355,9 @@ mod test_product_transfer {
         let transfer_id = env.register_contract(None, ProductTransferContract);
         let transfer_client = ProductTransferContractClient::new(&env, &transfer_id);
 
-        // Need to initialize the contract first
         let auth_id = env.register_contract(None, AuthorizationContract);
-        let main_id = env.register_contract(None, ChainLogisticsContract);
-        transfer_client.init(&main_id, &auth_id);
+        let pr_id = env.register_contract(None, ProductRegistryContract);
+        transfer_client.pt_init(&pr_id, &auth_id);
 
         let owner = Address::generate(&env);
         let new_owner = Address::generate(&env);
@@ -388,17 +375,11 @@ mod test_product_transfer {
         let transfer_id = env.register_contract(None, ProductTransferContract);
         let transfer_client = ProductTransferContractClient::new(&env, &transfer_id);
 
-        // Need to initialize the contracts first
         let auth_id = env.register_contract(None, AuthorizationContract);
-        let main_id = env.register_contract(None, ChainLogisticsContract);
-        let main_client = ChainLogisticsContractClient::new(&env, &main_id);
-        
-        // Initialize the main contract
-        let admin = Address::generate(&env);
-        main_client.init(&admin, &auth_id);
-        
+        let pr_id = env.register_contract(None, ProductRegistryContract);
+
         // Initialize the transfer contract
-        transfer_client.init(&main_id, &auth_id);
+        transfer_client.pt_init(&pr_id, &auth_id);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
 
@@ -415,13 +396,11 @@ mod test_product_transfer {
         let transfer_client = ProductTransferContractClient::new(&env, &transfer_id);
 
         let auth_id = env.register_contract(None, AuthorizationContract);
-        let main_id = env.register_contract(None, ChainLogisticsContract);
+        let pr_id = env.register_contract(None, ProductRegistryContract);
 
-        // First init should succeed
-        transfer_client.init(&main_id, &auth_id);
+        transfer_client.pt_init(&pr_id, &auth_id);
 
-        // Second init should fail
-        let res = transfer_client.try_init(&main_id, &auth_id);
+        let res = transfer_client.try_pt_init(&pr_id, &auth_id);
         assert_eq!(res, Err(Ok(Error::AlreadyInitialized)));
     }
 
@@ -437,7 +416,6 @@ mod test_product_transfer {
         let new_owner = Address::generate(&env);
         let fake_id = String::from_str(&env, "FAKE-001");
 
-        // Transfer without initialization should fail
         let res = transfer_client.try_transfer_product(&owner, &fake_id, &new_owner);
         assert_eq!(res, Err(Ok(Error::NotInitialized)));
     }
