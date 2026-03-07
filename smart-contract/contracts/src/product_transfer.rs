@@ -60,7 +60,11 @@ impl ProductTransferContract {
         let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
 
         // Verify product exists and get current product info
-        let product = main_client.get_product(&product_id);
+        let product = match main_client.try_get_product(&product_id) {
+            Ok(Ok(p)) => p,
+            Ok(Err(_)) => return Err(Error::ProductNotFound),
+            Err(_) => return Err(Error::ProductNotFound),
+        };
 
         // Verify current ownership
         if product.owner != owner {
@@ -84,7 +88,11 @@ impl ProductTransferContract {
     pub fn get_product_owner(env: Env, product_id: String) -> Result<Address, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        let product = main_client.get_product(&product_id);
+        let product = match main_client.try_get_product(&product_id) {
+            Ok(Ok(p)) => p,
+            Ok(Err(_)) => return Err(Error::ProductNotFound),
+            Err(_) => return Err(Error::ProductNotFound),
+        };
         Ok(product.owner)
     }
 
@@ -96,7 +104,11 @@ impl ProductTransferContract {
     ) -> Result<bool, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        let product = main_client.get_product(&product_id);
+        let product = match main_client.try_get_product(&product_id) {
+            Ok(Ok(p)) => p,
+            Ok(Err(_)) => return Err(Error::ProductNotFound),
+            Err(_) => return Err(Error::ProductNotFound),
+        };
         Ok(product.owner == address)
     }
 
@@ -272,9 +284,16 @@ mod test_product_transfer {
         let transfer_id = env.register_contract(None, ProductTransferContract);
         let transfer_client = ProductTransferContractClient::new(&env, &transfer_id);
 
-        // Need to initialize the contract first
+        // Need to initialize the contracts first
         let auth_id = env.register_contract(None, AuthorizationContract);
         let main_id = env.register_contract(None, ChainLogisticsContract);
+        let main_client = ChainLogisticsContractClient::new(&env, &main_id);
+        
+        // Initialize the main contract
+        let admin = Address::generate(&env);
+        main_client.init(&admin, &auth_id);
+        
+        // Initialize the transfer contract
         transfer_client.init(&main_id, &auth_id);
 
         let owner = Address::generate(&env);
@@ -369,9 +388,16 @@ mod test_product_transfer {
         let transfer_id = env.register_contract(None, ProductTransferContract);
         let transfer_client = ProductTransferContractClient::new(&env, &transfer_id);
 
-        // Need to initialize the contract first
+        // Need to initialize the contracts first
         let auth_id = env.register_contract(None, AuthorizationContract);
         let main_id = env.register_contract(None, ChainLogisticsContract);
+        let main_client = ChainLogisticsContractClient::new(&env, &main_id);
+        
+        // Initialize the main contract
+        let admin = Address::generate(&env);
+        main_client.init(&admin, &auth_id);
+        
+        // Initialize the transfer contract
         transfer_client.init(&main_id, &auth_id);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
