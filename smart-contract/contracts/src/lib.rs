@@ -10,6 +10,7 @@ mod authorization;
 mod product_transfer;
 mod admin;
 mod product_query;
+mod tracking;
 
 // #[cfg(test)]
 // mod test;
@@ -21,5 +22,6 @@ pub use authorization::*;
 pub use product_transfer::*;
 pub use admin::*;
 pub use product_query::*;
+pub use tracking::*;
 pub use types::*;
 pub use error::*;
