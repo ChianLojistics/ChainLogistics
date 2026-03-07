@@ -2,13 +2,13 @@
 
 import React, { useState } from 'react';
 import EventTypeSelector, { EventType } from './EventTypeSelector';
+import { LocationInput } from "./LocationInput";
 
 export default function EventTrackingForm() {
     const [eventType, setEventType] = useState<EventType | ''>('');
     const [location, setLocation] = useState('');
     const [note, setNote] = useState('');
     const [productId, setProductId] = useState('');
-    const [isLocating, setIsLocating] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
@@ -19,28 +19,6 @@ export default function EventTrackingForm() {
         { id: 'PRD-2034-ABC', name: 'Organic Cotton T-Shirt' },
         { id: 'PRD-5099-LMN', name: 'Fair Trade Chocolate' },
     ];
-
-    const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            setError('Geolocation is not supported by your browser');
-            return;
-        }
-
-        setIsLocating(true);
-        setError('');
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-                setIsLocating(false);
-            },
-            (err) => {
-                setIsLocating(false);
-                setError(`Failed to get location: ${err.message}`);
-            }
-        );
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -141,35 +119,17 @@ export default function EventTrackingForm() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-3">
-                        <label htmlFor="location" className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">3. Location Info *</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                id="location"
-                                value={location}
-                                onChange={(e) => setLocation(e.target.value)}
-                                placeholder="e.g. 12.345, -67.890 or Facility A"
-                                className="flex-1 rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50 border p-4"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={handleGetLocation}
-                                disabled={isLocating}
-                                className="px-5 bg-white text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition border border-gray-300 disabled:opacity-50 flex items-center justify-center shadow-sm whitespace-nowrap"
-                                title="Auto-detect GPS Location"
-                            >
-                                {isLocating ? (
-                                    <span className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
-                                ) : (
-                                    <span className="flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                        <span className="hidden sm:inline">Use GPS</span>
-                                    </span>
-                                )}
-                            </button>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">Provide facility name or geographic coordinates.</p>
+                        <LocationInput
+                            id="location"
+                            label="3. Location Info"
+                            required
+                            value={location}
+                            onChange={(value) => {
+                                setLocation(value);
+                                setError('');
+                            }}
+                            error={!location && error === 'Please fill in all required fields' ? 'Location is required' : undefined}
+                        />
                     </div>
 
                     <div className="space-y-3">
