@@ -131,7 +131,7 @@ impl StatsContract {
         for event_type in event_types.iter() {
             let count = storage::get_event_count_by_type(&env, &product_id, event_type);
             if count > 0 {
-                type_counts.push_back((*event_type, count));
+                type_counts.push_back((event_type.clone(), count));
             }
         }
         
