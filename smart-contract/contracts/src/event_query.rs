@@ -2,8 +2,16 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
 use crate::storage;
-use crate::types::{DataKey, TrackingEvent, TrackingEventFilter, TrackingEventPage};
+use crate::types::{DataKey, TrackingEventFilter, TrackingEventPage};
 use crate::ChainLogisticsContractClient;
+
+fn ensure_product_exists(env: &Env, product_id: &String) -> Result<(), Error> {
+    if storage::get_product(env, product_id).is_some() {
+        Ok(())
+    } else {
+        Err(Error::ProductNotFound)
+    }
+}
 
 // ─── Storage helpers for EventQueryContract ──────────────────────────────────
 
@@ -40,13 +48,8 @@ impl EventQueryContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Verify product exists
-        match main_client.try_get_product(&product_id) {
-            Ok(Ok(_)) => {},
-            _ => return Err(Error::ProductNotFound),
-        }
+        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        ensure_product_exists(&env, &product_id)?;
         
         // Get all event IDs for the product
         let all_ids = storage::get_product_event_ids(&env, &product_id);
@@ -82,13 +85,8 @@ impl EventQueryContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Verify product exists
-        match main_client.try_get_product(&product_id) {
-            Ok(Ok(_)) => {},
-            _ => return Err(Error::ProductNotFound),
-        }
+        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        ensure_product_exists(&env, &product_id)?;
         
         // Get total count for this type
         let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
@@ -124,13 +122,8 @@ impl EventQueryContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Verify product exists
-        match main_client.try_get_product(&product_id) {
-            Ok(Ok(_)) => {},
-            _ => return Err(Error::ProductNotFound),
-        }
+        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        ensure_product_exists(&env, &product_id)?;
         
         // Get all event IDs for the product
         let all_ids = storage::get_product_event_ids(&env, &product_id);
@@ -179,13 +172,8 @@ impl EventQueryContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Verify product exists
-        match main_client.try_get_product(&product_id) {
-            Ok(Ok(_)) => {},
-            _ => return Err(Error::ProductNotFound),
-        }
+        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        ensure_product_exists(&env, &product_id)?;
         
         // Get all event IDs for the product
         let all_ids = storage::get_product_event_ids(&env, &product_id);
@@ -245,13 +233,8 @@ impl EventQueryContract {
     /// Get total event count for a product.
     pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Verify product exists
-        match main_client.try_get_product(&product_id) {
-            Ok(Ok(_)) => {},
-            _ => return Err(Error::ProductNotFound),
-        }
+        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        ensure_product_exists(&env, &product_id)?;
         
         let ids = storage::get_product_event_ids(&env, &product_id);
         Ok(ids.len() as u64)
@@ -264,13 +247,8 @@ impl EventQueryContract {
         event_type: Symbol,
     ) -> Result<u64, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Verify product exists
-        match main_client.try_get_product(&product_id) {
-            Ok(Ok(_)) => {},
-            _ => return Err(Error::ProductNotFound),
-        }
+        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        ensure_product_exists(&env, &product_id)?;
         
         Ok(storage::get_event_count_by_type(&env, &product_id, &event_type))
     }
@@ -279,10 +257,10 @@ impl EventQueryContract {
 #[cfg(test)]
 mod test_event_query {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map};
+    use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map, Vec};
     use crate::{
         AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient,
-        ProductConfig, TrackingContract, TrackingContractClient,
+        TrackingContract, TrackingContractClient,
     };
 
     fn setup(env: &Env) -> (ChainLogisticsContractClient, TrackingContractClient, super::EventQueryContractClient) {
@@ -310,18 +288,27 @@ mod test_event_query {
         id: &str,
     ) -> String {
         let product_id = String::from_str(env, id);
-        client.register_product(
-            owner,
-            &ProductConfig {
+        let _ = client;
+        storage::set_product(
+            env,
+            &product_id,
+            &crate::types::Product {
                 id: product_id.clone(),
                 name: String::from_str(env, "Test Product"),
                 description: String::from_str(env, "Description"),
-                origin_location: String::from_str(env, "Origin"),
+                origin: crate::types::Origin {
+                    location: String::from_str(env, "Origin"),
+                    timestamp: 0,
+                },
+                owner: owner.clone(),
+                created_at: 0,
+                active: true,
                 category: String::from_str(env, "Category"),
                 tags: Vec::new(env),
                 certifications: Vec::new(env),
                 media_hashes: Vec::new(env),
                 custom: Map::new(env),
+                deactivation_info: Vec::new(env),
             },
         );
         product_id
