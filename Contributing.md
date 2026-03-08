@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to ChainLojistic! This comprehensive guide will help you contribute effectively to our open-source supply chain tracking platform.
 
-## 📚 Table of Contents
+## 📚 Table of Contentss
 - [Quick Start](#quick-start)
 - [Development Setup](#development-setup)
 - [Project Structure](#project-structure)
