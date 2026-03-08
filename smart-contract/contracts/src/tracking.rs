@@ -130,27 +130,28 @@ mod test_tracking {
     use soroban_sdk::{testutils::Address as _, Address, Env, Map};
     use crate::{
         AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient,
-        ProductConfig,
+        ProductConfig, ProductRegistryContract, ProductRegistryContractClient,
     };
 
-    fn setup(env: &Env) -> (ChainLogisticsContractClient, Address, Address, super::TrackingContractClient) {
+    fn setup(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractClient, Address, Address, super::TrackingContractClient) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let cl_id = env.register_contract(None, ChainLogisticsContract);
+        let registry_id = env.register_contract(None, ProductRegistryContract);
         let tracking_id = env.register_contract(None, super::TrackingContract);
 
         let cl_client = ChainLogisticsContractClient::new(env, &cl_id);
+        let registry_client = ProductRegistryContractClient::new(env, &registry_id);
         let tracking_client = super::TrackingContractClient::new(env, &tracking_id);
 
         let admin = Address::generate(env);
         cl_client.init(&admin, &auth_id);
-        tracking_client.init(&cl_id);
 
-        (cl_client, admin, cl_id, tracking_client)
+        (cl_client, registry_client, admin, cl_id, tracking_client)
     }
 
     fn register_test_product(
         env: &Env,
-        client: &ChainLogisticsContractClient,
+        client: &ProductRegistryContractClient,
         owner: &Address,
         id: &str,
     ) -> String {
@@ -177,9 +178,9 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add tracking event
         let event_type = Symbol::new(&env, "created");
@@ -211,9 +212,9 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add tracking event
         let event_type = Symbol::new(&env, "created");
@@ -245,7 +246,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, _registry_client, _admin, _cl_id, tracking_client) = setup(&env);
 
         // Get non-existent event
         let res = tracking_client.try_get_event(&999);
@@ -257,9 +258,9 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add multiple events
         let event_type = Symbol::new(&env, "shipped");
@@ -301,9 +302,9 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add events
         let event_type = Symbol::new(&env, "created");
@@ -343,9 +344,9 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         let location = String::from_str(&env, "Warehouse A");
         let data_hash = BytesN::from_array(&env, &[0; 32]);
@@ -395,9 +396,9 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add event with metadata
         let event_type = Symbol::new(&env, "created");
@@ -428,9 +429,9 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Try to add event with too many metadata fields
         let mut metadata = Map::new(&env);
@@ -483,7 +484,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _admin, cl_id, tracking_client) = setup(&env);
+        let (_cl_client, _registry_client, _admin, cl_id, tracking_client) = setup(&env);
 
         // Second init should fail
         let res = tracking_client.try_init(&cl_id);
