@@ -82,6 +82,35 @@ impl ChainLogisticsContract {
         Ok(())
     }
 
+    pub fn is_paused(env: Env) -> bool {
+        storage::is_paused(&env)
+    }
+
+    pub fn pause(env: Env, caller: Address) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
+        }
+        storage::set_paused(&env, true);
+        Ok(())
+    }
+
+    pub fn unpause(env: Env, caller: Address) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        if !storage::is_paused(&env) {
+            return Err(Error::ContractNotPaused);
+        }
+        storage::set_paused(&env, false);
+        Ok(())
+    }
+
+    pub fn transfer_admin(env: Env, current_admin: Address, new_admin: Address) -> Result<(), Error> {
+        require_admin(&env, &current_admin)?;
+        new_admin.require_auth();
+        storage::set_admin(&env, &new_admin);
+        Ok(())
+    }
+
     // Note: register_product, deactivate_product, reactivate_product,
     // get_product, and get_stats have been extracted to ProductRegistryContract
     // in product_registry.rs
