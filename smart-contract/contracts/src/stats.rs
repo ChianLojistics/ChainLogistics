@@ -1,17 +1,32 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
-
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec, contracttype};
+ 
 use crate::error::Error;
 use crate::types::{DataKey, ProductStats};
-use crate::ChainLogisticsContractClient;
+use crate::{ProductRegistryContractClient, TrackingContractClient};
+
+#[contracttype]
+#[derive(Clone)]
+enum StatsDataKey {
+    RegistryContract,
+    TrackingContract,
+}
 
 // ─── Storage helpers for StatsContract ───────────────────────────────────────
 
-fn get_main_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&DataKey::MainContract)
+fn get_registry_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&StatsDataKey::RegistryContract)
 }
 
-fn set_main_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::MainContract, address);
+fn set_registry_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&StatsDataKey::RegistryContract, address);
+}
+
+fn get_tracking_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&StatsDataKey::TrackingContract)
+}
+
+fn set_tracking_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&StatsDataKey::TrackingContract, address);
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
@@ -22,47 +37,47 @@ pub struct StatsContract;
 #[contractimpl]
 impl StatsContract {
     /// Initialize the StatsContract with the main contract address.
-    pub fn init(env: Env, main_contract: Address) -> Result<(), Error> {
-        if get_main_contract(&env).is_some() {
+    pub fn init(env: Env, registry_contract: Address, tracking_contract: Address) -> Result<(), Error> {
+        if get_registry_contract(&env).is_some() || get_tracking_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
-        set_main_contract(&env, &main_contract);
+        set_registry_contract(&env, &registry_contract);
+        set_tracking_contract(&env, &tracking_contract);
         Ok(())
     }
 
     /// Get global product statistics.
     /// Returns total and active product counts.
     pub fn get_stats(env: Env) -> Result<ProductStats, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        Ok(main_client.get_stats())
+        let registry_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
+        let registry_client = ProductRegistryContractClient::new(&env, &registry_contract);
+        Ok(registry_client.get_stats())
     }
 
     /// Get the total number of products registered.
     pub fn get_total_products(env: Env) -> Result<u64, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        let stats = main_client.get_stats();
+        let registry_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
+        let registry_client = ProductRegistryContractClient::new(&env, &registry_contract);
+
+        let stats = registry_client.get_stats();
         Ok(stats.total_products)
     }
 
     /// Get the number of active products.
     pub fn get_active_products(env: Env) -> Result<u64, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        let stats = main_client.get_stats();
+        let registry_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
+        let registry_client = ProductRegistryContractClient::new(&env, &registry_contract);
+
+        let stats = registry_client.get_stats();
         Ok(stats.active_products)
     }
 
     /// Get the number of inactive products.
     pub fn get_inactive_products(env: Env) -> Result<u64, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        let stats = main_client.get_stats();
+        let registry_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
+        let registry_client = ProductRegistryContractClient::new(&env, &registry_contract);
+
+        let stats = registry_client.get_stats();
         let total = stats.total_products;
         let active = stats.active_products;
         Ok(total.saturating_sub(active))
@@ -70,9 +85,7 @@ impl StatsContract {
 
     /// Get the total number of tracking events across all products.
     pub fn get_total_events(env: Env) -> Result<u64, Error> {
-        let _main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        
-        // Get the last event ID which represents total events created
+        let _ = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
         let last_event_id: u64 = env
             .storage()
             .persistent()
@@ -84,33 +97,31 @@ impl StatsContract {
     /// Get product-specific statistics.
     /// Returns (event_count, is_active) for a given product.
     pub fn get_product_stats(env: Env, product_id: String) -> Result<(u64, bool), Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Get event count from main contract
-        let event_count = match main_client.try_get_event_count(&product_id) {
-            Ok(Ok(count)) => count,
-            Ok(Err(_)) | Err(_) => return Err(Error::ProductNotFound),
-        };
-        
-        // Check if product is active by trying to get it
-        let is_active = match main_client.try_get_product(&product_id) {
+        let registry_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_contract = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+
+        let registry_client = ProductRegistryContractClient::new(&env, &registry_contract);
+        let tracking_client = TrackingContractClient::new(&env, &tracking_contract);
+
+        let is_active = match registry_client.try_get_product(&product_id) {
             Ok(Ok(product)) => product.active,
             _ => return Err(Error::ProductNotFound),
         };
-        
+
+        let event_count = tracking_client.get_event_count(&product_id);
+
         Ok((event_count, is_active))
     }
 
     /// Get the average number of events per product.
     pub fn get_average_events_per_product(env: Env) -> Result<u64, Error> {
-        let _main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        
+        let _main_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
+
         let total_products = Self::get_total_products(env.clone())?;
         if total_products == 0 {
             return Ok(0);
         }
-        
+
         let total_events = Self::get_total_events(env)?;
         Ok(total_events / total_products)
     }
@@ -121,18 +132,19 @@ impl StatsContract {
         env: Env,
         product_id: String,
     ) -> Result<Vec<(Symbol, u64)>, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
-        
-        // Verify product exists
-        match main_client.try_get_product(&product_id) {
-            Ok(Ok(_)) => {},
+        let registry_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_contract = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+        let registry_client = ProductRegistryContractClient::new(&env, &registry_contract);
+        let tracking_client = TrackingContractClient::new(&env, &tracking_contract);
+
+        match registry_client.try_get_product(&product_id) {
+            Ok(Ok(_)) => {}
             _ => return Err(Error::ProductNotFound),
-        }
-        
+        };
+
         // Count events by type
         let mut type_counts = Vec::new(&env);
-        
+
         // Common event types to check
         let event_types = [
             Symbol::new(&env, "created"),
@@ -141,18 +153,14 @@ impl StatsContract {
             Symbol::new(&env, "transferred"),
             Symbol::new(&env, "updated"),
         ];
-        
+
         for event_type in event_types.iter() {
-            match main_client.try_get_event_count_by_type(&product_id, event_type) {
-                Ok(Ok(count)) => {
-                    if count > 0 {
-                        type_counts.push_back((event_type.clone(), count));
-                    }
-                }
-                _ => {}
+            let count = tracking_client.get_event_count_by_type(&product_id, &event_type);
+            if count > 0 {
+                type_counts.push_back((event_type.clone(), count));
             }
         }
-        
+
         Ok(type_counts)
     }
 }
@@ -162,31 +170,28 @@ mod test_stats {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, Env, Map};
     use crate::{
-        AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient,
+        ProductRegistryContract, ProductRegistryContractClient,
         ProductConfig, TrackingContract, TrackingContractClient,
     };
 
-    fn setup(env: &Env) -> (ChainLogisticsContractClient, TrackingContractClient, super::StatsContractClient) {
-        let auth_id = env.register_contract(None, AuthorizationContract);
-        let cl_id = env.register_contract(None, ChainLogisticsContract);
+    fn setup(env: &Env) -> (ProductRegistryContractClient, TrackingContractClient, super::StatsContractClient) {
+        let registry_id = env.register_contract(None, ProductRegistryContract);
         let tracking_id = env.register_contract(None, TrackingContract);
         let stats_id = env.register_contract(None, super::StatsContract);
 
-        let cl_client = ChainLogisticsContractClient::new(env, &cl_id);
+        let registry_client = ProductRegistryContractClient::new(env, &registry_id);
         let tracking_client = TrackingContractClient::new(env, &tracking_id);
         let stats_client = super::StatsContractClient::new(env, &stats_id);
 
-        let admin = Address::generate(env);
-        cl_client.init(&admin, &auth_id);
-        tracking_client.init(&cl_id);
-        stats_client.init(&cl_id);
+        tracking_client.init(&registry_id);
+        stats_client.init(&registry_id, &tracking_id);
 
-        (cl_client, tracking_client, stats_client)
+        (registry_client, tracking_client, stats_client)
     }
 
     fn register_test_product(
         env: &Env,
-        client: &ChainLogisticsContractClient,
+        client: &ProductRegistryContractClient,
         owner: &Address,
         id: &str,
     ) -> String {
@@ -213,7 +218,7 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, stats_client) = setup(&env);
+        let (registry_client, _tracking_client, stats_client) = setup(&env);
 
         // Initial stats
         let stats = stats_client.get_stats();
@@ -222,8 +227,8 @@ mod test_stats {
 
         // Register products
         let owner = Address::generate(&env);
-        register_test_product(&env, &cl_client, &owner, "PROD1");
-        register_test_product(&env, &cl_client, &owner, "PROD2");
+        register_test_product(&env, &registry_client, &owner, "PROD1");
+        register_test_product(&env, &registry_client, &owner, "PROD2");
 
         // Updated stats
         let stats = stats_client.get_stats();
@@ -236,16 +241,16 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, stats_client) = setup(&env);
+        let (registry_client, _tracking_client, stats_client) = setup(&env);
 
         // Initial count
         assert_eq!(stats_client.get_total_products(), 0);
 
         // Register products
         let owner = Address::generate(&env);
-        register_test_product(&env, &cl_client, &owner, "PROD1");
-        register_test_product(&env, &cl_client, &owner, "PROD2");
-        register_test_product(&env, &cl_client, &owner, "PROD3");
+        register_test_product(&env, &registry_client, &owner, "PROD1");
+        register_test_product(&env, &registry_client, &owner, "PROD2");
+        register_test_product(&env, &registry_client, &owner, "PROD3");
 
         // Updated count
         assert_eq!(stats_client.get_total_products(), 3);
@@ -256,18 +261,18 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, stats_client) = setup(&env);
+        let (registry_client, _tracking_client, stats_client) = setup(&env);
         let owner = Address::generate(&env);
 
         // Register and deactivate a product
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
-        register_test_product(&env, &cl_client, &owner, "PROD2");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
+        register_test_product(&env, &registry_client, &owner, "PROD2");
 
         // Both active initially
         assert_eq!(stats_client.get_active_products(), 2);
 
         // Deactivate one
-        cl_client.deactivate_product(&owner, &product_id, &String::from_str(&env, "Testing"));
+        registry_client.deactivate_product(&owner, &product_id, &String::from_str(&env, "Testing"));
 
         // One active now
         assert_eq!(stats_client.get_active_products(), 1);
@@ -278,18 +283,18 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, stats_client) = setup(&env);
+        let (registry_client, _tracking_client, stats_client) = setup(&env);
         let owner = Address::generate(&env);
 
         // Register products
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
-        register_test_product(&env, &cl_client, &owner, "PROD2");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
+        register_test_product(&env, &registry_client, &owner, "PROD2");
 
         // No inactive initially
         assert_eq!(stats_client.get_inactive_products(), 0);
 
         // Deactivate one
-        cl_client.deactivate_product(&owner, &product_id, &String::from_str(&env, "Testing"));
+        registry_client.deactivate_product(&owner, &product_id, &String::from_str(&env, "Testing"));
 
         // One inactive now
         assert_eq!(stats_client.get_inactive_products(), 1);
@@ -300,7 +305,7 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _tracking_client, stats_client) = setup(&env);
+        let (_registry_client, _tracking_client, stats_client) = setup(&env);
 
         // No events initially
         assert_eq!(stats_client.get_total_events(), 0);
@@ -311,9 +316,9 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, stats_client) = setup(&env);
+        let (registry_client, _tracking_client, stats_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Get product stats
         let (event_count, is_active) = stats_client.get_product_stats(&product_id);
@@ -321,7 +326,7 @@ mod test_stats {
         assert!(is_active); // Product is active
 
         // Deactivate product
-        cl_client.deactivate_product(&owner, &product_id, &String::from_str(&env, "Testing"));
+        registry_client.deactivate_product(&owner, &product_id, &String::from_str(&env, "Testing"));
 
         // Check stats again
         let (event_count, is_active) = stats_client.get_product_stats(&product_id);
@@ -334,7 +339,7 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _tracking_client, stats_client) = setup(&env);
+        let (_registry_client, _tracking_client, stats_client) = setup(&env);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
         let res = stats_client.try_get_product_stats(&fake_id);
@@ -346,15 +351,15 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, stats_client) = setup(&env);
+        let (registry_client, _tracking_client, stats_client) = setup(&env);
 
         // No products - average should be 0
         assert_eq!(stats_client.get_average_events_per_product(), 0);
 
         // Register products
         let owner = Address::generate(&env);
-        register_test_product(&env, &cl_client, &owner, "PROD1");
-        register_test_product(&env, &cl_client, &owner, "PROD2");
+        register_test_product(&env, &registry_client, &owner, "PROD1");
+        register_test_product(&env, &registry_client, &owner, "PROD2");
 
         // Still 0 events - average should be 0
         assert_eq!(stats_client.get_average_events_per_product(), 0);
@@ -365,9 +370,9 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, stats_client) = setup(&env);
+        let (registry_client, _tracking_client, stats_client) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // No events yet - distribution should be empty
         let distribution = stats_client.get_event_type_distribution(&product_id);
@@ -379,7 +384,7 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _tracking_client, stats_client) = setup(&env);
+        let (_registry_client, _tracking_client, stats_client) = setup(&env);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
         let res = stats_client.try_get_event_type_distribution(&fake_id);
@@ -391,11 +396,12 @@ mod test_stats {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _tracking_client, stats_client) = setup(&env);
-        let cl_id = env.register_contract(None, ChainLogisticsContract);
+        let (_registry_client, _tracking_client, stats_client) = setup(&env);
+        let pr_id = env.register_contract(None, ProductRegistryContract);
+        let tracking_id = env.register_contract(None, TrackingContract);
 
         // Second init should fail
-        let res = stats_client.try_init(&cl_id);
+        let res = stats_client.try_init(&pr_id, &tracking_id);
         assert_eq!(res, Err(Ok(Error::AlreadyInitialized)));
     }
 

@@ -1,26 +1,41 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec, contracttype};
 
 use crate::error::Error;
-use crate::storage;
-use crate::types::{DataKey, TrackingEventFilter, TrackingEventPage};
-use crate::ChainLogisticsContractClient;
+use crate::types::TrackingEventFilter;
+use crate::types::TrackingEventPage;
+use crate::{ProductRegistryContractClient, TrackingContractClient};
+
+#[contracttype]
+#[derive(Clone)]
+enum QueryDataKey {
+    RegistryContract,
+    TrackingContract,
+}
+
+fn get_registry_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&QueryDataKey::RegistryContract)
+}
+
+fn set_registry_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&QueryDataKey::RegistryContract, address);
+}
+
+fn get_tracking_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&QueryDataKey::TrackingContract)
+}
+
+fn set_tracking_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&QueryDataKey::TrackingContract, address);
+}
 
 fn ensure_product_exists(env: &Env, product_id: &String) -> Result<(), Error> {
-    if storage::get_product(env, product_id).is_some() {
-        Ok(())
-    } else {
-        Err(Error::ProductNotFound)
+    let registry = get_registry_contract(env).ok_or(Error::NotInitialized)?;
+    let registry_client = ProductRegistryContractClient::new(env, &registry);
+
+    match registry_client.try_get_product(product_id) {
+        Ok(Ok(_)) => Ok(()),
+        _ => Err(Error::ProductNotFound),
     }
-}
-
-// ─── Storage helpers for EventQueryContract ──────────────────────────────────
-
-fn get_main_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&DataKey::MainContract)
-}
-
-fn set_main_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::MainContract, address);
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
@@ -30,12 +45,13 @@ pub struct EventQueryContract;
 
 #[contractimpl]
 impl EventQueryContract {
-    /// Initialize the EventQueryContract with the main contract address.
-    pub fn init(env: Env, main_contract: Address) -> Result<(), Error> {
-        if get_main_contract(&env).is_some() {
+    /// Initialize the EventQueryContract with the registry + tracking contract addresses.
+    pub fn init(env: Env, registry_contract: Address, tracking_contract: Address) -> Result<(), Error> {
+        if get_registry_contract(&env).is_some() || get_tracking_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
-        set_main_contract(&env, &main_contract);
+        set_registry_contract(&env, &registry_contract);
+        set_tracking_contract(&env, &tracking_contract);
         Ok(())
     }
 
@@ -47,27 +63,29 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         ensure_product_exists(&env, &product_id)?;
+
+        let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_client = TrackingContractClient::new(&env, &tracking);
         
-        // Get all event IDs for the product
-        let all_ids = storage::get_product_event_ids(&env, &product_id);
+        let all_ids = tracking_client.get_product_event_ids(&product_id);
         let total_count = all_ids.len() as u64;
 
-        // Get paginated event IDs
-        let event_ids = storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
+        let start = offset as u32;
+        let end = ((offset + limit) as u32).min(all_ids.len());
 
         // Fetch actual events
         let mut events = Vec::new(&env);
-        for i in 0..event_ids.len() {
-            let eid = event_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, eid) {
-                events.push_back(event);
+        for i in start..end {
+            let eid = all_ids.get_unchecked(i);
+            if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = event {
+                    events.push_back(event);
+                }
             }
         }
 
-        let has_more = offset + (event_ids.len() as u64) < total_count;
+        let has_more = offset + (events.len() as u64) < total_count;
 
         Ok(TrackingEventPage {
             events,
@@ -84,26 +102,41 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         ensure_product_exists(&env, &product_id)?;
-        
-        // Get total count for this type
-        let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
-        
-        // Get event IDs by type
-        let event_ids = storage::get_event_ids_by_type(&env, &product_id, &event_type, offset, limit);
 
-        // Fetch actual events
-        let mut events = Vec::new(&env);
-        for i in 0..event_ids.len() {
-            let eid = event_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, eid) {
-                events.push_back(event);
+        let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_client = TrackingContractClient::new(&env, &tracking);
+
+        let all_ids = tracking_client.get_product_event_ids(&product_id);
+        let mut matching_ids: Vec<u64> = Vec::new(&env);
+
+        for i in 0..all_ids.len() {
+            let eid = all_ids.get_unchecked(i);
+            if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = event {
+                    if event.event_type == event_type {
+                        matching_ids.push_back(eid);
+                    }
+                }
             }
         }
 
-        let has_more = offset + (event_ids.len() as u64) < total_count;
+        let total_count = matching_ids.len() as u64;
+
+        let start = offset as u32;
+        let end = ((offset + limit) as u32).min(matching_ids.len());
+
+        let mut events = Vec::new(&env);
+        for i in start..end {
+            let eid = matching_ids.get_unchecked(i);
+            if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = event {
+                    events.push_back(event);
+                }
+            }
+        }
+
+        let has_more = offset + (events.len() as u64) < total_count;
 
         Ok(TrackingEventPage {
             events,
@@ -121,35 +154,37 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         ensure_product_exists(&env, &product_id)?;
-        
-        // Get all event IDs for the product
-        let all_ids = storage::get_product_event_ids(&env, &product_id);
-        let mut matching_ids = Vec::new(&env);
 
-        // Filter by time range
+        let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_client = TrackingContractClient::new(&env, &tracking);
+
+        let all_ids = tracking_client.get_product_event_ids(&product_id);
+        let mut matching_ids: Vec<u64> = Vec::new(&env);
+
         for i in 0..all_ids.len() {
             let eid = all_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, eid) {
-                if event.timestamp >= start_time && event.timestamp <= end_time {
-                    matching_ids.push_back(eid);
+            if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = event {
+                    if event.timestamp >= start_time && event.timestamp <= end_time {
+                        matching_ids.push_back(eid);
+                    }
                 }
             }
         }
 
         let total_count = matching_ids.len() as u64;
 
-        // Apply pagination
         let mut events = Vec::new(&env);
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(matching_ids.len());
 
         for i in start..end {
             let eid = matching_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, eid) {
-                events.push_back(event);
+            if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = event {
+                    events.push_back(event);
+                }
             }
         }
 
@@ -171,53 +206,55 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         ensure_product_exists(&env, &product_id)?;
-        
-        // Get all event IDs for the product
-        let all_ids = storage::get_product_event_ids(&env, &product_id);
-        let mut matching_ids = Vec::new(&env);
+
+        let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_client = TrackingContractClient::new(&env, &tracking);
+
+        let all_ids = tracking_client.get_product_event_ids(&product_id);
+        let mut matching_ids: Vec<u64> = Vec::new(&env);
 
         let empty_sym = Symbol::new(&env, "");
         let empty_loc = String::from_str(&env, "");
 
-        // Apply composite filters
         for i in 0..all_ids.len() {
             let eid = all_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, eid) {
-                let mut matches = true;
+            if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = event {
+                    let mut matches = true;
 
-                if filter.event_type != empty_sym && event.event_type != filter.event_type {
-                    matches = false;
-                }
-                if filter.start_time > 0 && event.timestamp < filter.start_time {
-                    matches = false;
-                }
-                if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
-                    matches = false;
-                }
-                if filter.location != empty_loc && event.location != filter.location {
-                    matches = false;
-                }
+                    if filter.event_type != empty_sym && event.event_type != filter.event_type {
+                        matches = false;
+                    }
+                    if filter.start_time > 0 && event.timestamp < filter.start_time {
+                        matches = false;
+                    }
+                    if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
+                        matches = false;
+                    }
+                    if filter.location != empty_loc && event.location != filter.location {
+                        matches = false;
+                    }
 
-                if matches {
-                    matching_ids.push_back(eid);
+                    if matches {
+                        matching_ids.push_back(eid);
+                    }
                 }
             }
         }
 
         let total_count = matching_ids.len() as u64;
 
-        // Apply pagination
         let mut events = Vec::new(&env);
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(matching_ids.len());
 
         for i in start..end {
             let eid = matching_ids.get_unchecked(i);
-            if let Some(event) = storage::get_event(&env, eid) {
-                events.push_back(event);
+            if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = event {
+                    events.push_back(event);
+                }
             }
         }
 
@@ -232,12 +269,12 @@ impl EventQueryContract {
 
     /// Get total event count for a product.
     pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         ensure_product_exists(&env, &product_id)?;
-        
-        let ids = storage::get_product_event_ids(&env, &product_id);
-        Ok(ids.len() as u64)
+
+        let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_client = TrackingContractClient::new(&env, &tracking);
+
+        Ok(tracking_client.get_event_count(&product_id))
     }
 
     /// Get event count by type for a product.
@@ -246,11 +283,12 @@ impl EventQueryContract {
         product_id: String,
         event_type: Symbol,
     ) -> Result<u64, Error> {
-        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
-        let _main_client = ChainLogisticsContractClient::new(&env, &main_contract);
         ensure_product_exists(&env, &product_id)?;
-        
-        Ok(storage::get_event_count_by_type(&env, &product_id, &event_type))
+
+        let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
+        let tracking_client = TrackingContractClient::new(&env, &tracking);
+
+        Ok(tracking_client.get_event_count_by_type(&product_id, &event_type))
     }
 }
 
@@ -259,56 +297,45 @@ mod test_event_query {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map, Vec};
     use crate::{
-        AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient,
+        ProductRegistryContract, ProductRegistryContractClient,
+        ProductConfig,
         TrackingContract, TrackingContractClient,
     };
 
-    fn setup(env: &Env) -> (ChainLogisticsContractClient, TrackingContractClient, super::EventQueryContractClient) {
-        let auth_id = env.register_contract(None, AuthorizationContract);
-        let cl_id = env.register_contract(None, ChainLogisticsContract);
+    fn setup(env: &Env) -> (ProductRegistryContractClient, TrackingContractClient, super::EventQueryContractClient, Address, Address) {
+        let registry_id = env.register_contract(None, ProductRegistryContract);
         let tracking_id = env.register_contract(None, TrackingContract);
         let query_id = env.register_contract(None, super::EventQueryContract);
 
-        let cl_client = ChainLogisticsContractClient::new(env, &cl_id);
+        let registry_client = ProductRegistryContractClient::new(env, &registry_id);
         let tracking_client = TrackingContractClient::new(env, &tracking_id);
         let query_client = super::EventQueryContractClient::new(env, &query_id);
 
-        let admin = Address::generate(env);
-        cl_client.init(&admin, &auth_id);
-        tracking_client.init(&cl_id);
-        query_client.init(&cl_id);
+        tracking_client.init(&registry_id);
+        query_client.init(&registry_id, &tracking_id);
 
-        (cl_client, tracking_client, query_client)
+        (registry_client, tracking_client, query_client, registry_id, tracking_id)
     }
 
     fn register_test_product(
         env: &Env,
-        client: &ChainLogisticsContractClient,
+        client: &ProductRegistryContractClient,
         owner: &Address,
         id: &str,
     ) -> String {
         let product_id = String::from_str(env, id);
-        let _ = client;
-        storage::set_product(
-            env,
-            &product_id,
-            &crate::types::Product {
+        client.register_product(
+            owner,
+            &ProductConfig {
                 id: product_id.clone(),
                 name: String::from_str(env, "Test Product"),
                 description: String::from_str(env, "Description"),
-                origin: crate::types::Origin {
-                    location: String::from_str(env, "Origin"),
-                    timestamp: 0,
-                },
-                owner: owner.clone(),
-                created_at: 0,
-                active: true,
+                origin_location: String::from_str(env, "Origin"),
                 category: String::from_str(env, "Category"),
                 tags: Vec::new(env),
                 certifications: Vec::new(env),
                 media_hashes: Vec::new(env),
                 custom: Map::new(env),
-                deactivation_info: Vec::new(env),
             },
         );
         product_id
@@ -337,9 +364,9 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, _tracking_client, query_client) = setup(&env);
+        let (registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Get events for product with no events
         let result = query_client.get_product_events(&product_id, &0, &10);
@@ -353,7 +380,7 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _tracking_client, query_client) = setup(&env);
+        let (_registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
         let res = query_client.try_get_product_events(&fake_id, &0, &10);
@@ -365,9 +392,9 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, tracking_client, query_client) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Initially 0 events
         assert_eq!(query_client.get_event_count(&product_id), 0);
@@ -385,7 +412,7 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _tracking_client, query_client) = setup(&env);
+        let (_registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
         let res = query_client.try_get_event_count(&fake_id);
@@ -397,9 +424,9 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, tracking_client, query_client) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add events of different types
         add_test_event(&env, &tracking_client, &owner, &product_id, "created");
@@ -426,9 +453,9 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, tracking_client, query_client) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add events
         add_test_event(&env, &tracking_client, &owner, &product_id, "created");
@@ -446,9 +473,9 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, tracking_client, query_client) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add events
         add_test_event(&env, &tracking_client, &owner, &product_id, "created");
@@ -465,9 +492,9 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, tracking_client, query_client) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add events
         add_test_event(&env, &tracking_client, &owner, &product_id, "created");
@@ -490,9 +517,9 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (cl_client, tracking_client, query_client) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
         let owner = Address::generate(&env);
-        let product_id = register_test_product(&env, &cl_client, &owner, "PROD1");
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Add 5 events
         for _ in 0..5 {
@@ -521,11 +548,10 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _tracking_client, query_client) = setup(&env);
-        let cl_id = env.register_contract(None, ChainLogisticsContract);
+        let (_registry_client, _tracking_client, query_client, registry_id, tracking_id) = setup(&env);
 
         // Second init should fail
-        let res = query_client.try_init(&cl_id);
+        let res = query_client.try_init(&registry_id, &tracking_id);
         assert_eq!(res, Err(Ok(Error::AlreadyInitialized)));
     }
 

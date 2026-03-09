@@ -8,6 +8,7 @@ mod storage;
 mod storage_contract;
 mod error;
 mod validation;
+mod validation_contract;
 mod authorization;
 mod product_transfer;
 mod admin;

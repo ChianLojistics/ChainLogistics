@@ -4,8 +4,8 @@ use crate::types::{
     Product, TrackingEvent, TrackingEventFilter, TrackingEventPage,
 };
 use crate::error::Error;
-use crate::{storage, validation, AuthorizationContractClient};
-
+use crate::{storage, AuthorizationContractClient};
+use crate::validation_contract::ValidationContract;
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -103,21 +103,9 @@ impl ChainLogisticsContract {
         let product = read_product(&env, &product_id)?;
         require_can_add_event(&env, &product_id, &product, &actor)?;
 
-        const MAX_METADATA_FIELDS: u32 = 20;
-        const MAX_METADATA_VALUE_LEN: u32 = 256;
-
-        if metadata.len() > MAX_METADATA_FIELDS {
-            return Err(Error::TooManyCustomFields);
-        }
-
-        let meta_keys = metadata.keys();
-        for i in 0..meta_keys.len() {
-            let k = meta_keys.get_unchecked(i);
-            let v = metadata.get_unchecked(k);
-            if !validation::max_len(&v, MAX_METADATA_VALUE_LEN) {
-                return Err(Error::CustomFieldValueTooLong);
-            }
-        }
+        ValidationContract::validate_event_location(&location)?;
+        ValidationContract::validate_event_note(&note)?;
+        ValidationContract::validate_metadata(&metadata)?;
 
         let event_id = storage::next_event_id(&env);
         let event = TrackingEvent {
