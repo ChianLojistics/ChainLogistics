@@ -151,11 +151,14 @@ impl StorageContract {
     pub fn index_event_by_type(env: &Env, product_id: &String, event_type: &Symbol, event_id: u64) {
         let count_key = Self::event_type_count_key(product_id, event_type);
         let mut count: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
-        count += 1;
-        env.storage().persistent().set(&count_key, &count);
-
+        
+        // Store at 0-based index (count represents next available index)
         let index_key = Self::event_type_index_key(product_id, event_type, count);
         env.storage().persistent().set(&index_key, &event_id);
+        
+        // Increment count after storing
+        count += 1;
+        env.storage().persistent().set(&count_key, &count);
     }
 
     pub fn get_event_ids_by_type(
@@ -174,8 +177,9 @@ impl StorageContract {
             return result;
         }
 
-        let start = offset + 1;
-        let end = (start + limit).min(total + 1);
+        // Use 0-based indexing consistently
+        let start = offset;
+        let end = (start + limit).min(total);
 
         for i in start..end {
             let index_key = Self::event_type_index_key(product_id, event_type, i);
@@ -369,6 +373,148 @@ mod test_storage_contract {
             // Test offset > 0 with empty list
             let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 5, 10);
             assert_eq!(result.len(), 0);
+        });
+    }
+
+    #[test]
+    fn test_event_type_indexing_0_based() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ChainLogisticsContract);
+        let product_id = String::from_str(&env, "TEST_PRODUCT");
+        let event_type = Symbol::new(&env, "test_type");
+
+        env.as_contract(&contract_id, || {
+            // Index first event at position 0
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102);
+
+            // Test offset=0, limit=1 returns first event ID
+            let result = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 0, 1);
+            assert_eq!(result.len(), 1);
+            assert_eq!(result.get(0), Some(100));
+
+            // Test offset=1, limit=1 returns second event ID  
+            let result = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 1, 1);
+            assert_eq!(result.len(), 1);
+            assert_eq!(result.get(0), Some(101));
+
+            // Test offset=2, limit=1 returns third event ID
+            let result = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 2, 1);
+            assert_eq!(result.len(), 1);
+            assert_eq!(result.get(0), Some(102));
+
+            // Test offset=0, limit=2 returns first two event IDs
+            let result = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 0, 2);
+            assert_eq!(result.len(), 2);
+            assert_eq!(result.get(0), Some(100));
+            assert_eq!(result.get(1), Some(101));
+
+            // Test offset=1, limit=2 returns last two event IDs
+            let result = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 1, 2);
+            assert_eq!(result.len(), 2);
+            assert_eq!(result.get(0), Some(101));
+            assert_eq!(result.get(1), Some(102));
+
+            // Test offset >= total returns empty
+            let result = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 3, 1);
+            assert_eq!(result.len(), 0);
+
+            // Test pagination with limit larger than remaining
+            let result = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 1, 5);
+            assert_eq!(result.len(), 2);
+            assert_eq!(result.get(0), Some(101));
+            assert_eq!(result.get(1), Some(102));
+        });
+    }
+
+    #[test]
+    fn test_event_type_count_consistency() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ChainLogisticsContract);
+        let product_id = String::from_str(&env, "TEST_PRODUCT");
+        let event_type = Symbol::new(&env, "test_type");
+
+        env.as_contract(&contract_id, || {
+            // Initially count should be 0
+            assert_eq!(StorageContract::get_event_count_by_type(&env, &product_id, &event_type), 0);
+
+            // Add first event
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100);
+            assert_eq!(StorageContract::get_event_count_by_type(&env, &product_id, &event_type), 1);
+
+            // Add second event
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101);
+            assert_eq!(StorageContract::get_event_count_by_type(&env, &product_id, &event_type), 2);
+
+            // Add third event
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102);
+            assert_eq!(StorageContract::get_event_count_by_type(&env, &product_id, &event_type), 3);
+        });
+    }
+
+    #[test]
+    fn test_event_type_indexing_no_duplicates() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ChainLogisticsContract);
+        let product_id = String::from_str(&env, "TEST_PRODUCT");
+        let event_type = Symbol::new(&env, "test_type");
+
+        env.as_contract(&contract_id, || {
+            // Index 3 events
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102);
+
+            // Get all events in different pages
+            let page1 = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 0, 2);
+            let page2 = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 2, 2);
+            let page3 = StorageContract::get_event_ids_by_type(&env, &product_id, &event_type, 1, 2);
+
+            // Collect all IDs and verify no duplicates manually
+            let mut all_found = Vec::new(&env);
+            all_found.push_back(100);
+            all_found.push_back(101);
+            all_found.push_back(102);
+
+            // Verify page1 contains first two
+            assert_eq!(page1.len(), 2);
+            let mut found_first_two = false;
+            for i in 0..page1.len() {
+                if let Some(id) = page1.get(i) {
+                    if id == 100 || id == 101 {
+                        found_first_two = true;
+                    }
+                }
+            }
+            assert!(found_first_two);
+
+            // Verify page2 contains third
+            assert_eq!(page2.len(), 1);
+            let mut found_third = false;
+            for i in 0..page2.len() {
+                if let Some(id) = page2.get(i) {
+                    if id == 102 {
+                        found_third = true;
+                    }
+                }
+            }
+            assert!(found_third);
+
+            // Verify page3 contains last two
+            assert_eq!(page3.len(), 2);
+            let mut found_last_two = false;
+            for i in 0..page3.len() {
+                if let Some(id) = page3.get(i) {
+                    if id == 101 || id == 102 {
+                        found_last_two = true;
+                    }
+                }
+            }
+            assert!(found_last_two);
+
+            // Verify total unique count
+            assert_eq!(all_found.len(), 3);
         });
     }
 
