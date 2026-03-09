@@ -3,6 +3,7 @@ use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Sym
 use crate::error::Error;
 use crate::storage;
 use crate::types::{DataKey, TrackingEvent};
+use crate::validation_contract::ValidationContract;
 
 // ─── Storage helpers for TrackingContract ────────────────────────────────────
 
@@ -45,22 +46,9 @@ impl TrackingContract {
     ) -> Result<u64, Error> {
         actor.require_auth();
 
-        // Validate metadata
-        const MAX_METADATA_FIELDS: u32 = 20;
-        const MAX_METADATA_VALUE_LEN: u32 = 256;
-
-        if metadata.len() > MAX_METADATA_FIELDS {
-            return Err(Error::TooManyCustomFields);
-        }
-
-        let meta_keys = metadata.keys();
-        for i in 0..meta_keys.len() {
-            let k = meta_keys.get_unchecked(i);
-            let v = metadata.get_unchecked(k);
-            if v.len() > MAX_METADATA_VALUE_LEN {
-                return Err(Error::CustomFieldValueTooLong);
-            }
-        }
+        ValidationContract::validate_event_location(&location)?;
+        ValidationContract::validate_event_note(&note)?;
+        ValidationContract::validate_metadata(&metadata)?;
 
         // Generate unique event ID
         let event_id = storage::next_event_id(&env);
@@ -485,6 +473,8 @@ mod test_tracking {
         env.mock_all_auths();
 
         let (_cl_client, _registry_client, _admin, cl_id, tracking_client) = setup(&env);
+
+        tracking_client.init(&cl_id);
 
         // Second init should fail
         let res = tracking_client.try_init(&cl_id);

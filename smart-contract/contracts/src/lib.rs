@@ -7,6 +7,7 @@ mod types;
 mod storage;
 mod error;
 mod validation;
+mod validation_contract;
 mod authorization;
 mod product_transfer;
 mod admin;

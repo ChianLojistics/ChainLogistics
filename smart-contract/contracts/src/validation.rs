@@ -1,10 +1,12 @@
  #![allow(dead_code)]
 use soroban_sdk::String;
 
+use crate::validation_contract::ValidationContract;
+
 pub fn non_empty(s: &String) -> bool {
-    s.len() > 0
+    ValidationContract::non_empty(s).is_ok()
 }
 
 pub fn max_len(s: &String, max: u32) -> bool {
-    s.len() <= max
+    ValidationContract::max_len(s, max).is_ok()
 }

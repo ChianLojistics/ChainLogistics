@@ -2,7 +2,8 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
 use crate::types::{DeactInfo, Origin, Product, ProductConfig, ProductStats};
-use crate::{storage, validation};
+use crate::storage;
+use crate::validation_contract::ValidationContract;
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -44,71 +45,7 @@ impl ProductRegistryContract {
     ) -> Result<Product, Error> {
         owner.require_auth();
 
-        // --- Validation ---
-        const MAX_ID_LEN: u32 = 64;
-        const MAX_NAME_LEN: u32 = 128;
-        const MAX_ORIGIN_LEN: u32 = 128;
-        const MAX_CATEGORY_LEN: u32 = 64;
-        const MAX_DESC_LEN: u32 = 512;
-        const MAX_TAGS: u32 = 20;
-        const MAX_TAG_LEN: u32 = 64;
-        const MAX_CERTS: u32 = 50;
-        const MAX_MEDIA: u32 = 50;
-        const MAX_CUSTOM: u32 = 20;
-        const MAX_CUSTOM_VAL_LEN: u32 = 256;
-
-        if !validation::non_empty(&config.id) {
-            return Err(Error::InvalidProductId);
-        }
-        if !validation::max_len(&config.id, MAX_ID_LEN) {
-            return Err(Error::ProductIdTooLong);
-        }
-        if !validation::non_empty(&config.name) {
-            return Err(Error::InvalidProductName);
-        }
-        if !validation::max_len(&config.name, MAX_NAME_LEN) {
-            return Err(Error::ProductNameTooLong);
-        }
-        if !validation::non_empty(&config.origin_location) {
-            return Err(Error::InvalidOrigin);
-        }
-        if !validation::max_len(&config.origin_location, MAX_ORIGIN_LEN) {
-            return Err(Error::OriginTooLong);
-        }
-        if !validation::non_empty(&config.category) {
-            return Err(Error::InvalidCategory);
-        }
-        if !validation::max_len(&config.category, MAX_CATEGORY_LEN) {
-            return Err(Error::CategoryTooLong);
-        }
-        if !validation::max_len(&config.description, MAX_DESC_LEN) {
-            return Err(Error::DescriptionTooLong);
-        }
-        if config.tags.len() > MAX_TAGS {
-            return Err(Error::TooManyTags);
-        }
-        for i in 0..config.tags.len() {
-            if !validation::max_len(&config.tags.get_unchecked(i), MAX_TAG_LEN) {
-                return Err(Error::TagTooLong);
-            }
-        }
-        if config.certifications.len() > MAX_CERTS {
-            return Err(Error::TooManyCertifications);
-        }
-        if config.media_hashes.len() > MAX_MEDIA {
-            return Err(Error::TooManyMediaHashes);
-        }
-        if config.custom.len() > MAX_CUSTOM {
-            return Err(Error::TooManyCustomFields);
-        }
-        let custom_keys = config.custom.keys();
-        for i in 0..custom_keys.len() {
-            let k = custom_keys.get_unchecked(i);
-            let v = config.custom.get_unchecked(k);
-            if !validation::max_len(&v, MAX_CUSTOM_VAL_LEN) {
-                return Err(Error::CustomFieldValueTooLong);
-            }
-        }
+        ValidationContract::validate_product_config(&config)?;
 
         // --- Duplicate check ---
         if storage::has_product(&env, &config.id) {
@@ -175,9 +112,7 @@ impl ProductRegistryContract {
             return Err(Error::ProductDeactivated);
         }
 
-        if !validation::non_empty(&reason) {
-            return Err(Error::DeactivationReasonRequired);
-        }
+        ValidationContract::validate_deactivation_reason(&reason)?;
 
         product.active = false;
         let mut info = Vec::new(&env);
