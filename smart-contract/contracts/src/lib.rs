@@ -5,6 +5,7 @@ mod contract;
 mod product_registry;
 mod types;
 mod storage;
+mod storage_contract;
 mod error;
 mod validation;
 mod authorization;
