@@ -2,6 +2,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, Symbol};
 
 use crate::error::Error;
 use crate::types::DataKey;
+use crate::ChainLogisticsContractClient;
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
@@ -17,12 +18,12 @@ fn has_admin(env: &Env) -> bool {
     env.storage().persistent().has(&DataKey::Admin)
 }
 
-fn is_paused(env: &Env) -> bool {
-    env.storage().persistent().get(&DataKey::Paused).unwrap_or(false)
+fn get_main_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::MainContract)
 }
 
-fn set_paused(env: &Env, paused: bool) {
-    env.storage().persistent().set(&DataKey::Paused, &paused);
+fn set_main_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&DataKey::MainContract, address);
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -45,13 +46,13 @@ pub struct AdminContract;
 impl AdminContract {
     /// Initialize the contract with an admin address.
     /// Can only be called once.
-    pub fn admin_init(env: Env, admin: Address) -> Result<(), Error> {
+    pub fn admin_init(env: Env, admin: Address, main_contract: Address) -> Result<(), Error> {
         if has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
         admin.require_auth();
         set_admin(&env, &admin);
-        set_paused(&env, false);
+        set_main_contract(&env, &main_contract);
 
         // Emit initialization event
         env.events().publish(
@@ -69,7 +70,12 @@ impl AdminContract {
 
     /// Check if the contract is currently paused.
     pub fn is_paused(env: Env) -> bool {
-        is_paused(&env)
+        if let Some(main_contract) = get_main_contract(&env) {
+            let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+            main_client.is_paused()
+        } else {
+            false
+        }
     }
 
     /// Pause contract operations.
@@ -77,11 +83,14 @@ impl AdminContract {
     pub fn pause(env: Env, caller: Address) -> Result<(), Error> {
         require_admin(&env, &caller)?;
 
-        if is_paused(&env) {
-            return Err(Error::ContractPaused);
+        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
+        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        match main_client.try_pause(&caller) {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) => return Err(Error::InvalidInput),
+            Err(Ok(e)) => return Err(e),
+            Err(Err(_)) => return Err(Error::InvalidInput),
         }
-
-        set_paused(&env, true);
 
         // Emit pause event
         env.events().publish(
@@ -97,11 +106,14 @@ impl AdminContract {
     pub fn unpause(env: Env, caller: Address) -> Result<(), Error> {
         require_admin(&env, &caller)?;
 
-        if !is_paused(&env) {
-            return Err(Error::ContractNotPaused);
+        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
+        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        match main_client.try_unpause(&caller) {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) => return Err(Error::InvalidInput),
+            Err(Ok(e)) => return Err(e),
+            Err(Err(_)) => return Err(Error::InvalidInput),
         }
-
-        set_paused(&env, false);
 
         // Emit unpause event
         env.events().publish(
@@ -120,6 +132,15 @@ impl AdminContract {
 
         set_admin(&env, &new_admin);
 
+        let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
+        let main_client = ChainLogisticsContractClient::new(&env, &main_contract);
+        match main_client.try_transfer_admin(&current_admin, &new_admin) {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) => return Err(Error::InvalidInput),
+            Err(Ok(e)) => return Err(e),
+            Err(Err(_)) => return Err(Error::InvalidInput),
+        }
+
         // Emit transfer event
         env.events().publish(
             (Symbol::new(&env, "admin_transferred"),),
@@ -135,13 +156,20 @@ mod test_admin {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, Env};
 
+    use crate::{AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient};
+
     fn setup(env: &Env) -> (AdminContractClient, Address) {
         let contract_id = env.register_contract(None, AdminContract);
         let client = AdminContractClient::new(env, &contract_id);
         let admin = Address::generate(env);
 
+        let auth_id = env.register_contract(None, AuthorizationContract);
+        let cl_id = env.register_contract(None, ChainLogisticsContract);
+        let cl_client = ChainLogisticsContractClient::new(env, &cl_id);
+        cl_client.init(&admin, &auth_id);
+
         // Initialize the contract
-        client.admin_init(&admin);
+        client.admin_init(&admin, &cl_id);
 
         (client, admin)
     }
@@ -155,8 +183,13 @@ mod test_admin {
         let client = AdminContractClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
 
+        let auth_id = env.register_contract(None, AuthorizationContract);
+        let cl_id = env.register_contract(None, ChainLogisticsContract);
+        let cl_client = ChainLogisticsContractClient::new(&env, &cl_id);
+        cl_client.init(&admin, &auth_id);
+
         // Initialize should succeed
-        client.admin_init(&admin);
+        client.admin_init(&admin, &cl_id);
 
         // Verify admin is set
         let retrieved_admin = client.get_admin();
@@ -174,8 +207,13 @@ mod test_admin {
         let (client, _admin) = setup(&env);
         let new_admin = Address::generate(&env);
 
+        let auth_id = env.register_contract(None, AuthorizationContract);
+        let cl_id = env.register_contract(None, ChainLogisticsContract);
+        let cl_client = ChainLogisticsContractClient::new(&env, &cl_id);
+        cl_client.init(&new_admin, &auth_id);
+
         // Second init should fail
-        let res = client.try_admin_init(&new_admin);
+        let res = client.try_admin_init(&new_admin, &cl_id);
         assert_eq!(res, Err(Ok(Error::AlreadyInitialized)));
     }
 

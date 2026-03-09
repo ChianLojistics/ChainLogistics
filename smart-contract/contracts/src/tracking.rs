@@ -4,6 +4,7 @@ use crate::error::Error;
 use crate::storage;
 use crate::types::{DataKey, TrackingEvent};
 use crate::validation_contract::ValidationContract;
+use crate::ChainLogisticsContractClient;
 
 // ─── Storage helpers for TrackingContract ────────────────────────────────────
 
@@ -13,6 +14,15 @@ fn get_main_contract(env: &Env) -> Option<Address> {
 
 fn set_main_contract(env: &Env, address: &Address) {
     env.storage().persistent().set(&DataKey::MainContract, address);
+}
+
+fn require_not_paused(env: &Env) -> Result<(), Error> {
+    let main_contract = get_main_contract(env).ok_or(Error::NotInitialized)?;
+    let main_client = ChainLogisticsContractClient::new(env, &main_contract);
+    if main_client.is_paused() {
+        return Err(Error::ContractPaused);
+    }
+    Ok(())
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
@@ -44,6 +54,7 @@ impl TrackingContract {
         note: String,
         metadata: Map<Symbol, String>,
     ) -> Result<u64, Error> {
+        require_not_paused(&env)?;
         actor.require_auth();
 
         ValidationContract::validate_event_location(&location)?;
@@ -121,7 +132,7 @@ mod test_tracking {
         ProductConfig, ProductRegistryContract, ProductRegistryContractClient,
     };
 
-    fn setup(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractClient, Address, Address, super::TrackingContractClient) {
+    fn setup_uninitialized(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractClient, Address, Address, super::TrackingContractClient) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let cl_id = env.register_contract(None, ChainLogisticsContract);
         let registry_id = env.register_contract(None, ProductRegistryContract);
@@ -134,6 +145,12 @@ mod test_tracking {
         let admin = Address::generate(env);
         cl_client.init(&admin, &auth_id);
 
+        (cl_client, registry_client, admin, cl_id, tracking_client)
+    }
+
+    fn setup_initialized(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractClient, Address, Address, super::TrackingContractClient) {
+        let (cl_client, registry_client, admin, cl_id, tracking_client) = setup_uninitialized(env);
+        tracking_client.init(&cl_id);
         (cl_client, registry_client, admin, cl_id, tracking_client)
     }
 
@@ -166,7 +183,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -200,7 +217,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -230,11 +247,11 @@ mod test_tracking {
     }
 
     #[test]
-    fn test_get_event_not_found() {
+    fn test_get_event_before_init_fails() {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, _registry_client, _admin, _cl_id, tracking_client) = setup_uninitialized(&env);
 
         // Get non-existent event
         let res = tracking_client.try_get_event(&999);
@@ -242,11 +259,54 @@ mod test_tracking {
     }
 
     #[test]
+    fn test_add_event_when_paused_fails_and_unpause_restores() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (cl_client, registry_client, admin, cl_id, tracking_client) = setup_initialized(&env);
+
+        let owner = Address::generate(&env);
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
+
+        cl_client.pause(&admin);
+
+        let event_type = Symbol::new(&env, "created");
+        let location = String::from_str(&env, "Warehouse A");
+        let data_hash = BytesN::from_array(&env, &[0; 32]);
+        let note = String::from_str(&env, "Product created");
+        let metadata = Map::new(&env);
+
+        let res = tracking_client.try_add_tracking_event(
+            &owner,
+            &product_id,
+            &event_type,
+            &location,
+            &data_hash,
+            &note,
+            &metadata,
+        );
+        assert_eq!(res, Err(Ok(Error::ContractPaused)));
+
+        cl_client.unpause(&admin);
+
+        let event_id = tracking_client.add_tracking_event(
+            &owner,
+            &product_id,
+            &event_type,
+            &location,
+            &data_hash,
+            &note,
+            &metadata,
+        );
+        assert_eq!(event_id, 1);
+    }
+
+    #[test]
     fn test_add_multiple_events() {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -290,7 +350,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -332,7 +392,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -384,7 +444,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -417,7 +477,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -472,7 +532,7 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _registry_client, _admin, cl_id, tracking_client) = setup(&env);
+        let (_cl_client, _registry_client, _admin, cl_id, tracking_client) = setup_uninitialized(&env);
 
         tracking_client.init(&cl_id);
 
@@ -496,11 +556,9 @@ mod test_tracking {
         let data_hash = BytesN::from_array(&env, &[0; 32]);
         let metadata = Map::new(&env);
 
-        // Adding event without initialization should succeed (init only stores main_contract)
-        // But since we don't need main_contract for basic tracking, it should work
-        // Actually, the current implementation doesn't require init for tracking
-        // Let's verify it works
-        let event_id = tracking_client.add_tracking_event(
+        // Adding event without initialization should fail because pause enforcement requires
+        // the main contract address to be set via init.
+        let res = tracking_client.try_add_tracking_event(
             &owner,
             &product_id,
             &event_type,
@@ -510,6 +568,6 @@ mod test_tracking {
             &metadata,
         );
 
-        assert_eq!(event_id, 1);
+        assert_eq!(res, Err(Ok(Error::NotInitialized)));
     }
 }
