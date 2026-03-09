@@ -372,7 +372,7 @@ mod test_event_query {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map, Vec};
     use crate::{
-        AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient,
+        AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract, ChainLogisticsContractClient,
         ProductRegistryContract, ProductRegistryContractClient,
         ProductConfig,
         TrackingContract, TrackingContractClient,
@@ -390,8 +390,12 @@ mod test_event_query {
         cl_client.init(&admin, &auth_id);
 
         let registry_client = ProductRegistryContractClient::new(env, &registry_id);
+        let auth_client = AuthorizationContractClient::new(env, &auth_id);
         let tracking_client = TrackingContractClient::new(env, &tracking_id);
         let query_client = super::EventQueryContractClient::new(env, &query_id);
+
+        auth_client.configure_initializer(&registry_id);
+        registry_client.configure_auth_contract(&auth_id);
 
         tracking_client.init(&cl_id);
         query_client.init(&registry_id, &tracking_id);

@@ -8,7 +8,16 @@ use crate::{
     Error, ProductConfig,
 };
 
-fn setup(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractClient, AuthorizationContractClient, Address) {
+fn setup(
+    env: &Env,
+) -> (
+    ChainLogisticsContractClient,
+    ProductRegistryContractClient,
+    AuthorizationContractClient,
+    Address,
+    Address,
+    Address,
+) {
     let auth_id = env.register_contract(None, AuthorizationContract);
     let cl_id = env.register_contract(None, ChainLogisticsContract);
     let pr_id = env.register_contract(None, ProductRegistryContract);
@@ -19,8 +28,11 @@ fn setup(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractCli
     
     let admin = Address::generate(env);
     cl_client.init(&admin, &auth_id);
+
+    auth_client.configure_initializer(&pr_id);
+    pr_client.configure_auth_contract(&auth_id);
     
-    (cl_client, pr_client, auth_client, admin)
+    (cl_client, pr_client, auth_client, admin, pr_id, auth_id)
 }
 
 fn create_test_product(env: &Env, pr_client: &ProductRegistryContractClient, owner: &Address) -> String {
@@ -46,7 +58,7 @@ fn create_test_product(env: &Env, pr_client: &ProductRegistryContractClient, own
 fn test_registration_and_stats() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_cl_client, pr_client, _auth_client, _admin) = setup(&env);
+    let (_cl_client, pr_client, _auth_client, _admin, _pr_id, _auth_id) = setup(&env);
     let owner = Address::generate(&env);
     
     let stats_before = pr_client.get_stats();
@@ -67,7 +79,7 @@ fn test_authorization_contract_flow() {
     let env = Env::default();
     env.mock_all_auths();
     
-    let (_cl_client, pr_client, auth_client, _admin) = setup(&env);
+    let (_cl_client, pr_client, auth_client, _admin, pr_id, _auth_id) = setup(&env);
     let owner = Address::generate(&env);
     let actor = Address::generate(&env);
     
@@ -76,8 +88,6 @@ fn test_authorization_contract_flow() {
     // Check initial auth — owner is authorized via ProductRegistryContract's set_auth call
     // Note: auth_client is a separate contract, so owner init happens through CL init_product_owner
     // For this test we directly test the AuthorizationContract
-    auth_client.init_product_owner(&product_id, &owner);
-    
     assert!(auth_client.is_authorized(&product_id, &owner));
     assert!(!auth_client.is_authorized(&product_id, &actor));
     
@@ -94,7 +104,7 @@ fn test_authorization_contract_flow() {
 fn test_product_lifecycle() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_cl_client, pr_client, _auth_client, _admin) = setup(&env);
+    let (_cl_client, pr_client, _auth_client, _admin, _pr_id, _auth_id) = setup(&env);
     let owner = Address::generate(&env);
     
     let id = create_test_product(&env, &pr_client, &owner);

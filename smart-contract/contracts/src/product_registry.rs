@@ -1,6 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
+use crate::AuthorizationContractClient;
 use crate::types::{DeactInfo, Origin, Product, ProductConfig, ProductStats};
 use crate::storage;
 use crate::validation_contract::ValidationContract;
@@ -13,6 +14,14 @@ fn get_transfer_contract(env: &Env) -> Option<Address> {
 
 fn set_transfer_contract(env: &Env, address: &Address) {
     env.storage().persistent().set(&crate::types::DataKey::TransferContract, address);
+}
+
+fn get_auth_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&crate::types::DataKey::AuthContract)
+}
+
+fn set_auth_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&crate::types::DataKey::AuthContract, address);
 }
 
 fn require_transfer_contract(env: &Env, caller: &Address) -> Result<(), Error> {
@@ -94,6 +103,11 @@ impl ProductRegistryContract {
         storage::put_product_event_ids(&env, &config.id, &Vec::new(&env));
         storage::set_auth(&env, &config.id, &owner, true);
 
+        let auth_contract = get_auth_contract(&env).ok_or(Error::NotInitialized)?;
+        let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
+        let self_address = env.current_contract_address();
+        auth_client.init_product_owner(&self_address, &config.id, &owner);
+
         // Update global counters
         let total = storage::get_total_products(&env) + 1;
         storage::set_total_products(&env, total);
@@ -107,6 +121,17 @@ impl ProductRegistryContract {
         );
 
         Ok(product)
+    }
+
+    pub fn configure_auth_contract(env: Env, auth_contract: Address) -> Result<(), Error> {
+        match get_auth_contract(&env) {
+            None => {
+                set_auth_contract(&env, &auth_contract);
+                Ok(())
+            }
+            Some(existing) if existing == auth_contract => Ok(()),
+            Some(_) => Err(Error::AlreadyInitialized),
+        }
     }
 
     /// Configure which contract is allowed to call `transfer_owner`.

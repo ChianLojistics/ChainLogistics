@@ -128,7 +128,7 @@ mod test_tracking {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, Env, Map};
     use crate::{
-        AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient,
+        AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract, ChainLogisticsContractClient,
         ProductConfig, ProductRegistryContract, ProductRegistryContractClient,
     };
 
@@ -141,6 +141,10 @@ mod test_tracking {
         let cl_client = ChainLogisticsContractClient::new(env, &cl_id);
         let registry_client = ProductRegistryContractClient::new(env, &registry_id);
         let tracking_client = super::TrackingContractClient::new(env, &tracking_id);
+
+        let auth_client = AuthorizationContractClient::new(env, &auth_id);
+        auth_client.configure_initializer(&registry_id);
+        registry_client.configure_auth_contract(&auth_id);
 
         let admin = Address::generate(env);
         cl_client.init(&admin, &auth_id);

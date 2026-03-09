@@ -6,6 +6,7 @@ use soroban_sdk::{
 };
 
 use crate::{
+    AuthorizationContract, AuthorizationContractClient,
     ProductRegistryContract, ProductRegistryContractClient,
     Error, ProductConfig,
 };
@@ -13,8 +14,15 @@ use crate::{
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 fn setup(env: &Env) -> ProductRegistryContractClient {
+    let auth_id = env.register_contract(None, AuthorizationContract);
     let contract_id = env.register_contract(None, ProductRegistryContract);
-    ProductRegistryContractClient::new(env, &contract_id)
+    let client = ProductRegistryContractClient::new(env, &contract_id);
+    let auth_client = AuthorizationContractClient::new(env, &auth_id);
+
+    auth_client.configure_initializer(&contract_id);
+    client.configure_auth_contract(&auth_id);
+
+    client
 }
 
 fn register_test_product(
