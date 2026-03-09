@@ -36,6 +36,11 @@ impl ProductTransferContract {
         }
         set_main_contract(&env, &main_contract);
         set_auth_contract(&env, &auth_contract);
+
+        let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
+        let self_address = env.current_contract_address();
+        pr_client.configure_transfer_contract(&self_address);
+
         Ok(())
     }
 
@@ -71,9 +76,17 @@ impl ProductTransferContract {
             return Err(Error::Unauthorized);
         }
 
+        if !product.active {
+            return Err(Error::ProductDeactivated);
+        }
+
         // Update authorization mappings via AuthorizationContract
         let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
         auth_client.update_product_owner(&owner, &product_id, &new_owner);
+
+        // Update registry product record ownership
+        let self_address = env.current_contract_address();
+        pr_client.transfer_owner(&self_address, &product_id, &new_owner);
 
         // Emit transfer event
         env.events().publish(
@@ -133,6 +146,7 @@ impl ProductTransferContract {
 
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
         let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
+        let self_address = env.current_contract_address();
 
         let mut transferred_count: u32 = 0;
 
@@ -149,8 +163,15 @@ impl ProductTransferContract {
                 continue; // Skip products not owned by the caller
             }
 
+            if !product.active {
+                continue;
+            }
+
             // Update authorization mappings
             auth_client.update_product_owner(&owner, &product_id, &new_owner);
+
+            // Update registry product record ownership
+            pr_client.transfer_owner(&self_address, &product_id, &new_owner);
 
             // Emit transfer event
             env.events().publish(
@@ -234,6 +255,14 @@ mod test_product_transfer {
 
         // Transfer ownership
         transfer_client.transfer_product(&owner, &id, &new_owner);
+
+        // Verify new owner in registry
+        let p2 = pr_client.get_product(&id);
+        assert_eq!(p2.owner, new_owner);
+
+        // Verify new owner is authorized in authorization contract
+        let ok = _auth_client.is_authorized(&id, &new_owner);
+        assert!(ok);
     }
 
     #[test]
@@ -269,7 +298,7 @@ mod test_product_transfer {
 
         // Verify transfer succeeded by checking product owner
         let result_owner = transfer_client.get_product_owner(&id);
-        assert_eq!(result_owner, owner); // Owner in registry unchanged, auth updated in auth contract
+        assert_eq!(result_owner, new_owner);
     }
 
     #[test]

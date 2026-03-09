@@ -92,6 +92,7 @@ pub enum DataKey {
     Paused,
     AuthContract, // Added for cross-contract delegation
     MainContract, // Added for ProductTransferContract
+    TransferContract,
     TotalProducts,
     ActiveProducts,
 }
