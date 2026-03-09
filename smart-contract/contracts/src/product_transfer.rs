@@ -141,6 +141,11 @@ impl ProductTransferContract {
             return Err(Error::EmptyBatch);
         }
 
+        // Validate batch size to prevent excessive computation
+        if product_ids.len() > 100 {
+            return Err(Error::EmptyBatch); // Reuse error for batch size limit
+        }
+
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let auth_contract = get_auth_contract(&env).ok_or(Error::NotInitialized)?;
 
@@ -151,35 +156,35 @@ impl ProductTransferContract {
         let mut transferred_count: u32 = 0;
 
         for i in 0..product_ids.len() {
-            let product_id = product_ids.get_unchecked(i);
+            if let Some(product_id) = product_ids.get(i) {
+                // Verify ownership for each product
+                let product = match pr_client.try_get_product(&product_id) {
+                    Ok(Ok(p)) => p,
+                    Ok(Err(_)) | Err(_) => continue, // Skip non-existent products or errors
+                };
 
-            // Verify ownership for each product
-            let product = match pr_client.try_get_product(&product_id) {
-                Ok(Ok(p)) => p,
-                Ok(Err(_)) | Err(_) => continue, // Skip non-existent products or errors
-            };
+                if product.owner != owner {
+                    continue; // Skip products not owned by the caller
+                }
 
-            if product.owner != owner {
-                continue; // Skip products not owned by the caller
+                if !product.active {
+                    continue;
+                }
+
+                // Update authorization mappings
+                auth_client.update_product_owner(&owner, &product_id, &new_owner);
+
+                // Update registry product record ownership
+                pr_client.transfer_owner(&self_address, &product_id, &new_owner);
+
+                // Emit transfer event
+                env.events().publish(
+                    (Symbol::new(&env, "product_transferred"), product_id),
+                    (owner.clone(), new_owner.clone()),
+                );
+
+                transferred_count += 1;
             }
-
-            if !product.active {
-                continue;
-            }
-
-            // Update authorization mappings
-            auth_client.update_product_owner(&owner, &product_id, &new_owner);
-
-            // Update registry product record ownership
-            pr_client.transfer_owner(&self_address, &product_id, &new_owner);
-
-            // Emit transfer event
-            env.events().publish(
-                (Symbol::new(&env, "product_transferred"), product_id),
-                (owner.clone(), new_owner.clone()),
-            );
-
-            transferred_count += 1;
         }
 
         Ok(transferred_count)
@@ -414,6 +419,90 @@ mod test_product_transfer {
 
         let res = transfer_client.try_get_product_owner(&fake_id);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_batch_transfer_boundary_conditions() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (pr_client, _auth_client, _admin, transfer_client, _pr_id) = setup(&env);
+
+        let owner = Address::generate(&env);
+        let new_owner = Address::generate(&env);
+
+        // Test empty batch (should fail)
+        let product_ids = Vec::new(&env);
+        let res = transfer_client.try_batch_transfer_products(&owner, &product_ids, &new_owner);
+        assert_eq!(res, Err(Ok(Error::EmptyBatch)));
+
+        // Test batch size limit (should fail)
+        let mut large_batch = Vec::new(&env);
+        for i in 0..101 {
+            let id = String::from_str(&env, "PROD");
+            large_batch.push_back(id);
+        }
+        let res = transfer_client.try_batch_transfer_products(&owner, &large_batch, &new_owner);
+        assert_eq!(res, Err(Ok(Error::EmptyBatch))); // Reusing error for batch size limit
+
+        // Test normal batch size (should work if products exist)
+        let mut normal_batch = Vec::new(&env);
+        for i in 0..5 {
+            let id = String::from_str(&env, "PROD");
+            normal_batch.push_back(id);
+        }
+        // This will return 0 because products don't exist, but won't fail due to batch size
+        let count = transfer_client.batch_transfer_products(&owner, &normal_batch, &new_owner);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_batch_transfer_with_nonexistent_products() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (pr_client, auth_client, _admin, transfer_client, _pr_id) = setup(&env);
+
+        let owner = Address::generate(&env);
+        let new_owner = Address::generate(&env);
+
+        // Register some products
+        let id1 = register_test_product(&env, &pr_client, &auth_client, &owner);
+        let id2 = register_test_product(&env, &pr_client, &auth_client, &owner);
+
+        // Create batch with mix of existing and non-existing products
+        let mut mixed_batch = Vec::new(&env);
+        mixed_batch.push_back(id1); // exists
+        mixed_batch.push_back(String::from_str(&env, "NONEXISTENT")); // doesn't exist
+        mixed_batch.push_back(id2); // exists
+        mixed_batch.push_back(String::from_str(&env, "ALSO_NONEXISTENT")); // doesn't exist
+
+        let count = transfer_client.batch_transfer_products(&owner, &mixed_batch, &new_owner);
+        assert_eq!(count, 2); // Should only transfer existing products
+    }
+
+    #[test]
+    fn test_batch_transfer_with_unowned_products() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (pr_client, auth_client, _admin, transfer_client, _pr_id) = setup(&env);
+
+        let owner = Address::generate(&env);
+        let other_owner = Address::generate(&env);
+        let new_owner = Address::generate(&env);
+
+        // Register products by different owners
+        let id1 = register_test_product(&env, &pr_client, &auth_client, &owner);
+        let id2 = register_test_product(&env, &pr_client, &auth_client, &other_owner);
+
+        // Create batch with mix of owned and unowned products
+        let mut mixed_batch = Vec::new(&env);
+        mixed_batch.push_back(id1); // owned by caller
+        mixed_batch.push_back(id2); // owned by other person
+
+        let count = transfer_client.batch_transfer_products(&owner, &mixed_batch, &new_owner);
+        assert_eq!(count, 1); // Should only transfer owned products
     }
 
     #[test]

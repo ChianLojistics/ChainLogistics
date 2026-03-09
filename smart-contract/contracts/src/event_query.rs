@@ -63,6 +63,15 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
+        // Validate input parameters
+        if limit == 0 || limit > 1000 {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count: 0,
+                has_more: false,
+            });
+        }
+        
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
@@ -71,16 +80,25 @@ impl EventQueryContract {
         let all_ids = tracking_client.get_product_event_ids(&product_id);
         let total_count = all_ids.len() as u64;
 
+        if offset >= total_count {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count,
+                has_more: false,
+            });
+        }
+
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(all_ids.len());
 
         // Fetch actual events
         let mut events = Vec::new(&env);
         for i in start..end {
-            let eid = all_ids.get_unchecked(i);
-            if let Ok(event) = tracking_client.try_get_event(&eid) {
-                if let Ok(event) = event {
-                    events.push_back(event);
+            if let Some(eid) = all_ids.get(i) {
+                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                    if let Ok(event) = event {
+                        events.push_back(event);
+                    }
                 }
             }
         }
@@ -102,6 +120,15 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
+        // Validate input parameters
+        if limit == 0 || limit > 1000 {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count: 0,
+                has_more: false,
+            });
+        }
+        
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
@@ -111,11 +138,12 @@ impl EventQueryContract {
         let mut matching_ids: Vec<u64> = Vec::new(&env);
 
         for i in 0..all_ids.len() {
-            let eid = all_ids.get_unchecked(i);
-            if let Ok(event) = tracking_client.try_get_event(&eid) {
-                if let Ok(event) = event {
-                    if event.event_type == event_type {
-                        matching_ids.push_back(eid);
+            if let Some(eid) = all_ids.get(i) {
+                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                    if let Ok(event) = event {
+                        if event.event_type == event_type {
+                            matching_ids.push_back(eid);
+                        }
                     }
                 }
             }
@@ -123,15 +151,24 @@ impl EventQueryContract {
 
         let total_count = matching_ids.len() as u64;
 
+        if offset >= total_count {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count,
+                has_more: false,
+            });
+        }
+
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(matching_ids.len());
 
         let mut events = Vec::new(&env);
         for i in start..end {
-            let eid = matching_ids.get_unchecked(i);
-            if let Ok(event) = tracking_client.try_get_event(&eid) {
-                if let Ok(event) = event {
-                    events.push_back(event);
+            if let Some(eid) = matching_ids.get(i) {
+                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                    if let Ok(event) = event {
+                        events.push_back(event);
+                    }
                 }
             }
         }
@@ -154,6 +191,15 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
+        // Validate input parameters
+        if limit == 0 || limit > 1000 {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count: 0,
+                has_more: false,
+            });
+        }
+        
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
@@ -163,11 +209,12 @@ impl EventQueryContract {
         let mut matching_ids: Vec<u64> = Vec::new(&env);
 
         for i in 0..all_ids.len() {
-            let eid = all_ids.get_unchecked(i);
-            if let Ok(event) = tracking_client.try_get_event(&eid) {
-                if let Ok(event) = event {
-                    if event.timestamp >= start_time && event.timestamp <= end_time {
-                        matching_ids.push_back(eid);
+            if let Some(eid) = all_ids.get(i) {
+                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                    if let Ok(event) = event {
+                        if event.timestamp >= start_time && event.timestamp <= end_time {
+                            matching_ids.push_back(eid);
+                        }
                     }
                 }
             }
@@ -175,15 +222,24 @@ impl EventQueryContract {
 
         let total_count = matching_ids.len() as u64;
 
-        let mut events = Vec::new(&env);
+        if offset >= total_count {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count,
+                has_more: false,
+            });
+        }
+
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(matching_ids.len());
 
+        let mut events = Vec::new(&env);
         for i in start..end {
-            let eid = matching_ids.get_unchecked(i);
-            if let Ok(event) = tracking_client.try_get_event(&eid) {
-                if let Ok(event) = event {
-                    events.push_back(event);
+            if let Some(eid) = matching_ids.get(i) {
+                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                    if let Ok(event) = event {
+                        events.push_back(event);
+                    }
                 }
             }
         }
@@ -206,6 +262,15 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
+        // Validate input parameters
+        if limit == 0 || limit > 1000 {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count: 0,
+                has_more: false,
+            });
+        }
+        
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
@@ -218,26 +283,27 @@ impl EventQueryContract {
         let empty_loc = String::from_str(&env, "");
 
         for i in 0..all_ids.len() {
-            let eid = all_ids.get_unchecked(i);
-            if let Ok(event) = tracking_client.try_get_event(&eid) {
-                if let Ok(event) = event {
-                    let mut matches = true;
+            if let Some(eid) = all_ids.get(i) {
+                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                    if let Ok(event) = event {
+                        let mut matches = true;
 
-                    if filter.event_type != empty_sym && event.event_type != filter.event_type {
-                        matches = false;
-                    }
-                    if filter.start_time > 0 && event.timestamp < filter.start_time {
-                        matches = false;
-                    }
-                    if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
-                        matches = false;
-                    }
-                    if filter.location != empty_loc && event.location != filter.location {
-                        matches = false;
-                    }
+                        if filter.event_type != empty_sym && event.event_type != filter.event_type {
+                            matches = false;
+                        }
+                        if filter.start_time > 0 && event.timestamp < filter.start_time {
+                            matches = false;
+                        }
+                        if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
+                            matches = false;
+                        }
+                        if filter.location != empty_loc && event.location != filter.location {
+                            matches = false;
+                        }
 
-                    if matches {
-                        matching_ids.push_back(eid);
+                        if matches {
+                            matching_ids.push_back(eid);
+                        }
                     }
                 }
             }
@@ -245,15 +311,24 @@ impl EventQueryContract {
 
         let total_count = matching_ids.len() as u64;
 
-        let mut events = Vec::new(&env);
+        if offset >= total_count {
+            return Ok(TrackingEventPage {
+                events: Vec::new(&env),
+                total_count,
+                has_more: false,
+            });
+        }
+
         let start = offset as u32;
         let end = ((offset + limit) as u32).min(matching_ids.len());
 
+        let mut events = Vec::new(&env);
         for i in start..end {
-            let eid = matching_ids.get_unchecked(i);
-            if let Ok(event) = tracking_client.try_get_event(&eid) {
-                if let Ok(event) = event {
-                    events.push_back(event);
+            if let Some(eid) = matching_ids.get(i) {
+                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                    if let Ok(event) = event {
+                        events.push_back(event);
+                    }
                 }
             }
         }
@@ -547,6 +622,131 @@ mod test_event_query {
         // Get last 1
         let result = query_client.get_product_events(&product_id, &4, &2);
         assert_eq!(result.events.len(), 1);
+        assert!(!result.has_more);
+    }
+
+    #[test]
+    fn test_pagination_boundary_conditions() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let owner = Address::generate(&env);
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
+
+        // Add 5 events for testing
+        for _ in 0..5 {
+            add_test_event(&env, &tracking_client, &owner, &product_id, "created");
+        }
+
+        // Test limit == 0 (should return empty due to validation)
+        let result = query_client.get_product_events(&product_id, &0, &0);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+
+        // Test very large limit (should return empty due to validation)
+        let result = query_client.get_product_events(&product_id, &0, &1001);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+
+        // Test offset == total_count (should return empty)
+        let result = query_client.get_product_events(&product_id, &5, &2);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 5);
+        assert!(!result.has_more);
+
+        // Test offset > total_count (should return empty)
+        let result = query_client.get_product_events(&product_id, &10, &2);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 5);
+        assert!(!result.has_more);
+
+        // Test normal pagination still works
+        let result = query_client.get_product_events(&product_id, &0, &3);
+        assert_eq!(result.events.len(), 3);
+        assert_eq!(result.total_count, 5);
+        assert!(result.has_more);
+
+        let result = query_client.get_product_events(&product_id, &3, &3);
+        assert_eq!(result.events.len(), 2);
+        assert_eq!(result.total_count, 5);
+        assert!(!result.has_more);
+    }
+
+    #[test]
+    fn test_empty_product_boundary_conditions() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let owner = Address::generate(&env);
+        let product_id = register_test_product(&env, &registry_client, &owner, "EMPTY_PROD");
+
+        // Test with empty product (no events)
+        let result = query_client.get_product_events(&product_id, &0, &10);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+
+        // Test offset > 0 with empty product
+        let result = query_client.get_product_events(&product_id, &5, &10);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+
+        // Test filtered queries with empty product
+        let result = query_client.get_events_by_type(&product_id, &Symbol::new(&env, "created"), &0, &10);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+
+        let filter = TrackingEventFilter {
+            event_type: Symbol::new(&env, ""),
+            start_time: 0,
+            end_time: u64::MAX,
+            location: String::from_str(&env, ""),
+        };
+        let result = query_client.get_filtered_events(&product_id, &filter, &0, &10);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+    }
+
+    #[test]
+    fn test_query_boundary_conditions_with_validation() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let owner = Address::generate(&env);
+        let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
+
+        // Add some events
+        add_test_event(&env, &tracking_client, &owner, &product_id, "created");
+        add_test_event(&env, &tracking_client, &owner, &product_id, "shipped");
+
+        // Test validation on different query types
+        let result = query_client.get_events_by_type(&product_id, &Symbol::new(&env, "created"), &0, &0);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+
+        let result = query_client.get_events_by_time_range(&product_id, &0, &u64::MAX, &0, &1001);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
+        assert!(!result.has_more);
+
+        let filter = TrackingEventFilter {
+            event_type: Symbol::new(&env, "created"),
+            start_time: 0,
+            end_time: u64::MAX,
+            location: String::from_str(&env, ""),
+        };
+        let result = query_client.get_filtered_events(&product_id, &filter, &0, &0);
+        assert_eq!(result.events.len(), 0);
+        assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
     }
 
