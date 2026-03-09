@@ -5,6 +5,25 @@ use crate::types::{DeactInfo, Origin, Product, ProductConfig, ProductStats};
 use crate::storage;
 use crate::validation_contract::ValidationContract;
 
+// ─── Storage helpers for trusted transfer contract ───────────────────────────
+
+fn get_transfer_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&crate::types::DataKey::TransferContract)
+}
+
+fn set_transfer_contract(env: &Env, address: &Address) {
+    env.storage().persistent().set(&crate::types::DataKey::TransferContract, address);
+}
+
+fn require_transfer_contract(env: &Env, caller: &Address) -> Result<(), Error> {
+    let trusted = get_transfer_contract(env).ok_or(Error::NotInitialized)?;
+    caller.require_auth();
+    if *caller != trusted {
+        return Err(Error::Unauthorized);
+    }
+    Ok(())
+}
+
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
@@ -86,6 +105,43 @@ impl ProductRegistryContract {
             (Symbol::new(&env, "product_registered"), config.id.clone()),
             product.clone(),
         );
+
+        Ok(product)
+    }
+
+    /// Configure which contract is allowed to call `transfer_owner`.
+    ///
+    /// This is intentionally one-time set (or idempotent if set to the same
+    /// address) to avoid ownership transfers being callable by arbitrary
+    /// contracts.
+    pub fn configure_transfer_contract(env: Env, transfer_contract: Address) -> Result<(), Error> {
+        match get_transfer_contract(&env) {
+            None => {
+                set_transfer_contract(&env, &transfer_contract);
+                Ok(())
+            }
+            Some(existing) if existing == transfer_contract => Ok(()),
+            Some(_) => Err(Error::AlreadyInitialized),
+        }
+    }
+
+    /// Update a product's `owner` field.
+    ///
+    /// This must only be called by the configured `ProductTransferContract`.
+    pub fn transfer_owner(
+        env: Env,
+        caller: Address,
+        product_id: String,
+        new_owner: Address,
+    ) -> Result<Product, Error> {
+        require_transfer_contract(&env, &caller)?;
+
+        let mut product = read_product(&env, &product_id)?;
+        if !product.active {
+            return Err(Error::ProductDeactivated);
+        }
+        product.owner = new_owner;
+        write_product(&env, &product);
 
         Ok(product)
     }
