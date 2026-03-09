@@ -69,13 +69,19 @@ mod test_product_query {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, Env, Map, Vec};
     use crate::{
+        AuthorizationContract, AuthorizationContractClient,
         ProductRegistryContract, ProductRegistryContractClient,
         ProductConfig,
     };
 
     fn setup(env: &Env) -> (ProductRegistryContractClient, Address) {
+        let auth_id = env.register_contract(None, AuthorizationContract);
         let pr_id = env.register_contract(None, ProductRegistryContract);
         let pr_client = ProductRegistryContractClient::new(env, &pr_id);
+
+        let auth_client = AuthorizationContractClient::new(env, &auth_id);
+        auth_client.configure_initializer(&pr_id);
+        pr_client.configure_auth_contract(&auth_id);
 
         let query_id = env.register_contract(None, super::ProductQueryContract);
         let query_client = super::ProductQueryContractClient::new(env, &query_id);

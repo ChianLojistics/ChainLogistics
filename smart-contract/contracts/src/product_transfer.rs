@@ -210,6 +210,9 @@ mod test_product_transfer {
         let auth_client = AuthorizationContractClient::new(env, &auth_id);
         let transfer_client = ProductTransferContractClient::new(env, &transfer_id);
 
+        auth_client.configure_initializer(&pr_id);
+        pr_client.configure_auth_contract(&auth_id);
+
         let admin = Address::generate(env);
         // Initialize ProductTransferContract with ProductRegistryContract and AuthorizationContract
         transfer_client.pt_init(&pr_id, &auth_id);
@@ -220,7 +223,6 @@ mod test_product_transfer {
     fn register_test_product(
         env: &Env,
         client: &ProductRegistryContractClient,
-        auth_client: &AuthorizationContractClient,
         owner: &Address,
         id: &str,
     ) -> String {
@@ -239,8 +241,6 @@ mod test_product_transfer {
                 custom: Map::new(env),
             },
         );
-        // Also init auth so ProductTransferContract can delegate
-        auth_client.init_product_owner(&id, owner);
         id
     }
 
@@ -253,7 +253,7 @@ mod test_product_transfer {
 
         let owner = Address::generate(&env);
         let new_owner = Address::generate(&env);
-        let id = register_test_product(&env, &pr_client, &_auth_client, &owner, "PROD1");
+        let id = register_test_product(&env, &pr_client, &owner, "PROD1");
 
         // Verify initial owner
         let p = pr_client.get_product(&id);
@@ -281,7 +281,7 @@ mod test_product_transfer {
         let owner = Address::generate(&env);
         let attacker = Address::generate(&env);
         let new_owner = Address::generate(&env);
-        let id = register_test_product(&env, &pr_client, &_auth_client, &owner, "PROD1");
+        let id = register_test_product(&env, &pr_client, &owner, "PROD1");
 
         // Non-owner attempt should fail
         let res = transfer_client.try_transfer_product(&attacker, &id, &new_owner);
@@ -297,7 +297,7 @@ mod test_product_transfer {
 
         let owner = Address::generate(&env);
         let new_owner = Address::generate(&env);
-        let id = register_test_product(&env, &pr_client, &_auth_client, &owner, "PROD1");
+        let id = register_test_product(&env, &pr_client, &owner, "PROD1");
 
         // Both parties authenticated via mock_all_auths, transfer should succeed
         transfer_client.transfer_product(&owner, &id, &new_owner);
@@ -338,7 +338,7 @@ mod test_product_transfer {
 
         let owner = Address::generate(&env);
         let non_owner = Address::generate(&env);
-        let id = register_test_product(&env, &pr_client, &_auth_client, &owner, "PROD1");
+        let id = register_test_product(&env, &pr_client, &owner, "PROD1");
 
         assert!(transfer_client.is_product_owner(&id, &owner));
         assert!(!transfer_client.is_product_owner(&id, &non_owner));
@@ -355,8 +355,8 @@ mod test_product_transfer {
         let new_owner = Address::generate(&env);
 
         // Register multiple products
-        let id1 = register_test_product(&env, &pr_client, &_auth_client, &owner, "PROD1");
-        let id2 = register_test_product(&env, &pr_client, &_auth_client, &owner, "PROD2");
+        let id1 = register_test_product(&env, &pr_client, &owner, "PROD1");
+        let id2 = register_test_product(&env, &pr_client, &owner, "PROD2");
 
         // Batch transfer
         let mut product_ids = Vec::new(&env);
@@ -453,8 +453,8 @@ mod test_product_transfer {
         let new_owner = Address::generate(&env);
 
         // Register some products
-        let id1 = register_test_product(&env, &pr_client, &auth_client, &owner, "PROD1");
-        let id2 = register_test_product(&env, &pr_client, &auth_client, &owner, "PROD2");
+        let id1 = register_test_product(&env, &pr_client, &owner, "PROD1");
+        let id2 = register_test_product(&env, &pr_client, &owner, "PROD2");
 
         // Create batch with mix of existing and non-existing products
         let mut mixed_batch = Vec::new(&env);
@@ -479,8 +479,8 @@ mod test_product_transfer {
         let new_owner = Address::generate(&env);
 
         // Register products by different owners
-        let id1 = register_test_product(&env, &pr_client, &auth_client, &owner, "PROD1");
-        let id2 = register_test_product(&env, &pr_client, &auth_client, &other_owner, "PROD2");
+        let id1 = register_test_product(&env, &pr_client, &owner, "PROD1");
+        let id2 = register_test_product(&env, &pr_client, &other_owner, "PROD2");
 
         // Create batch with mix of owned and unowned products
         let mut mixed_batch = Vec::new(&env);

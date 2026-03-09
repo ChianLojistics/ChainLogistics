@@ -170,11 +170,13 @@ mod test_stats {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Address, Env, Map};
     use crate::{
+        AuthorizationContract, AuthorizationContractClient,
         ProductRegistryContract, ProductRegistryContractClient,
         ProductConfig, TrackingContract, TrackingContractClient,
     };
 
     fn setup(env: &Env) -> (ProductRegistryContractClient, TrackingContractClient, super::StatsContractClient) {
+        let auth_id = env.register_contract(None, AuthorizationContract);
         let registry_id = env.register_contract(None, ProductRegistryContract);
         let tracking_id = env.register_contract(None, TrackingContract);
         let stats_id = env.register_contract(None, super::StatsContract);
@@ -182,6 +184,10 @@ mod test_stats {
         let registry_client = ProductRegistryContractClient::new(env, &registry_id);
         let tracking_client = TrackingContractClient::new(env, &tracking_id);
         let stats_client = super::StatsContractClient::new(env, &stats_id);
+
+        let auth_client = AuthorizationContractClient::new(env, &auth_id);
+        auth_client.configure_initializer(&registry_id);
+        registry_client.configure_auth_contract(&auth_id);
 
         tracking_client.init(&registry_id);
         stats_client.init(&registry_id, &tracking_id);
