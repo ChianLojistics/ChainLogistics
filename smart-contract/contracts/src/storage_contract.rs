@@ -98,6 +98,12 @@ impl StorageContract {
         offset: u64,
         limit: u64,
     ) -> Vec<u64> {
+        // Validate input parameters
+        if limit == 0 || limit > 1000 {
+            // Return empty result for invalid limit (0 or too large)
+            return Vec::new(env);
+        }
+        
         let all_ids = Self::get_product_event_ids(env, product_id);
         let total = all_ids.len() as u64;
 
@@ -111,7 +117,9 @@ impl StorageContract {
         let start = offset as u32;
 
         for i in start..end {
-            result.push_back(all_ids.get_unchecked(i));
+            if let Some(id) = all_ids.get(i) {
+                result.push_back(id);
+            }
         }
 
         result
@@ -291,6 +299,76 @@ mod test_storage_contract {
             StorageContract::put_product(&env, &product);
             assert!(StorageContract::has_product(&env, &product.id));
             assert!(StorageContract::get_product(&env, &product.id).is_some());
+        });
+    }
+
+    #[test]
+    fn test_pagination_boundary_conditions() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ChainLogisticsContract);
+        let product_id = String::from_str(&env, "TEST_PRODUCT");
+
+        env.as_contract(&contract_id, || {
+            // Create test data - 5 event IDs
+            let mut test_ids = Vec::new(&env);
+            for i in 1..=5 {
+                test_ids.push_back(i);
+            }
+            StorageContract::put_product_event_ids(&env, &product_id, &test_ids);
+
+            // Test offset == len (should return empty)
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 5, 2);
+            assert_eq!(result.len(), 0);
+
+            // Test limit == 0 (should return empty due to validation)
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 0, 0);
+            assert_eq!(result.len(), 0);
+
+            // Test very large limit (should return empty due to validation)
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 0, 1001);
+            assert_eq!(result.len(), 0);
+
+            // Test offset > len (should return empty)
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 10, 2);
+            assert_eq!(result.len(), 0);
+
+            // Test normal cases
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 0, 3);
+            assert_eq!(result.len(), 3);
+            assert_eq!(result.get(0), Some(1));
+            assert_eq!(result.get(1), Some(2));
+            assert_eq!(result.get(2), Some(3));
+
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 3, 3);
+            assert_eq!(result.len(), 2);
+            assert_eq!(result.get(0), Some(4));
+            assert_eq!(result.get(1), Some(5));
+
+            // Test exact boundary
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 0, 5);
+            assert_eq!(result.len(), 5);
+
+            // Test limit larger than remaining
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 4, 10);
+            assert_eq!(result.len(), 1);
+            assert_eq!(result.get(0), Some(5));
+        });
+    }
+
+    #[test]
+    fn test_pagination_empty_list() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, ChainLogisticsContract);
+        let product_id = String::from_str(&env, "EMPTY_PRODUCT");
+
+        env.as_contract(&contract_id, || {
+            // Test with empty product event IDs
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 0, 10);
+            assert_eq!(result.len(), 0);
+
+            // Test offset > 0 with empty list
+            let result = StorageContract::get_product_event_ids_paginated(&env, &product_id, 5, 10);
+            assert_eq!(result.len(), 0);
         });
     }
 
