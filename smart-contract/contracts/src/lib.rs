@@ -16,6 +16,7 @@ mod product_query;
 mod tracking;
 mod stats;
 mod event_query;
+mod upgrade;
 
 #[cfg(test)]
 mod test;
@@ -31,5 +32,6 @@ pub use product_query::*;
 pub use tracking::*;
 pub use stats::*;
 pub use event_query::*;
+pub use upgrade::*;
 pub use types::*;
 pub use error::*;
