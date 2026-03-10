@@ -441,11 +441,12 @@ fn test_search_products_by_name() {
     // Test search by exact name
     let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
     assert_eq!(results.len(), 1);
-    assert_eq!(results.get(0), Some(coffee_id));
+    assert_eq!(results.get(0), Some(coffee_id.clone()));
 
-    // Test search by partial name (case sensitive for now)
+    // Test search by partial name (should find coffee by category)
     let results = client.search_products(&String::from_str(&env, "Coffee"), &10u32);
-    assert_eq!(results.len(), 0); // Exact match only for now
+    assert_eq!(results.len(), 1); // Found by category "Coffee"
+    assert_eq!(results.get(0), Some(coffee_id));
 
     // Test search by tea name
     let results = client.search_products(&String::from_str(&env, "Green Tea Leaves"), &10u32);
@@ -479,11 +480,11 @@ fn test_search_products_by_origin() {
     client.register_product(&owner, &tea_config);
 
     // Test search by origin
-    let results = client.search_products(&String::from_str(&env, "Yirgacheffe, Ethiopia"), 10u32);
+    let results = client.search_products(&String::from_str(&env, "Yirgacheffe, Ethiopia"), &10u32);
     assert_eq!(results.len(), 1);
     assert_eq!(results.get(0), Some(coffee_id));
 
-    let results = client.search_products(&String::from_str(&env, "Hangzhou, China"), 10u32);
+    let results = client.search_products(&String::from_str(&env, "Hangzhou, China"), &10u32);
     assert_eq!(results.len(), 1);
     assert_eq!(results.get(0), Some(tea_id));
 }
@@ -514,11 +515,11 @@ fn test_search_products_by_category() {
     client.register_product(&owner, &tea_config);
 
     // Test search by category
-    let results = client.search_products(&String::from_str(&env, "Coffee"), 10u32);
+    let results = client.search_products(&String::from_str(&env, "Coffee"), &10u32);
     assert_eq!(results.len(), 1);
     assert_eq!(results.get(0), Some(coffee_id));
 
-    let results = client.search_products(&String::from_str(&env, "Tea"), 10u32);
+    let results = client.search_products(&String::from_str(&env, "Tea"), &10u32);
     assert_eq!(results.len(), 1);
     assert_eq!(results.get(0), Some(tea_id));
 }
@@ -550,11 +551,11 @@ fn test_search_products_with_limit() {
     }
 
     // Test search with limit
-    let results = client.search_products(&String::from_str(&env, "Coffee"), 3u32);
+    let results = client.search_products(&String::from_str(&env, "Coffee"), &3u32);
     assert_eq!(results.len(), 3);
 
     // Test search with zero limit
-    let results = client.search_products(&String::from_str(&env, "Coffee"), 0u32);
+    let results = client.search_products(&String::from_str(&env, "Coffee"), &0u32);
     assert_eq!(results.len(), 0);
 }
 
@@ -570,7 +571,7 @@ fn test_search_products_deactivated() {
     let coffee_id = register_test_product(&env, &client, &owner);
 
     // Verify product is searchable
-    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), 10);
+    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
     assert_eq!(results.len(), 1);
     assert_eq!(results.get(0), Some(coffee_id.clone()));
 
@@ -582,14 +583,14 @@ fn test_search_products_deactivated() {
     );
 
     // Verify product is no longer searchable
-    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), 10);
+    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
     assert_eq!(results.len(), 0);
 
     // Reactivate product
     client.reactivate_product(&owner, &coffee_id);
 
     // Verify product is searchable again
-    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), 10);
+    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
     assert_eq!(results.len(), 1);
     assert_eq!(results.get(0), Some(coffee_id));
 }
@@ -606,9 +607,9 @@ fn test_search_products_no_results() {
     register_test_product(&env, &client, &owner);
 
     // Test search with no results
-    let results = client.search_products(&String::from_str(&env, "Nonexistent Product"), 10u32);
+    let results = client.search_products(&String::from_str(&env, "Nonexistent Product"), &10u32);
     assert_eq!(results.len(), 0);
 
-    let results = client.search_products(&String::from_str(&env, "Wine"), 10u32);
+    let results = client.search_products(&String::from_str(&env, "Wine"), &10u32);
     assert_eq!(results.len(), 0);
 }
