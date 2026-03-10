@@ -22,6 +22,8 @@ mod upgrade;
 mod test;
 #[cfg(test)]
 mod test_auth;
+#[cfg(test)]
+mod load_tests;
 
 pub use contract::*;
 pub use product_registry::*;
