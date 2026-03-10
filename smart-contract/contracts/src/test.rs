@@ -408,3 +408,208 @@ fn test_multiple_products_stats_tracking() {
     assert_eq!(stats.total_products, 3);
     assert_eq!(stats.active_products, 2);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRODUCT SEARCH TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_search_products_by_name() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = setup(&env);
+
+    let owner = Address::generate(&env);
+
+    // Register test products
+    let coffee_id = register_test_product(&env, &client, &owner);
+    
+    let tea_id = String::from_str(&env, "TEA-CHN-001");
+    let tea_config = ProductConfig {
+        id: tea_id.clone(),
+        name: String::from_str(&env, "Green Tea Leaves"),
+        description: String::from_str(&env, "Premium green tea from China"),
+        origin_location: String::from_str(&env, "Hangzhou, China"),
+        category: String::from_str(&env, "Tea"),
+        tags: Vec::new(&env),
+        certifications: Vec::new(&env),
+        media_hashes: Vec::new(&env),
+        custom: Map::new(&env),
+    };
+    client.register_product(&owner, &tea_config);
+
+    // Test search by exact name
+    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(coffee_id.clone()));
+
+    // Test search by partial name (should find coffee by category)
+    let results = client.search_products(&String::from_str(&env, "Coffee"), &10u32);
+    assert_eq!(results.len(), 1); // Found by category "Coffee"
+    assert_eq!(results.get(0), Some(coffee_id));
+
+    // Test search by tea name
+    let results = client.search_products(&String::from_str(&env, "Green Tea Leaves"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(tea_id));
+}
+
+#[test]
+fn test_search_products_by_origin() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = setup(&env);
+
+    let owner = Address::generate(&env);
+
+    // Register test products
+    let coffee_id = register_test_product(&env, &client, &owner);
+    
+    let tea_id = String::from_str(&env, "TEA-CHN-001");
+    let tea_config = ProductConfig {
+        id: tea_id.clone(),
+        name: String::from_str(&env, "Green Tea Leaves"),
+        description: String::from_str(&env, "Premium green tea from China"),
+        origin_location: String::from_str(&env, "Hangzhou, China"),
+        category: String::from_str(&env, "Tea"),
+        tags: Vec::new(&env),
+        certifications: Vec::new(&env),
+        media_hashes: Vec::new(&env),
+        custom: Map::new(&env),
+    };
+    client.register_product(&owner, &tea_config);
+
+    // Test search by origin
+    let results = client.search_products(&String::from_str(&env, "Yirgacheffe, Ethiopia"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(coffee_id));
+
+    let results = client.search_products(&String::from_str(&env, "Hangzhou, China"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(tea_id));
+}
+
+#[test]
+fn test_search_products_by_category() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = setup(&env);
+
+    let owner = Address::generate(&env);
+
+    // Register test products
+    let coffee_id = register_test_product(&env, &client, &owner);
+    
+    let tea_id = String::from_str(&env, "TEA-CHN-001");
+    let tea_config = ProductConfig {
+        id: tea_id.clone(),
+        name: String::from_str(&env, "Green Tea Leaves"),
+        description: String::from_str(&env, "Premium green tea from China"),
+        origin_location: String::from_str(&env, "Hangzhou, China"),
+        category: String::from_str(&env, "Tea"),
+        tags: Vec::new(&env),
+        certifications: Vec::new(&env),
+        media_hashes: Vec::new(&env),
+        custom: Map::new(&env),
+    };
+    client.register_product(&owner, &tea_config);
+
+    // Test search by category
+    let results = client.search_products(&String::from_str(&env, "Coffee"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(coffee_id));
+
+    let results = client.search_products(&String::from_str(&env, "Tea"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(tea_id));
+}
+
+#[test]
+fn test_search_products_with_limit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = setup(&env);
+
+    let owner = Address::generate(&env);
+
+    // Register multiple products with same category
+    let product_names = ["COFFEE-001", "COFFEE-002", "COFFEE-003", "COFFEE-004", "COFFEE-005"];
+    for name in &product_names {
+        let id = String::from_str(&env, name);
+        let config = ProductConfig {
+            id: id.clone(),
+            name: String::from_str(&env, "Coffee Beans"),
+            description: String::from_str(&env, "Premium coffee"),
+            origin_location: String::from_str(&env, "Various"),
+            category: String::from_str(&env, "Coffee"),
+            tags: Vec::new(&env),
+            certifications: Vec::new(&env),
+            media_hashes: Vec::new(&env),
+            custom: Map::new(&env),
+        };
+        client.register_product(&owner, &config);
+    }
+
+    // Test search with limit
+    let results = client.search_products(&String::from_str(&env, "Coffee"), &3u32);
+    assert_eq!(results.len(), 3);
+
+    // Test search with zero limit
+    let results = client.search_products(&String::from_str(&env, "Coffee"), &0u32);
+    assert_eq!(results.len(), 0);
+}
+
+#[test]
+fn test_search_products_deactivated() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = setup(&env);
+
+    let owner = Address::generate(&env);
+
+    // Register test product
+    let coffee_id = register_test_product(&env, &client, &owner);
+
+    // Verify product is searchable
+    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(coffee_id.clone()));
+
+    // Deactivate product
+    client.deactivate_product(
+        &owner,
+        &coffee_id,
+        &String::from_str(&env, "Test deactivation"),
+    );
+
+    // Verify product is no longer searchable
+    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
+    assert_eq!(results.len(), 0);
+
+    // Reactivate product
+    client.reactivate_product(&owner, &coffee_id);
+
+    // Verify product is searchable again
+    let results = client.search_products(&String::from_str(&env, "Organic Coffee Beans"), &10u32);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.get(0), Some(coffee_id));
+}
+
+#[test]
+fn test_search_products_no_results() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = setup(&env);
+
+    let owner = Address::generate(&env);
+
+    // Register test product
+    register_test_product(&env, &client, &owner);
+
+    // Test search with no results
+    let results = client.search_products(&String::from_str(&env, "Nonexistent Product"), &10u32);
+    assert_eq!(results.len(), 0);
+
+    let results = client.search_products(&String::from_str(&env, "Wine"), &10u32);
+    assert_eq!(results.len(), 0);
+}

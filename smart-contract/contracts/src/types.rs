@@ -95,6 +95,7 @@ pub enum DataKey {
     TransferContract,
     TotalProducts,
     ActiveProducts,
+    SearchIndex(IndexKey), // For product search functionality
 }
 
 #[contracttype]
@@ -113,4 +114,10 @@ pub struct TrackingEventFilter {
     pub start_time: u64,
     pub end_time: u64,
     pub location: String,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IndexKey {
+    Keyword(String), // keyword -> Vec<product_id>
 }
