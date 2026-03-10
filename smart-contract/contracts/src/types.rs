@@ -96,6 +96,10 @@ pub enum DataKey {
     TotalProducts,
     ActiveProducts,
     SearchIndex(IndexKey), // For product search functionality
+    ContractVersion, // Current contract version
+    UpgradeInfo, // Current upgrade information
+    UpgradeStatus, // Current upgrade status
+    EmergencyPause, // Emergency pause flag
 }
 
 #[contracttype]
@@ -120,4 +124,31 @@ pub struct TrackingEventFilter {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum IndexKey {
     Keyword(String), // keyword -> Vec<product_id>
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractVersion {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeInfo {
+    pub new_version: ContractVersion,
+    pub new_contract_address: Address,
+    pub upgrade_timestamp: u64,
+    pub upgraded_by: Address,
+    pub migration_required: bool,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum UpgradeStatus {
+    NotStarted,
+    InProgress,
+    Completed,
+    Failed,
 }

@@ -41,4 +41,11 @@ pub enum Error {
     ProductDeactivated = 40,
     DeactivationReasonRequired = 41,
     ProductAlreadyActive = 42,
+
+    // --- Upgrade (50-60) ---
+    InvalidUpgrade = 50,
+    UpgradeInProgress = 51,
+    NoUpgradeInProgress = 52,
+    EmergencyPaused = 53,
+    NotEmergencyPaused = 54,
 }
