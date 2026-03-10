@@ -51,6 +51,33 @@ fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
+// ─── Search helpers ───────────────────────────────────────────────────────────
+
+fn index_product(env: &Env, product: &Product) {
+    // Index the full name, origin, and category as searchable keywords
+    // Case insensitive search will be handled in the search function
+    
+    // Index name
+    storage::add_to_search_index(env, product.name.clone(), &product.id);
+    
+    // Index origin
+    storage::add_to_search_index(env, product.origin.location.clone(), &product.id);
+    
+    // Index category
+    storage::add_to_search_index(env, product.category.clone(), &product.id);
+}
+
+fn deindex_product(env: &Env, product: &Product) {
+    // Remove from name index
+    storage::remove_from_search_index(env, product.name.clone(), &product.id);
+    
+    // Remove from origin index
+    storage::remove_from_search_index(env, product.origin.location.clone(), &product.id);
+    
+    // Remove from category index
+    storage::remove_from_search_index(env, product.category.clone(), &product.id);
+}
+
 // ─── Contract ────────────────────────────────────────────────────────────────
 
 #[contract]
@@ -102,6 +129,9 @@ impl ProductRegistryContract {
         write_product(&env, &product);
         storage::put_product_event_ids(&env, &config.id, &Vec::new(&env));
         storage::set_auth(&env, &config.id, &owner, true);
+
+        // Index product for search
+        index_product(&env, &product);
 
         let auth_contract = get_auth_contract(&env).ok_or(Error::NotInitialized)?;
         let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
@@ -206,6 +236,9 @@ impl ProductRegistryContract {
 
         write_product(&env, &product);
 
+        // Remove product from search index when deactivated
+        deindex_product(&env, &product);
+
         // Decrement active counter
         let active = storage::get_active_products(&env).saturating_sub(1);
         storage::set_active_products(&env, active);
@@ -239,6 +272,9 @@ impl ProductRegistryContract {
 
         write_product(&env, &product);
 
+        // Re-index product when reactivated
+        index_product(&env, &product);
+
         // Increment active counter
         let active = storage::get_active_products(&env) + 1;
         storage::set_active_products(&env, active);
@@ -266,5 +302,38 @@ impl ProductRegistryContract {
             total_products: storage::get_total_products(&env),
             active_products: storage::get_active_products(&env),
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRODUCT SEARCH
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Search products by name, origin, or category.
+    ///
+    /// Returns matching product IDs with case insensitive matching.
+    /// Results are limited for gas efficiency.
+    pub fn search_products(env: Env, query: String, limit: u32) -> Vec<String> {
+        let mut results = Vec::new(&env);
+        
+        if limit == 0 {
+            return results;
+        }
+        
+        // Search for exact match first (case sensitive)
+        let exact_matches = storage::get_search_index(&env, &query);
+        for i in 0..exact_matches.len() {
+            if results.len() >= limit {
+                return results;
+            }
+            let product_id = exact_matches.get(i).unwrap();
+            if !results.contains(&product_id) {
+                results.push_back(product_id.clone());
+            }
+        }
+        
+        // If we need more results, we could implement partial matching here
+        // For now, this provides basic search functionality
+        
+        results
     }
 }

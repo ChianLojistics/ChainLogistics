@@ -132,3 +132,40 @@ pub fn get_active_products(env: &Env) -> u64 {
 pub fn set_active_products(env: &Env, count: u64) {
     StorageContract::set_active_products(env, count)
 }
+
+// ─── Search Index ───────────────────────────────────────────────────────────
+
+pub fn put_search_index(env: &Env, keyword: &String, product_ids: &Vec<String>) {
+    env.storage().persistent().set(&crate::types::DataKey::SearchIndex(crate::types::IndexKey::Keyword(keyword.clone())), product_ids);
+}
+
+pub fn get_search_index(env: &Env, keyword: &String) -> Vec<String> {
+    env.storage().persistent()
+        .get(&crate::types::DataKey::SearchIndex(crate::types::IndexKey::Keyword(keyword.clone())))
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn add_to_search_index(env: &Env, keyword: String, product_id: &String) {
+    let mut ids = get_search_index(env, &keyword);
+    if !ids.contains(product_id) {
+        ids.push_back(product_id.clone());
+        put_search_index(env, &keyword, &ids);
+    }
+}
+
+pub fn remove_from_search_index(env: &Env, keyword: String, product_id: &String) {
+    let mut ids = get_search_index(env, &keyword);
+    let mut found = false;
+    let mut i = 0;
+    while i < ids.len() {
+        if ids.get(i).unwrap() == product_id.clone() {
+            ids.remove(i);
+            found = true;
+            break;
+        }
+        i += 1;
+    }
+    if found {
+        put_search_index(env, &keyword, &ids);
+    }
+}
