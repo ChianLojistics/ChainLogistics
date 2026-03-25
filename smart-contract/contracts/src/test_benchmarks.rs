@@ -95,6 +95,7 @@ fn benchmark_registration_scales_to_500_products() {
 }
 
 #[test]
+#[ignore = "benchmark workload, run manually in performance pipeline"]
 fn benchmark_batch_transfer_chunks_of_100() {
     let env = Env::default();
     let (registry, transfer) = setup(&env);
