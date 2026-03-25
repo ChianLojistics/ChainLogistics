@@ -1,0 +1,145 @@
+name: Security Scan
+
+on:
+  schedule:
+    # Run weekly on Mondays at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  rust-security:
+    name: Rust Security Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./smart-contract
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Run cargo audit
+      run: cargo audit --format json --output audit.json || true
+
+    - name: Upload audit results
+      uses: actions/upload-artifact@v4
+      with:
+        name: rust-audit-results
+        path: smart-contract/audit.json
+        retention-days: 30
+
+    - name: Check for critical vulnerabilities
+      run: |
+        if [ -f audit.json ]; then
+          if grep -q '"severity": "critical"' audit.json || grep -q '"severity": "high"' audit.json; then
+            echo "Critical or high severity vulnerabilities found!"
+            exit 1
+          fi
+        fi
+
+  npm-security:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run npm audit
+      run: npm audit --audit-level moderate --json > audit-results.json || true
+
+    - name: Check for vulnerabilities
+      run: |
+        if grep -q '"severity": "critical"' audit-results.json || grep -q '"severity": "high"' audit-results.json; then
+          echo "Critical or high severity vulnerabilities found!"
+          exit 1
+        fi
+
+    - name: Upload audit results
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-audit-results
+        path: frontend/audit-results.json
+        retention-days: 30
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript-typescript', 'rust' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-and-quality
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install license-checker
+      run: npm install -g license-checker
+
+    - name: Check frontend licenses
+      working-directory: ./frontend
+      run: |
+        license-checker --json > licenses.json
+        # Check for GPL licenses which might be problematic
+        if grep -q '"license": "GPL' licenses.json; then
+          echo "GPL licensed dependencies found - review for compatibility"
+          grep '"license": "GPL' licenses.json
+        fi
+
+    - name: Upload license report
+      uses: actions/upload-artifact@v4
+      with:
+        name: license-report
+        path: |
+          frontend/licenses.json
+        retention-days: 30
