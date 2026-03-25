@@ -26,7 +26,7 @@ impl ValidationContract {
 
     // --- Primitive validators ---
     pub fn non_empty(s: &String) -> Result<(), Error> {
-        if s.len() == 0 {
+        if s.len() < 1 {
             return Err(Error::InvalidInput);
         }
         Ok(())
@@ -46,28 +46,28 @@ impl ValidationContract {
 
     // --- Product validation ---
     pub fn validate_product_config(config: &ProductConfig) -> Result<(), Error> {
-        if config.id.len() == 0 {
+        if config.id.len() < 1 {
             return Err(Error::InvalidProductId);
         }
         if config.id.len() > Self::MAX_PRODUCT_ID_LEN {
             return Err(Error::ProductIdTooLong);
         }
 
-        if config.name.len() == 0 {
+        if config.name.len() < 1 {
             return Err(Error::InvalidProductName);
         }
         if config.name.len() > Self::MAX_PRODUCT_NAME_LEN {
             return Err(Error::ProductNameTooLong);
         }
 
-        if config.origin_location.len() == 0 {
+        if config.origin_location.len() < 1 {
             return Err(Error::InvalidOrigin);
         }
         if config.origin_location.len() > Self::MAX_ORIGIN_LEN {
             return Err(Error::OriginTooLong);
         }
 
-        if config.category.len() == 0 {
+        if config.category.len() < 1 {
             return Err(Error::InvalidCategory);
         }
         if config.category.len() > Self::MAX_CATEGORY_LEN {
@@ -100,7 +100,7 @@ impl ValidationContract {
     }
 
     pub fn validate_deactivation_reason(reason: &String) -> Result<(), Error> {
-        if reason.len() == 0 {
+        if reason.len() < 1 {
             return Err(Error::DeactivationReasonRequired);
         }
         Ok(())
