@@ -73,7 +73,7 @@ describe("QR Code Utilities", () => {
 
     it("should handle QRCode generation errors", async () => {
       const error = new Error("QR generation failed");
-      mockQRCode.default.toDataURL.mockRejectedValue(error);
+      vi.mocked(mockQRCode.default.toDataURL).mockRejectedValue(error);
 
       const productId = "prod-123";
       await expect(generateProductQR(productId)).rejects.toThrow("QR generation failed");
@@ -105,7 +105,7 @@ describe("QR Code Utilities", () => {
 
     it("should handle SVG generation errors", async () => {
       const error = new Error("SVG generation failed");
-      mockQRCode.default.toString.mockRejectedValue(error);
+      vi.mocked(mockQRCode.default.toString).mockRejectedValue(error);
 
       const productId = "prod-456";
       await expect(generateProductQRSVG(productId)).rejects.toThrow("SVG generation failed");
