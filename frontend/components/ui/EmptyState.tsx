@@ -38,7 +38,7 @@ export type EmptyStateCta = {
 };
 
 export interface EmptyStateProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
     VariantProps<typeof emptyStateVariants> {
   illustration?: React.ReactNode;
   icon?: React.ReactNode;

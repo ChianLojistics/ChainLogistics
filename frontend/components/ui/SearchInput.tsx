@@ -15,7 +15,7 @@ export type SearchInputSuggestion<TSuggestion extends BaseSuggestion = BaseSugge
 
 export interface SearchInputProps<
   TSuggestion extends BaseSuggestion = BaseSuggestion,
-> extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "defaultValue" | "onChange"> {
+> extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "defaultValue"> {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
