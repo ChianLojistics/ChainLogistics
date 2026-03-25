@@ -1,58 +1,80 @@
 version: 2
+
 updates:
-  # Enable version updates for Rust dependencies
+  # Rust dependencies (Soroban contracts)
   - package-ecosystem: "cargo"
     directory: "/smart-contract"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+
     open-pull-requests-limit: 10
+
     reviewers:
-      - "your-username"  # Replace with actual maintainer username
+      - "Lynndabel"
+
     assignees:
-      - "your-username"  # Replace with actual maintainer username
+      - "Lynndabel"
+
     commit-message:
       prefix: "deps"
-      prefix-development: "deps-dev"
       include: "scope"
+
+    versioning-strategy: increase
+
     labels:
       - "dependencies"
       - "rust"
+
     groups:
       rust-dependencies:
         patterns:
           - "*"
 
-  # Enable version updates for npm dependencies
+  # Frontend dependencies (Next.js / TypeScript)
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+
     open-pull-requests-limit: 10
+
     reviewers:
-      - "your-username"  # Replace with actual maintainer username
+      - "Lynndabel"
+
     assignees:
-      - "your-username"  # Replace with actual maintainer username
+      - "Lynndabel"
+
     commit-message:
       prefix: "deps"
-      prefix-development: "deps-dev"
       include: "scope"
+
+    versioning-strategy: increase
+
     labels:
       - "dependencies"
       - "javascript"
+
     groups:
       frontend-dependencies:
         patterns:
           - "*"
+
     ignore:
-      # Ignore major version updates for React (too risky)
+      # Ignore risky React major updates
       - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
+        update-types:
+          - "version-update:semver-major"
+
       - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
-      # Ignore Soroban SDK updates (need manual testing)
+        update-types:
+          - "version-update:semver-major"
+
+      # Ignore Soroban SDK updates requiring manual testing
       - dependency-name: "@stellar/*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"

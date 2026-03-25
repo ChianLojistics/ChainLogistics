@@ -9,137 +9,96 @@ on:
     branches: [ main ]
 
 jobs:
-  rust-security:
-    name: Rust Security Audit
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./smart-contract
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Install cargo-audit
-      run: cargo install cargo-audit
-
-    - name: Run cargo audit
-      run: cargo audit --format json --output audit.json || true
-
-    - name: Upload audit results
-      uses: actions/upload-artifact@v4
-      with:
-        name: rust-audit-results
-        path: smart-contract/audit.json
-        retention-days: 30
-
-    - name: Check for critical vulnerabilities
-      run: |
-        if [ -f audit.json ]; then
-          if grep -q '"severity": "critical"' audit.json || grep -q '"severity": "high"' audit.json; then
-            echo "Critical or high severity vulnerabilities found!"
-            exit 1
-          fi
-        fi
-
-  npm-security:
-    name: NPM Security Audit
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run npm audit
-      run: npm audit --audit-level moderate --json > audit-results.json || true
-
-    - name: Check for vulnerabilities
-      run: |
-        if grep -q '"severity": "critical"' audit-results.json || grep -q '"severity": "high"' audit-results.json; then
-          echo "Critical or high severity vulnerabilities found!"
-          exit 1
-        fi
-
-    - name: Upload audit results
-      uses: actions/upload-artifact@v4
-      with:
-        name: npm-audit-results
-        path: frontend/audit-results.json
-        retention-days: 30
+  # Replaces the separate rust-security and npm-security jobs.
+  #
+  # WHY: cargo audit is effectively unmaintained (primary maintainer stepped back March 2025).
+  # Its --format json --output flags don't exist (correct flag is --json to stdout), and its
+  # JSON schema doesn't have a flat "severity": "critical" field, so the grep checks were
+  # silently never matching anything. OSV-Scanner covers Cargo, npm, and 11+ other ecosystems,
+  # outputs SARIF to GitHub's Security tab natively, and is actively maintained by Google.
+  osv-scan:
+    name: OSV Dependency Scan
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.3
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      # Recursively scans the repo, picking up both Cargo.lock and frontend/package-lock.json
+      scan-args: |-
+        --recursive
+        ./
 
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
-
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript-typescript', 'rust' ]
-
+        # Fixed: 'rust' is not a supported CodeQL language.
+        # CodeQL does not support Rust — remove it to prevent the job from failing silently
+        # or erroring. If you want static analysis for Rust, use cargo clippy (in CI) or
+        # a dedicated tool like semgrep with Rust rules.
+        language: [ 'javascript-typescript' ]
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
-        queries: security-and-quality
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-      with:
-        category: "/language:${{matrix.language}}"
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
 
   license-check:
     name: License Compliance
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-    - name: Install license-checker
-      run: npm install -g license-checker
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
 
-    - name: Check frontend licenses
-      working-directory: ./frontend
-      run: |
-        license-checker --json > licenses.json
-        # Check for GPL licenses which might be problematic
-        if grep -q '"license": "GPL' licenses.json; then
-          echo "GPL licensed dependencies found - review for compatibility"
-          grep '"license": "GPL' licenses.json
-        fi
+      - name: Install license-checker
+        run: npm install -g license-checker
 
-    - name: Upload license report
-      uses: actions/upload-artifact@v4
-      with:
-        name: license-report
-        path: |
-          frontend/licenses.json
-        retention-days: 30
+      - name: Check frontend licenses
+        working-directory: ./frontend
+        run: |
+          license-checker --json --out licenses.json
+          # Warn on any GPL variant (GPL-2.0, GPL-3.0, LGPL, AGPL, etc.)
+          if grep -qE '"licenses":\s*"(A|L)?GPL' licenses.json; then
+            echo "⚠ GPL-family licensed dependencies found — review for compatibility:"
+            grep -E '"licenses":\s*"(A|L)?GPL' licenses.json
+            # This is a warning, not a hard failure — adjust to 'exit 1' if you want to enforce
+          else
+            echo "✓ No GPL-family licenses found."
+          fi
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: frontend/licenses.json
+          retention-days: 30
