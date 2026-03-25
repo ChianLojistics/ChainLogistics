@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/lib/state/providers";
+import { MonitoringBootstrap, PerformanceBudgetAlerts } from "@/components/analytics";
 import { Toaster } from "@/components/ui/sonner";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import "./globals.css";
@@ -56,6 +57,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AppProviders>
+          <MonitoringBootstrap />
+          <PerformanceBudgetAlerts />
           {children}
           <Toaster />
           <ToastContainer />
