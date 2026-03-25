@@ -1,3 +1,4 @@
+#![allow(clippy::len_zero)]
 use soroban_sdk::{Address, Map, String, Symbol};
 
 use crate::error::Error;
