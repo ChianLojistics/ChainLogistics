@@ -11,78 +11,101 @@ on:
         default: 'staging'
         type: choice
         options:
-        - staging
-        - production
+          - staging
+          - production
+
+# Prevent concurrent deploys to the same environment
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
 
 jobs:
   deploy-contracts:
     name: Deploy Smart Contracts
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'staging' }}
+    outputs:
+      # Expose contract IDs to downstream jobs if needed
+      deployed: ${{ steps.deploy.outputs.deployed }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: wasm32-unknown-unknown
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
-    - name: Install Soroban CLI
-      run: |
-        curl -L https://github.com/stellar/soroban-cli/releases/latest/download/soroban-cli-linux-x64.tar.gz | tar xz
-        sudo mv soroban /usr/local/bin/
+      # Fixed: use the official Stellar CLI GitHub Action (replaces broken soroban curl install)
+      - name: Install Stellar CLI
+        uses: stellar/stellar-cli@v23.4.0
 
-    - name: Build contracts
-      working-directory: ./smart-contract
-      run: cargo build --release --target wasm32-unknown-unknown
+      # Fixed: register the deployer key into the CLI key store.
+      # --secret-key flag was removed from deploy/invoke commands in modern stellar CLI.
+      # The correct approach is to add the key once via `stellar keys add` and then
+      # reference it by name with --source-account in subsequent commands.
+      - name: Register deployer identity
+        env:
+          STELLAR_SECRET_KEY: ${{ secrets.STELLAR_SECRET_KEY }}
+        run: |
+          echo "$STELLAR_SECRET_KEY" | stellar keys add deployer --secret-key
 
-    - name: Configure Soroban network
-      run: |
-        NETWORK=${{ github.event.inputs.environment || 'staging' }}
-        if [ "$NETWORK" = "production" ]; then
-          echo "SOROBAN_RPC_URL=https://soroban-rpc.mainnet.stellar.org" >> $GITHUB_ENV
-          echo "SOROBAN_NETWORK_PASSPHRASE=Public Global Stellar Network ; September 2015" >> $GITHUB_ENV
-        else
-          echo "SOROBAN_RPC_URL=https://soroban-testnet.stellar.org" >> $GITHUB_ENV
-          echo "SOROBAN_NETWORK_PASSPHRASE=Test SDF Network ; September 2015" >> $GITHUB_ENV
-        fi
+      # Fixed: use stellar contract build instead of cargo build --target wasm32-unknown-unknown.
+      # This ensures correct metadata, optimizer flags, and proper wasm output paths.
+      - name: Build contracts
+        working-directory: ./smart-contract
+        run: stellar contract build
 
-    - name: Deploy contracts
-      env:
-        SOROBAN_SECRET_KEY: ${{ secrets.SOROBAN_SECRET_KEY }}
-      run: |
-        # Deploy each contract
-        for wasm_file in smart-contract/target/wasm32-unknown-unknown/release/*.wasm; do
-          echo "Deploying $(basename $wasm_file .wasm)..."
-          CONTRACT_ID=$(soroban contract deploy \
-            --wasm $wasm_file \
-            --secret-key $SOROBAN_SECRET_KEY \
-            --rpc-url $SOROBAN_RPC_URL \
-            --network-passphrase "$SOROBAN_NETWORK_PASSPHRASE")
-          echo "Deployed contract: $CONTRACT_ID"
-          echo "$CONTRACT_ID" >> deployed_contracts.txt
-        done
+      - name: Configure network
+        run: |
+          NETWORK=${{ github.event.inputs.environment || 'staging' }}
+          if [ "$NETWORK" = "production" ]; then
+            echo "STELLAR_NETWORK=mainnet" >> $GITHUB_ENV
+            echo "STELLAR_RPC_URL=https://soroban-rpc.mainnet.stellar.org" >> $GITHUB_ENV
+            echo "STELLAR_NETWORK_PASSPHRASE=Public Global Stellar Network ; September 2015" >> $GITHUB_ENV
+          else
+            echo "STELLAR_NETWORK=testnet" >> $GITHUB_ENV
+            echo "STELLAR_RPC_URL=https://soroban-testnet.stellar.org" >> $GITHUB_ENV
+            echo "STELLAR_NETWORK_PASSPHRASE=Test SDF Network ; September 2015" >> $GITHUB_ENV
+          fi
 
-    - name: Initialize contracts
-      env:
-        SOROBAN_SECRET_KEY: ${{ secrets.SOROBAN_SECRET_KEY }}
-      run: |
-        # Read deployed contract IDs and initialize them
-        while read CONTRACT_ID; do
-          echo "Initializing contract $CONTRACT_ID..."
-          # Add initialization logic here based on your contract requirements
-        done < deployed_contracts.txt
+      # Fixed: replaced --secret-key (removed flag) with --source-account referencing the
+      # registered identity. Also uses --alias per current CLI docs so contracts can be
+      # referenced by name in subsequent steps instead of tracking raw IDs in a text file.
+      - name: Deploy contracts
+        id: deploy
+        run: |
+          for wasm_file in smart-contract/target/wasm32-unknown-unknown/release/*.wasm; do
+            CONTRACT_NAME=$(basename "$wasm_file" .wasm)
+            echo "Deploying $CONTRACT_NAME..."
+            stellar contract deploy \
+              --wasm "$wasm_file" \
+              --source-account deployer \
+              --network "$STELLAR_NETWORK" \
+              --rpc-url "$STELLAR_RPC_URL" \
+              --network-passphrase "$STELLAR_NETWORK_PASSPHRASE" \
+              --alias "$CONTRACT_NAME" \
+              --ignore-checks
+            echo "Deployed $CONTRACT_NAME"
+          done
+          echo "deployed=true" >> $GITHUB_OUTPUT
 
-    - name: Health check
-      run: |
-        echo "Performing health checks..."
-        # Add health check logic to verify contracts are working
+      - name: Initialize contracts
+        run: |
+          # Add per-contract initialization calls here, e.g.:
+          # stellar contract invoke \
+          #   --id <contract-alias> \
+          #   --source-account deployer \
+          #   --network "$STELLAR_NETWORK" \
+          #   -- initialize --admin deployer
+          echo "Add initialization logic here"
 
-    - name: Update deployment status
-      run: |
-        echo "deployment_status=success" >> $GITHUB_ENV
+      - name: Health check
+        run: |
+          # Add contract health check invocations here, e.g.:
+          # stellar contract invoke --id <alias> --network "$STELLAR_NETWORK" -- get_status
+          echo "Add health check logic here"
 
   deploy-frontend:
     name: Deploy Frontend
@@ -91,85 +114,89 @@ jobs:
     needs: deploy-contracts
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-    - name: Install dependencies
-      working-directory: ./frontend
-      run: npm ci
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
 
-    - name: Update environment variables
-      working-directory: ./frontend
-      run: |
-        NETWORK=${{ github.event.inputs.environment || 'staging' }}
-        if [ "$NETWORK" = "production" ]; then
-          echo "NEXT_PUBLIC_CONTRACT_ID=${{ secrets.PRODUCTION_CONTRACT_ID }}" >> .env.local
-          echo "NEXT_PUBLIC_STELLAR_NETWORK=mainnet" >> .env.local
-          echo "NEXT_PUBLIC_RPC_URL=https://soroban-rpc.mainnet.stellar.org" >> .env.local
-        else
-          echo "NEXT_PUBLIC_CONTRACT_ID=${{ secrets.STAGING_CONTRACT_ID }}" >> .env.local
-          echo "NEXT_PUBLIC_STELLAR_NETWORK=testnet" >> .env.local
-          echo "NEXT_PUBLIC_RPC_URL=https://soroban-testnet.stellar.org" >> .env.local
-        fi
+      - name: Write environment config
+        working-directory: ./frontend
+        run: |
+          NETWORK=${{ github.event.inputs.environment || 'staging' }}
+          if [ "$NETWORK" = "production" ]; then
+            echo "NEXT_PUBLIC_CONTRACT_ID=${{ secrets.PRODUCTION_CONTRACT_ID }}" >> .env.local
+            echo "NEXT_PUBLIC_STELLAR_NETWORK=mainnet" >> .env.local
+            echo "NEXT_PUBLIC_RPC_URL=https://soroban-rpc.mainnet.stellar.org" >> .env.local
+          else
+            echo "NEXT_PUBLIC_CONTRACT_ID=${{ secrets.STAGING_CONTRACT_ID }}" >> .env.local
+            echo "NEXT_PUBLIC_STELLAR_NETWORK=testnet" >> .env.local
+            echo "NEXT_PUBLIC_RPC_URL=https://soroban-testnet.stellar.org" >> .env.local
+          fi
 
-    - name: Build frontend
-      working-directory: ./frontend
-      run: npm run build
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
 
-    - name: Deploy to Vercel
-      if: env.VERCEL_TOKEN != ''
-      run: |
-        npm install -g vercel
-        cd frontend
-        vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
+      # Fixed: `if: env.VERCEL_TOKEN != ''` silently never evaluates true in GitHub Actions
+      # because env context is not available in `if:` conditions.
+      # Use vars (non-secret config) to gate the Vercel deploy instead.
+      - name: Deploy to Vercel
+        if: vars.USE_VERCEL == 'true'
+        working-directory: ./frontend
+        run: |
+          npm install -g vercel
+          vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
 
-    - name: Deploy to GitHub Pages (fallback)
-      if: env.VERCEL_TOKEN == ''
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./frontend/.next
-        cname: ${{ github.event.inputs.environment == 'production' && 'chainlogistics.app' || 'staging.chainlogistics.app' }}
+      # Fixed: upgraded from stale peaceiris/actions-gh-pages@v3 to @v4
+      - name: Deploy to GitHub Pages (fallback)
+        if: vars.USE_VERCEL != 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/.next
+          cname: ${{ (github.event.inputs.environment == 'production') && 'chainlogistics.app' || 'staging.chainlogistics.app' }}
 
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
-    needs: [deploy-contracts, deploy-frontend]
+    needs: [ deploy-contracts, deploy-frontend ]
     if: always()
 
     steps:
-    - name: Notify success
-      if: needs.deploy-contracts.result == 'success' && needs.deploy-frontend.result == 'success'
-      run: |
-        echo "Deployment successful!"
-        # Add notification logic here (Slack, email, etc.)
+      - name: Notify success
+        if: needs.deploy-contracts.result == 'success' && needs.deploy-frontend.result == 'success'
+        run: |
+          echo "Deployment successful!"
+          # Add Slack/email notification here
 
-    - name: Notify failure
-      if: failure()
-      run: |
-        echo "Deployment failed!"
-        # Add notification logic here (Slack, email, etc.)
+      - name: Notify failure
+        if: needs.deploy-contracts.result == 'failure' || needs.deploy-frontend.result == 'failure'
+        run: |
+          echo "Deployment failed!"
+          # Add Slack/email notification here
 
+  # NOTE: True contract rollback on Stellar/Soroban is not possible by reverting a deploy —
+  # deployed contracts are immutable on-chain. A real rollback strategy requires either:
+  #   1. Redeploying the previous WASM and updating any router/proxy contract to point to it, or
+  #   2. Maintaining a feature-flag or upgrade mechanism inside the contract itself.
+  # The stub below is preserved as a placeholder for frontend-only rollback (e.g. Vercel promote).
   rollback:
-    name: Rollback on Failure
+    name: Rollback Frontend on Failure
     runs-on: ubuntu-latest
-    needs: [deploy-contracts, deploy-frontend]
-    if: failure() && github.event_name == 'push'
+    needs: [ deploy-contracts, deploy-frontend ]
+    if: failure() && github.event_name == 'push' && vars.USE_VERCEL == 'true'
 
     steps:
-    - name: Rollback contracts
-      run: |
-        echo "Rolling back contract deployment..."
-        # Add rollback logic for contracts
-
-    - name: Rollback frontend
-      run: |
-        echo "Rolling back frontend deployment..."
-        # Add rollback logic for frontend
+      - name: Rollback Vercel deployment
+        run: |
+          echo "Promote the previous Vercel deployment via the Vercel API or CLI here."
+          # vercel rollback --token ${{ secrets.VERCEL_TOKEN }}
