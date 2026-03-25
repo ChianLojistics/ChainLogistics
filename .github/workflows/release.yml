@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   release:
@@ -11,78 +11,113 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Get version from tag
-      id: get_version
-      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      # Setup Node
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-    - name: Generate changelog
-      id: changelog
-      run: |
-        # Get previous tag
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        if [ -z "$PREVIOUS_TAG" ]; then
-          PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
-        fi
+      # Install Rust
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-        # Generate changelog
-        echo "## What's Changed" > changelog.md
-        echo "" >> changelog.md
-        git log --pretty=format:"* %s (%h)" --no-merges ${PREVIOUS_TAG}..HEAD >> changelog.md
-        echo "" >> changelog.md
-        echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ github.ref }}" >> changelog.md
+      # Add WASM target
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
 
-        # Set output
-        {
-          echo 'changelog<<EOF'
-          cat changelog.md
-          echo EOF
-        } >> $GITHUB_OUTPUT
+      # Install Soroban CLI
+      - name: Install Soroban CLI
+        run: cargo install soroban-cli --locked
 
-    - name: Build Rust contracts
-      working-directory: ./smart-contract
-      run: |
-        curl -L https://github.com/stellar/soroban-cli/releases/latest/download/soroban-cli-linux-x64.tar.gz | tar xz
-        sudo mv soroban /usr/local/bin/
-        cargo build --release --target wasm32-unknown-unknown
+      # Extract version from tag
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-    - name: Build frontend
-      working-directory: ./frontend
-      run: |
-        npm ci
-        npm run build
-        tar -czf frontend-build.tar.gz .next/
+      # Generate changelog
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
 
-    - name: Create release archives
-      run: |
-        mkdir -p release-artifacts
-        cp smart-contract/target/wasm32-unknown-unknown/release/*.wasm release-artifacts/
-        cp frontend/frontend-build.tar.gz release-artifacts/
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+          git log --pretty=format:"* %s (%h)" --no-merges ${PREVIOUS_TAG}..HEAD >> changelog.md
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ github.ref }}" >> changelog.md
 
-    - name: Create GitHub release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ steps.get_version.outputs.version }}
-        body: ${{ steps.changelog.outputs.changelog }}
-        draft: false
-        prerelease: false
+          {
+            echo 'changelog<<EOF'
+            cat changelog.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
 
-    - name: Upload release assets
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./release-artifacts/
-        asset_name: chainlogistics-${{ steps.get_version.outputs.version }}
-        asset_content_type: application/zip
+      # Build Soroban contracts
+      - name: Build Rust contracts
+        working-directory: ./smart-contract
+        run: cargo build --release --target wasm32-unknown-unknown
+
+      # Install frontend dependencies
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      # Build frontend
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      # Package frontend build
+      - name: Package frontend build
+        run: |
+          tar -czf frontend-build.tar.gz -C frontend .next
+
+      # Prepare release artifacts
+      - name: Prepare release artifacts
+        run: |
+          mkdir release-artifacts
+          cp smart-contract/target/wasm32-unknown-unknown/release/*.wasm release-artifacts/
+          cp frontend-build.tar.gz release-artifacts/
+
+      # Zip artifacts
+      - name: Zip release artifacts
+        run: |
+          cd release-artifacts
+          zip -r ../chainlogistics-${{ steps.get_version.outputs.version }}.zip .
+
+      # Create GitHub Release
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
+
+      # Upload release asset
+      - name: Upload release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./chainlogistics-${{ steps.get_version.outputs.version }}.zip
+          asset_name: chainlogistics-${{ steps.get_version.outputs.version }}.zip
+          asset_content_type: application/zip
+
 
   publish-frontend:
     name: Publish Frontend
@@ -90,35 +125,28 @@ jobs:
     needs: release
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
-    - name: Install dependencies
-      working-directory: ./frontend
-      run: npm ci
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
 
-    - name: Build frontend
-      working-directory: ./frontend
-      run: npm run build
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
 
-    - name: Deploy to Vercel (if configured)
-      if: env.VERCEL_TOKEN != ''
-      run: |
-        npm install -g vercel
-        cd frontend
-        vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
-
-    - name: Deploy to GitHub Pages (fallback)
-      if: env.VERCEL_TOKEN == ''
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./frontend/.next
-        cname: chainlogistics.vercel.app
+      # Deploy to Vercel
+      - name: Deploy to Vercel
+        if: secrets.VERCEL_TOKEN != ''
+        run: |
+          npm install -g vercel
+          cd frontend
+          vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
