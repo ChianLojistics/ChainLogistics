@@ -60,12 +60,7 @@ pub fn next_event_id(env: &Env) -> u64 {
 
 // ─── Event type index ────────────────────────────────────────────────────────
 
-pub fn index_event_by_type(
-    env: &Env,
-    product_id: &String,
-    event_type: &Symbol,
-    event_id: u64,
-) {
+pub fn index_event_by_type(env: &Env, product_id: &String, event_type: &Symbol, event_id: u64) {
     StorageContract::index_event_by_type(env, product_id, event_type, event_id)
 }
 
@@ -136,12 +131,18 @@ pub fn set_active_products(env: &Env, count: u64) {
 // ─── Search Index ───────────────────────────────────────────────────────────
 
 pub fn put_search_index(env: &Env, keyword: &String, product_ids: &Vec<String>) {
-    env.storage().persistent().set(&crate::types::DataKey::SearchIndex(crate::types::IndexKey::Keyword(keyword.clone())), product_ids);
+    env.storage().persistent().set(
+        &crate::types::DataKey::SearchIndex(crate::types::IndexKey::Keyword(keyword.clone())),
+        product_ids,
+    );
 }
 
 pub fn get_search_index(env: &Env, keyword: &String) -> Vec<String> {
-    env.storage().persistent()
-        .get(&crate::types::DataKey::SearchIndex(crate::types::IndexKey::Keyword(keyword.clone())))
+    env.storage()
+        .persistent()
+        .get(&crate::types::DataKey::SearchIndex(
+            crate::types::IndexKey::Keyword(keyword.clone()),
+        ))
         .unwrap_or_else(|| Vec::new(env))
 }
 

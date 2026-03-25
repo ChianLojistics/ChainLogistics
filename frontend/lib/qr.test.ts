@@ -1,15 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { generateProductQR, generateProductQRSVG, getVerificationUrl } from "../qr";
+import { generateProductQR, generateProductQRSVG, getVerificationUrl } from "./qr";
+
+const { toDataURLMock, toStringMock } = vi.hoisted(() => ({
+  toDataURLMock: vi.fn(),
+  toStringMock: vi.fn(),
+}));
 
 // Mock QRCode library
 vi.mock('qrcode', () => ({
   default: {
-    toDataURL: vi.fn(),
-    toString: vi.fn(),
+    toDataURL: toDataURLMock,
+    toString: toStringMock,
   },
 }));
-
-const mockQRCode = await import('qrcode');
 
 describe("QR Code Utilities", () => {
   beforeEach(() => {
@@ -52,12 +55,12 @@ describe("QR Code Utilities", () => {
   describe("generateProductQR", () => {
     it("should generate QR code data URL", async () => {
       const mockDataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA";
-      mockQRCode.default.toDataURL.mockResolvedValue(mockDataURL);
+      toDataURLMock.mockResolvedValue(mockDataURL);
 
       const productId = "prod-123";
       const result = await generateProductQR(productId);
 
-      expect(mockQRCode.default.toDataURL).toHaveBeenCalledWith(
+      expect(toDataURLMock).toHaveBeenCalledWith(
         "http://localhost:3000/verify/prod-123",
         {
           width: 300,
@@ -73,7 +76,7 @@ describe("QR Code Utilities", () => {
 
     it("should handle QRCode generation errors", async () => {
       const error = new Error("QR generation failed");
-      vi.mocked(mockQRCode.default.toDataURL).mockRejectedValue(error);
+      toDataURLMock.mockRejectedValue(error);
 
       const productId = "prod-123";
       await expect(generateProductQR(productId)).rejects.toThrow("QR generation failed");
@@ -83,12 +86,12 @@ describe("QR Code Utilities", () => {
   describe("generateProductQRSVG", () => {
     it("should generate QR code SVG string", async () => {
       const mockSVG = '<svg xmlns="http://www.w3.org/2000/svg"><!-- QR Code --></svg>';
-      mockQRCode.default.toString.mockResolvedValue(mockSVG);
+      toStringMock.mockResolvedValue(mockSVG);
 
       const productId = "prod-456";
       const result = await generateProductQRSVG(productId);
 
-      expect(mockQRCode.default.toString).toHaveBeenCalledWith(
+      expect(toStringMock).toHaveBeenCalledWith(
         "http://localhost:3000/verify/prod-456",
         {
           type: 'svg',
@@ -105,7 +108,7 @@ describe("QR Code Utilities", () => {
 
     it("should handle SVG generation errors", async () => {
       const error = new Error("SVG generation failed");
-      vi.mocked(mockQRCode.default.toString).mockRejectedValue(error);
+      toStringMock.mockRejectedValue(error);
 
       const productId = "prod-456";
       await expect(generateProductQRSVG(productId)).rejects.toThrow("SVG generation failed");

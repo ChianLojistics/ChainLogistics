@@ -1,27 +1,35 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
-use crate::AuthorizationContractClient;
-use crate::types::{DeactInfo, Origin, Product, ProductConfig, ProductStats};
 use crate::storage;
+use crate::types::{DeactInfo, Origin, Product, ProductConfig, ProductStats};
 use crate::validation_contract::ValidationContract;
+use crate::AuthorizationContractClient;
 
 // ─── Storage helpers for trusted transfer contract ───────────────────────────
 
 fn get_transfer_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&crate::types::DataKey::TransferContract)
+    env.storage()
+        .persistent()
+        .get(&crate::types::DataKey::TransferContract)
 }
 
 fn set_transfer_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&crate::types::DataKey::TransferContract, address);
+    env.storage()
+        .persistent()
+        .set(&crate::types::DataKey::TransferContract, address);
 }
 
 fn get_auth_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&crate::types::DataKey::AuthContract)
+    env.storage()
+        .persistent()
+        .get(&crate::types::DataKey::AuthContract)
 }
 
 fn set_auth_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&crate::types::DataKey::AuthContract, address);
+    env.storage()
+        .persistent()
+        .set(&crate::types::DataKey::AuthContract, address);
 }
 
 fn require_transfer_contract(env: &Env, caller: &Address) -> Result<(), Error> {
@@ -56,21 +64,21 @@ fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
 fn index_product(env: &Env, product: &Product) {
     // Index individual words from name, origin, and category
     // This allows for partial matching
-    
+
     // Index name words
     let name_words = split_into_words(env, &product.name);
     for i in 0..name_words.len() {
         let word = name_words.get(i).unwrap();
         storage::add_to_search_index(env, word.clone(), &product.id);
     }
-    
+
     // Index origin words
     let origin_words = split_into_words(env, &product.origin.location);
     for i in 0..origin_words.len() {
         let word = origin_words.get(i).unwrap();
         storage::add_to_search_index(env, word.clone(), &product.id);
     }
-    
+
     // Index category words
     let category_words = split_into_words(env, &product.category);
     for i in 0..category_words.len() {
@@ -81,14 +89,14 @@ fn index_product(env: &Env, product: &Product) {
 
 fn split_into_words(env: &Env, text: &String) -> Vec<String> {
     let mut words = Vec::new(env);
-    
+
     // For now, just use the full text as a single "word"
     // This avoids the to_string() conversion issues
     // In a real implementation, we'd want to split into individual words
     if text.len() > 2 {
         words.push_back(text.clone());
     }
-    
+
     words
 }
 
@@ -99,14 +107,14 @@ fn deindex_product(env: &Env, product: &Product) {
         let word = name_words.get(i).unwrap();
         storage::remove_from_search_index(env, word.clone(), &product.id);
     }
-    
+
     // Remove from origin index
     let origin_words = split_into_words(env, &product.origin.location);
     for i in 0..origin_words.len() {
         let word = origin_words.get(i).unwrap();
         storage::remove_from_search_index(env, word.clone(), &product.id);
     }
-    
+
     // Remove from category index
     let category_words = split_into_words(env, &product.category);
     for i in 0..category_words.len() {
@@ -292,11 +300,7 @@ impl ProductRegistryContract {
     ///
     /// Only the product owner can reactivate. Clears deactivation info
     /// and increments the active product counter.
-    pub fn reactivate_product(
-        env: Env,
-        owner: Address,
-        product_id: String,
-    ) -> Result<(), Error> {
+    pub fn reactivate_product(env: Env, owner: Address, product_id: String) -> Result<(), Error> {
         let mut product = read_product(&env, &product_id)?;
         require_owner(&product, &owner)?;
 
@@ -351,11 +355,11 @@ impl ProductRegistryContract {
     /// Results are limited for gas efficiency.
     pub fn search_products(env: Env, query: String, limit: u32) -> Vec<String> {
         let mut results = Vec::new(&env);
-        
+
         if limit == 0 {
             return results;
         }
-        
+
         // Search for exact match first (case sensitive)
         let exact_matches = storage::get_search_index(&env, &query);
         for i in 0..exact_matches.len() {
@@ -367,10 +371,10 @@ impl ProductRegistryContract {
                 results.push_back(product_id.clone());
             }
         }
-        
+
         // If we need more results, we could implement partial matching here
         // For now, this provides basic search functionality
-        
+
         results
     }
 }

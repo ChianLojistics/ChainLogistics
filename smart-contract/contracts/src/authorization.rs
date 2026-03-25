@@ -1,5 +1,5 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, contracttype};
 use crate::error::Error;
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 
 #[contracttype]
 #[derive(Clone)]
@@ -15,7 +15,11 @@ pub struct AuthorizationContract;
 #[contractimpl]
 impl AuthorizationContract {
     pub fn configure_initializer(env: Env, initializer: Address) -> Result<(), Error> {
-        match env.storage().persistent().get::<AuthDataKey, Address>(&AuthDataKey::Initializer) {
+        match env
+            .storage()
+            .persistent()
+            .get::<AuthDataKey, Address>(&AuthDataKey::Initializer)
+        {
             None => {
                 env.storage()
                     .persistent()
@@ -45,23 +49,40 @@ impl AuthorizationContract {
             return Err(Error::Unauthorized);
         }
 
-        if env.storage().persistent().has(&AuthDataKey::Owner(product_id.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&AuthDataKey::Owner(product_id.clone()))
+        {
             return Err(Error::ProductAlreadyExists);
         }
-        env.storage().persistent().set(&AuthDataKey::Owner(product_id), &owner);
+        env.storage()
+            .persistent()
+            .set(&AuthDataKey::Owner(product_id), &owner);
         Ok(())
     }
 
     /// Update product ownership (transfer).
-    pub fn update_product_owner(env: Env, old_owner: Address, product_id: String, new_owner: Address) -> Result<(), Error> {
+    pub fn update_product_owner(
+        env: Env,
+        old_owner: Address,
+        product_id: String,
+        new_owner: Address,
+    ) -> Result<(), Error> {
         old_owner.require_auth();
-        let owner: Address = env.storage().persistent().get(&AuthDataKey::Owner(product_id.clone())).ok_or(Error::ProductNotFound)?;
-        
+        let owner: Address = env
+            .storage()
+            .persistent()
+            .get(&AuthDataKey::Owner(product_id.clone()))
+            .ok_or(Error::ProductNotFound)?;
+
         if owner != old_owner {
             return Err(Error::Unauthorized);
         }
 
-        env.storage().persistent().set(&AuthDataKey::Owner(product_id), &new_owner);
+        env.storage()
+            .persistent()
+            .set(&AuthDataKey::Owner(product_id), &new_owner);
         Ok(())
     }
 
@@ -73,13 +94,19 @@ impl AuthorizationContract {
         actor: Address,
     ) -> Result<(), Error> {
         owner.require_auth();
-        
-        let current_owner: Address = env.storage().persistent().get(&AuthDataKey::Owner(product_id.clone())).ok_or(Error::ProductNotFound)?;
+
+        let current_owner: Address = env
+            .storage()
+            .persistent()
+            .get(&AuthDataKey::Owner(product_id.clone()))
+            .ok_or(Error::ProductNotFound)?;
         if current_owner != owner {
             return Err(Error::Unauthorized);
         }
 
-        env.storage().persistent().set(&AuthDataKey::Authorized(product_id, actor), &true);
+        env.storage()
+            .persistent()
+            .set(&AuthDataKey::Authorized(product_id, actor), &true);
         Ok(())
     }
 
@@ -92,24 +119,38 @@ impl AuthorizationContract {
     ) -> Result<(), Error> {
         owner.require_auth();
 
-        let current_owner: Address = env.storage().persistent().get(&AuthDataKey::Owner(product_id.clone())).ok_or(Error::ProductNotFound)?;
+        let current_owner: Address = env
+            .storage()
+            .persistent()
+            .get(&AuthDataKey::Owner(product_id.clone()))
+            .ok_or(Error::ProductNotFound)?;
         if current_owner != owner {
             return Err(Error::Unauthorized);
         }
 
-        env.storage().persistent().remove(&AuthDataKey::Authorized(product_id, actor));
+        env.storage()
+            .persistent()
+            .remove(&AuthDataKey::Authorized(product_id, actor));
         Ok(())
     }
 
     /// Check whether an actor is authorized.
     pub fn is_authorized(env: Env, product_id: String, actor: Address) -> Result<bool, Error> {
-        let owner: Address = env.storage().persistent().get(&AuthDataKey::Owner(product_id.clone())).ok_or(Error::ProductNotFound)?;
-        
+        let owner: Address = env
+            .storage()
+            .persistent()
+            .get(&AuthDataKey::Owner(product_id.clone()))
+            .ok_or(Error::ProductNotFound)?;
+
         if owner == actor {
             return Ok(true);
         }
 
-        Ok(env.storage().persistent().get(&AuthDataKey::Authorized(product_id, actor)).unwrap_or(false))
+        Ok(env
+            .storage()
+            .persistent()
+            .get(&AuthDataKey::Authorized(product_id, actor))
+            .unwrap_or(false))
     }
 }
 

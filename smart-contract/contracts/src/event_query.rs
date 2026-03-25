@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec, contracttype};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
 use crate::types::TrackingEventFilter;
@@ -13,19 +13,27 @@ enum QueryDataKey {
 }
 
 fn get_registry_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&QueryDataKey::RegistryContract)
+    env.storage()
+        .persistent()
+        .get(&QueryDataKey::RegistryContract)
 }
 
 fn set_registry_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&QueryDataKey::RegistryContract, address);
+    env.storage()
+        .persistent()
+        .set(&QueryDataKey::RegistryContract, address);
 }
 
 fn get_tracking_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&QueryDataKey::TrackingContract)
+    env.storage()
+        .persistent()
+        .get(&QueryDataKey::TrackingContract)
 }
 
 fn set_tracking_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&QueryDataKey::TrackingContract, address);
+    env.storage()
+        .persistent()
+        .set(&QueryDataKey::TrackingContract, address);
 }
 
 fn ensure_product_exists(env: &Env, product_id: &String) -> Result<(), Error> {
@@ -46,7 +54,11 @@ pub struct EventQueryContract;
 #[contractimpl]
 impl EventQueryContract {
     /// Initialize the EventQueryContract with the registry + tracking contract addresses.
-    pub fn init(env: Env, registry_contract: Address, tracking_contract: Address) -> Result<(), Error> {
+    pub fn init(
+        env: Env,
+        registry_contract: Address,
+        tracking_contract: Address,
+    ) -> Result<(), Error> {
         if get_registry_contract(&env).is_some() || get_tracking_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
@@ -57,7 +69,7 @@ impl EventQueryContract {
 
     /// Get paginated events for a product.
     /// Returns events with pagination info (total_count, has_more).
-    pub fn get_product_events(
+    pub fn query_get_product_events(
         env: Env,
         product_id: String,
         offset: u64,
@@ -71,13 +83,13 @@ impl EventQueryContract {
                 has_more: false,
             });
         }
-        
+
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
         let tracking_client = TrackingContractClient::new(&env, &tracking);
-        
-        let all_ids = tracking_client.get_product_event_ids(&product_id);
+
+        let all_ids = tracking_client.tracking_get_product_event_ids(&product_id);
         let total_count = all_ids.len() as u64;
 
         if offset >= total_count {
@@ -95,7 +107,7 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
                     if let Ok(event) = event {
                         events.push_back(event);
                     }
@@ -113,7 +125,7 @@ impl EventQueryContract {
     }
 
     /// Get events filtered by type with pagination.
-    pub fn get_events_by_type(
+    pub fn query_get_events_by_type(
         env: Env,
         product_id: String,
         event_type: Symbol,
@@ -128,18 +140,18 @@ impl EventQueryContract {
                 has_more: false,
             });
         }
-        
+
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
         let tracking_client = TrackingContractClient::new(&env, &tracking);
 
-        let all_ids = tracking_client.get_product_event_ids(&product_id);
+        let all_ids = tracking_client.tracking_get_product_event_ids(&product_id);
         let mut matching_ids: Vec<u64> = Vec::new(&env);
 
         for i in 0..all_ids.len() {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
                     if let Ok(event) = event {
                         if event.event_type == event_type {
                             matching_ids.push_back(eid);
@@ -165,7 +177,7 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = matching_ids.get(i) {
-                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
                     if let Ok(event) = event {
                         events.push_back(event);
                     }
@@ -183,7 +195,7 @@ impl EventQueryContract {
     }
 
     /// Get events within a time range with pagination.
-    pub fn get_events_by_time_range(
+    pub fn query_get_events_by_time_range(
         env: Env,
         product_id: String,
         start_time: u64,
@@ -199,18 +211,18 @@ impl EventQueryContract {
                 has_more: false,
             });
         }
-        
+
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
         let tracking_client = TrackingContractClient::new(&env, &tracking);
 
-        let all_ids = tracking_client.get_product_event_ids(&product_id);
+        let all_ids = tracking_client.tracking_get_product_event_ids(&product_id);
         let mut matching_ids: Vec<u64> = Vec::new(&env);
 
         for i in 0..all_ids.len() {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
                     if let Ok(event) = event {
                         if event.timestamp >= start_time && event.timestamp <= end_time {
                             matching_ids.push_back(eid);
@@ -236,7 +248,7 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = matching_ids.get(i) {
-                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
                     if let Ok(event) = event {
                         events.push_back(event);
                     }
@@ -255,7 +267,7 @@ impl EventQueryContract {
 
     /// Get events with composite filtering (type, time range, location).
     /// All filter criteria are optional - use empty values to skip a filter.
-    pub fn get_filtered_events(
+    pub fn query_get_filtered_events(
         env: Env,
         product_id: String,
         filter: TrackingEventFilter,
@@ -270,13 +282,13 @@ impl EventQueryContract {
                 has_more: false,
             });
         }
-        
+
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
         let tracking_client = TrackingContractClient::new(&env, &tracking);
 
-        let all_ids = tracking_client.get_product_event_ids(&product_id);
+        let all_ids = tracking_client.tracking_get_product_event_ids(&product_id);
         let mut matching_ids: Vec<u64> = Vec::new(&env);
 
         let empty_sym = Symbol::new(&env, "");
@@ -284,7 +296,7 @@ impl EventQueryContract {
 
         for i in 0..all_ids.len() {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
                     if let Ok(event) = event {
                         let mut matches = true;
 
@@ -325,7 +337,7 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = matching_ids.get(i) {
-                if let Ok(event) = tracking_client.try_get_event(&eid) {
+                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
                     if let Ok(event) = event {
                         events.push_back(event);
                     }
@@ -343,17 +355,17 @@ impl EventQueryContract {
     }
 
     /// Get total event count for a product.
-    pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
+    pub fn query_get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
         ensure_product_exists(&env, &product_id)?;
 
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
         let tracking_client = TrackingContractClient::new(&env, &tracking);
 
-        Ok(tracking_client.get_event_count(&product_id))
+        Ok(tracking_client.tracking_get_event_count(&product_id))
     }
 
     /// Get event count by type for a product.
-    pub fn get_event_count_by_type(
+    pub fn query_get_event_count_by_type(
         env: Env,
         product_id: String,
         event_type: Symbol,
@@ -363,22 +375,29 @@ impl EventQueryContract {
         let tracking = get_tracking_contract(&env).ok_or(Error::NotInitialized)?;
         let tracking_client = TrackingContractClient::new(&env, &tracking);
 
-        Ok(tracking_client.get_event_count_by_type(&product_id, &event_type))
+        Ok(tracking_client.tracking_get_event_count_by_type(&product_id, &event_type))
     }
 }
 
 #[cfg(test)]
 mod test_event_query {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map, Vec};
     use crate::{
-        AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract, ChainLogisticsContractClient,
-        ProductRegistryContract, ProductRegistryContractClient,
-        ProductConfig,
-        TrackingContract, TrackingContractClient,
+        AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract,
+        ChainLogisticsContractClient, ProductConfig, ProductRegistryContract,
+        ProductRegistryContractClient, TrackingContract, TrackingContractClient,
     };
+    use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map, Vec};
 
-    fn setup(env: &Env) -> (ProductRegistryContractClient, TrackingContractClient, super::EventQueryContractClient, Address, Address) {
+    fn setup(
+        env: &Env,
+    ) -> (
+        ProductRegistryContractClient,
+        TrackingContractClient,
+        super::EventQueryContractClient,
+        Address,
+        Address,
+    ) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let cl_id = env.register_contract(None, ChainLogisticsContract);
         let registry_id = env.register_contract(None, ProductRegistryContract);
@@ -400,7 +419,13 @@ mod test_event_query {
         tracking_client.init(&cl_id);
         query_client.init(&registry_id, &tracking_id);
 
-        (registry_client, tracking_client, query_client, registry_id, tracking_id)
+        (
+            registry_client,
+            tracking_client,
+            query_client,
+            registry_id,
+            tracking_id,
+        )
     }
 
     fn register_test_product(
@@ -434,7 +459,7 @@ mod test_event_query {
         product_id: &String,
         event_type: &str,
     ) -> u64 {
-        tracking_client.add_tracking_event(
+        tracking_client.tracking_add_event(
             owner,
             product_id,
             &Symbol::new(env, event_type),
@@ -450,12 +475,13 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, _tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Get events for product with no events
-        let result = query_client.get_product_events(&product_id, &0, &10);
+        let result = query_client.query_get_product_events(&product_id, &0, &10);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
@@ -466,10 +492,11 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (_registry_client, _tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
-        let res = query_client.try_get_product_events(&fake_id, &0, &10);
+        let res = query_client.try_query_get_product_events(&fake_id, &0, &10);
         assert_eq!(res, Err(Ok(Error::ProductNotFound)));
     }
 
@@ -478,19 +505,20 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
         // Initially 0 events
-        assert_eq!(query_client.get_event_count(&product_id), 0);
+        assert_eq!(query_client.query_get_event_count(&product_id), 0);
 
         // Add events
         add_test_event(&env, &tracking_client, &owner, &product_id, "created");
         add_test_event(&env, &tracking_client, &owner, &product_id, "shipped");
 
         // Count should be 2
-        assert_eq!(query_client.get_event_count(&product_id), 2);
+        assert_eq!(query_client.query_get_event_count(&product_id), 2);
     }
 
     #[test]
@@ -498,10 +526,11 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (_registry_client, _tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
 
         let fake_id = String::from_str(&env, "NONEXISTENT");
-        let res = query_client.try_get_event_count(&fake_id);
+        let res = query_client.try_query_get_event_count(&fake_id);
         assert_eq!(res, Err(Ok(Error::ProductNotFound)));
     }
 
@@ -510,7 +539,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -521,15 +551,15 @@ mod test_event_query {
 
         // Check counts by type
         assert_eq!(
-            query_client.get_event_count_by_type(&product_id, &Symbol::new(&env, "created")),
+            query_client.query_get_event_count_by_type(&product_id, &Symbol::new(&env, "created")),
             1
         );
         assert_eq!(
-            query_client.get_event_count_by_type(&product_id, &Symbol::new(&env, "shipped")),
+            query_client.query_get_event_count_by_type(&product_id, &Symbol::new(&env, "shipped")),
             2
         );
         assert_eq!(
-            query_client.get_event_count_by_type(&product_id, &Symbol::new(&env, "received")),
+            query_client.query_get_event_count_by_type(&product_id, &Symbol::new(&env, "received")),
             0
         );
     }
@@ -539,7 +569,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -549,7 +580,12 @@ mod test_event_query {
         add_test_event(&env, &tracking_client, &owner, &product_id, "received");
 
         // Get only shipped events
-        let result = query_client.get_events_by_type(&product_id, &Symbol::new(&env, "shipped"), &0, &10);
+        let result = query_client.query_get_events_by_type(
+            &product_id,
+            &Symbol::new(&env, "shipped"),
+            &0,
+            &10,
+        );
         assert_eq!(result.events.len(), 1);
         assert_eq!(result.total_count, 1);
     }
@@ -559,7 +595,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -568,7 +605,8 @@ mod test_event_query {
         add_test_event(&env, &tracking_client, &owner, &product_id, "shipped");
 
         // Get events in time range (all events)
-        let result = query_client.get_events_by_time_range(&product_id, &0, &u64::MAX, &0, &10);
+        let result =
+            query_client.query_get_events_by_time_range(&product_id, &0, &u64::MAX, &0, &10);
         assert_eq!(result.events.len(), 2);
         assert_eq!(result.total_count, 2);
     }
@@ -578,7 +616,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -593,7 +632,7 @@ mod test_event_query {
             end_time: u64::MAX,
             location: String::from_str(&env, ""),
         };
-        let result = query_client.get_filtered_events(&product_id, &filter, &0, &10);
+        let result = query_client.query_get_filtered_events(&product_id, &filter, &0, &10);
         assert_eq!(result.events.len(), 1);
         assert_eq!(result.total_count, 1);
     }
@@ -603,7 +642,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -613,18 +653,18 @@ mod test_event_query {
         }
 
         // Get first 2
-        let result = query_client.get_product_events(&product_id, &0, &2);
+        let result = query_client.query_get_product_events(&product_id, &0, &2);
         assert_eq!(result.events.len(), 2);
         assert_eq!(result.total_count, 5);
         assert!(result.has_more);
 
         // Get next 2
-        let result = query_client.get_product_events(&product_id, &2, &2);
+        let result = query_client.query_get_product_events(&product_id, &2, &2);
         assert_eq!(result.events.len(), 2);
         assert!(result.has_more);
 
         // Get last 1
-        let result = query_client.get_product_events(&product_id, &4, &2);
+        let result = query_client.query_get_product_events(&product_id, &4, &2);
         assert_eq!(result.events.len(), 1);
         assert!(!result.has_more);
     }
@@ -634,7 +674,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -644,36 +685,36 @@ mod test_event_query {
         }
 
         // Test limit == 0 (should return empty due to validation)
-        let result = query_client.get_product_events(&product_id, &0, &0);
+        let result = query_client.query_get_product_events(&product_id, &0, &0);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
 
         // Test very large limit (should return empty due to validation)
-        let result = query_client.get_product_events(&product_id, &0, &1001);
+        let result = query_client.query_get_product_events(&product_id, &0, &1001);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
 
         // Test offset == total_count (should return empty)
-        let result = query_client.get_product_events(&product_id, &5, &2);
+        let result = query_client.query_get_product_events(&product_id, &5, &2);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 5);
         assert!(!result.has_more);
 
         // Test offset > total_count (should return empty)
-        let result = query_client.get_product_events(&product_id, &10, &2);
+        let result = query_client.query_get_product_events(&product_id, &10, &2);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 5);
         assert!(!result.has_more);
 
         // Test normal pagination still works
-        let result = query_client.get_product_events(&product_id, &0, &3);
+        let result = query_client.query_get_product_events(&product_id, &0, &3);
         assert_eq!(result.events.len(), 3);
         assert_eq!(result.total_count, 5);
         assert!(result.has_more);
 
-        let result = query_client.get_product_events(&product_id, &3, &3);
+        let result = query_client.query_get_product_events(&product_id, &3, &3);
         assert_eq!(result.events.len(), 2);
         assert_eq!(result.total_count, 5);
         assert!(!result.has_more);
@@ -684,24 +725,30 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, _tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, _tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "EMPTY_PROD");
 
         // Test with empty product (no events)
-        let result = query_client.get_product_events(&product_id, &0, &10);
+        let result = query_client.query_get_product_events(&product_id, &0, &10);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
 
         // Test offset > 0 with empty product
-        let result = query_client.get_product_events(&product_id, &5, &10);
+        let result = query_client.query_get_product_events(&product_id, &5, &10);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
 
         // Test filtered queries with empty product
-        let result = query_client.get_events_by_type(&product_id, &Symbol::new(&env, "created"), &0, &10);
+        let result = query_client.query_get_events_by_type(
+            &product_id,
+            &Symbol::new(&env, "created"),
+            &0,
+            &10,
+        );
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
@@ -712,7 +759,7 @@ mod test_event_query {
             end_time: u64::MAX,
             location: String::from_str(&env, ""),
         };
-        let result = query_client.get_filtered_events(&product_id, &filter, &0, &10);
+        let result = query_client.query_get_filtered_events(&product_id, &filter, &0, &10);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
@@ -723,7 +770,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) = setup(&env);
+        let (registry_client, tracking_client, query_client, _registry_id, _tracking_id) =
+            setup(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -732,12 +780,18 @@ mod test_event_query {
         add_test_event(&env, &tracking_client, &owner, &product_id, "shipped");
 
         // Test validation on different query types
-        let result = query_client.get_events_by_type(&product_id, &Symbol::new(&env, "created"), &0, &0);
+        let result = query_client.query_get_events_by_type(
+            &product_id,
+            &Symbol::new(&env, "created"),
+            &0,
+            &0,
+        );
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
 
-        let result = query_client.get_events_by_time_range(&product_id, &0, &u64::MAX, &0, &1001);
+        let result =
+            query_client.query_get_events_by_time_range(&product_id, &0, &u64::MAX, &0, &1001);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
@@ -748,7 +802,7 @@ mod test_event_query {
             end_time: u64::MAX,
             location: String::from_str(&env, ""),
         };
-        let result = query_client.get_filtered_events(&product_id, &filter, &0, &0);
+        let result = query_client.query_get_filtered_events(&product_id, &filter, &0, &0);
         assert_eq!(result.events.len(), 0);
         assert_eq!(result.total_count, 0);
         assert!(!result.has_more);
@@ -759,7 +813,8 @@ mod test_event_query {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_registry_client, _tracking_client, query_client, registry_id, tracking_id) = setup(&env);
+        let (_registry_client, _tracking_client, query_client, registry_id, tracking_id) =
+            setup(&env);
 
         // Second init should fail
         let res = query_client.try_init(&registry_id, &tracking_id);
@@ -777,7 +832,7 @@ mod test_event_query {
         let fake_id = String::from_str(&env, "FAKE-001");
 
         // Query without initialization should fail
-        let res = query_client.try_get_event_count(&fake_id);
+        let res = query_client.try_query_get_event_count(&fake_id);
         assert_eq!(res, Err(Ok(Error::NotInitialized)));
     }
 }

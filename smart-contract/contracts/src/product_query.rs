@@ -11,7 +11,9 @@ fn get_main_contract(env: &Env) -> Option<Address> {
 }
 
 fn set_main_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::MainContract, address);
+    env.storage()
+        .persistent()
+        .set(&DataKey::MainContract, address);
 }
 
 // ─── Contract ──────────────────────────────────────────────────────────────────
@@ -35,7 +37,7 @@ impl ProductQueryContract {
     pub fn query_product(env: Env, product_id: String) -> Result<Product, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
-        
+
         match pr_client.try_get_product(&product_id) {
             Ok(Ok(product)) => Ok(product),
             Ok(Err(_)) => Err(Error::ProductNotFound),
@@ -48,7 +50,7 @@ impl ProductQueryContract {
     pub fn query_stats(env: Env) -> Result<ProductStats, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
-        
+
         Ok(pr_client.get_stats())
     }
 
@@ -56,7 +58,7 @@ impl ProductQueryContract {
     pub fn query_product_exists(env: Env, product_id: String) -> Result<bool, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
-        
+
         match pr_client.try_get_product(&product_id) {
             Ok(Ok(_)) => Ok(true),
             _ => Ok(false),
@@ -67,12 +69,11 @@ impl ProductQueryContract {
 #[cfg(test)]
 mod test_product_query {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, Map, Vec};
     use crate::{
-        AuthorizationContract, AuthorizationContractClient,
-        ProductRegistryContract, ProductRegistryContractClient,
-        ProductConfig,
+        AuthorizationContract, AuthorizationContractClient, ProductConfig, ProductRegistryContract,
+        ProductRegistryContractClient,
     };
+    use soroban_sdk::{testutils::Address as _, Address, Env, Map, Vec};
 
     fn setup(env: &Env) -> (ProductRegistryContractClient, Address) {
         let auth_id = env.register_contract(None, AuthorizationContract);
