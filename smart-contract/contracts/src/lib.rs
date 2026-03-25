@@ -2,6 +2,7 @@
 #![allow(ambiguous_glob_reexports)]
 #![allow(mismatched_lifetime_syntaxes)]
 #![allow(dead_code)]
+#![allow(deprecated)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::collapsible_match)]
 #![allow(clippy::needless_borrow)]

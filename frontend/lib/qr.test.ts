@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { generateProductQR, generateProductQRSVG, getVerificationUrl } from "./qr";
 
-const toDataURLMock = vi.fn();
-const toStringMock = vi.fn();
+const { toDataURLMock, toStringMock } = vi.hoisted(() => ({
+  toDataURLMock: vi.fn(),
+  toStringMock: vi.fn(),
+}));
 
 // Mock QRCode library
 vi.mock('qrcode', () => ({
