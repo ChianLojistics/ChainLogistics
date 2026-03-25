@@ -2,6 +2,7 @@
 import { Contract, xdr, rpc, TransactionBuilder, Networks } from "@stellar/stellar-sdk";
 import type { StellarNetwork } from "./networks";
 import { CONTRACT_CONFIG } from "@/lib/contract/config";
+import { trackContractInteraction, trackError } from "@/lib/analytics";
 
 function scValToJs(scVal: xdr.ScVal): any {
   switch (scVal.switch()) {
@@ -108,12 +109,16 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
 
   const rpcServer = new rpc.Server(rpcUrl, { allowHttp: true });
   const contract = new Contract(contractId);
+
+  const now = () => Date.now();
+
   return {
     async ping(): Promise<string> {
       return "ok";
     },
 
     async get_product_event_ids(productId: string): Promise<number[]> {
+      const startedAt = now();
       try {
         const operation = contract.call("get_product_event_ids", xdr.ScVal.scvString(productId));
         const networkPassphrase = network === "testnet" ? Networks.TESTNET : network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
@@ -141,12 +146,33 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
         if (result && (result as any).retval) {
           const jsValue = scValToJs((result as any).retval);
           if (Array.isArray(jsValue)) {
+            trackContractInteraction({
+              method: "get_product_event_ids",
+              durationMs: now() - startedAt,
+              success: true,
+              context: { productId, resultCount: jsValue.length },
+            });
             return jsValue.map(Number);
           }
         }
+
+        trackContractInteraction({
+          method: "get_product_event_ids",
+          durationMs: now() - startedAt,
+          success: true,
+          context: { productId, resultCount: 0 },
+        });
         return [];
       } catch (error) {
         console.error("Failed to get product event IDs:", error);
+        trackContractInteraction({
+          method: "get_product_event_ids",
+          durationMs: now() - startedAt,
+          success: false,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          context: { productId },
+        });
+        trackError(error, { source: "contractClient.get_product_event_ids", productId });
         throw error;
       }
     },
@@ -160,6 +186,7 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
       note: string;
       data_hash?: string;
     } | null> {
+      const startedAt = now();
       try {
         const operation = contract.call("get_event", xdr.ScVal.scvU64(xdr.Uint64.fromString(eventId.toString())));
         const networkPassphrase = network === "testnet" ? Networks.TESTNET : network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
@@ -184,12 +211,20 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
 
         const result = await rpcServer.simulateTransaction(transaction);
 
-        if (!result || !(result as any).retval) return null;
+        if (!result || !(result as any).retval) {
+          trackContractInteraction({
+            method: "get_event",
+            durationMs: now() - startedAt,
+            success: true,
+            context: { eventId, found: false },
+          });
+          return null;
+        }
 
         const jsValue = scValToJs((result as any).retval);
         if (!jsValue || typeof jsValue !== "object") return null;
 
-        return {
+        const parsedEvent = {
           event_id: Number(jsValue.event_id || 0),
           product_id: scValToString(jsValue.product_id) || "",
           actor: scValToString(jsValue.actor) || "",
@@ -198,8 +233,25 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
           note: scValToString(jsValue.note) || "",
           data_hash: jsValue.data_hash ? scValToString(jsValue.data_hash) : undefined,
         };
+
+        trackContractInteraction({
+          method: "get_event",
+          durationMs: now() - startedAt,
+          success: true,
+          context: { eventId, found: true },
+        });
+
+        return parsedEvent;
       } catch (error) {
         console.error(`Failed to get event ${eventId}:`, error);
+        trackContractInteraction({
+          method: "get_event",
+          durationMs: now() - startedAt,
+          success: false,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          context: { eventId },
+        });
+        trackError(error, { source: "contractClient.get_event", eventId });
         return null;
       }
     },

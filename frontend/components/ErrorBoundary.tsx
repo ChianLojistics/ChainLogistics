@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { trackError } from "@/lib/analytics";
 
 type ErrorBoundaryProps = {
   children: React.ReactNode;
@@ -24,6 +25,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error) {
     console.error(error);
+    trackError(error, {
+      source: "ErrorBoundary.componentDidCatch",
+      component: this.constructor.name,
+    });
   }
 
   private handleReset = () => {

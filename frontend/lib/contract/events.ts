@@ -1,10 +1,12 @@
 import type { TimelineEvent } from "@/lib/types/tracking";
 import { createContractClient } from "@/lib/stellar/contractClient";
+import { trackContractInteraction, trackError } from "@/lib/analytics";
 import { CONTRACT_CONFIG, validateContractConfig } from "./config";
 
 export async function fetchProductEvents(
   productId: string
 ): Promise<TimelineEvent[]> {
+  const startedAt = Date.now();
   try {
     validateContractConfig();
 
@@ -17,6 +19,12 @@ export async function fetchProductEvents(
     const eventIds = await contractClient.get_product_event_ids(productId);
 
     if (eventIds.length === 0) {
+      trackContractInteraction({
+        method: "fetch_product_events",
+        durationMs: Date.now() - startedAt,
+        success: true,
+        context: { productId, resultCount: 0 },
+      });
       return [];
     }
 
@@ -28,9 +36,25 @@ export async function fetchProductEvents(
       (e): e is TimelineEvent => e !== null
     );
 
-    return validEvents.sort((a, b) => b.timestamp - a.timestamp);
+    const sorted = validEvents.sort((a, b) => b.timestamp - a.timestamp);
+    trackContractInteraction({
+      method: "fetch_product_events",
+      durationMs: Date.now() - startedAt,
+      success: true,
+      context: { productId, resultCount: sorted.length },
+    });
+
+    return sorted;
   } catch (error) {
     console.error("Failed to fetch product events:", error);
+    trackContractInteraction({
+      method: "fetch_product_events",
+      durationMs: Date.now() - startedAt,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      context: { productId },
+    });
+    trackError(error, { source: "fetchProductEvents", productId });
     throw error;
   }
 }
