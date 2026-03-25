@@ -1,8 +1,8 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
 
 use crate::error::Error;
-use crate::{AuthorizationContractClient, ProductRegistryContractClient};
 use crate::types::DataKey;
+use crate::{AuthorizationContractClient, ProductRegistryContractClient};
 
 // ─── Storage helpers for ProductTransferContract ─────────────────────────────
 
@@ -11,7 +11,9 @@ fn get_auth_contract(env: &Env) -> Option<Address> {
 }
 
 fn set_auth_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::AuthContract, address);
+    env.storage()
+        .persistent()
+        .set(&DataKey::AuthContract, address);
 }
 
 fn get_main_contract(env: &Env) -> Option<Address> {
@@ -19,7 +21,9 @@ fn get_main_contract(env: &Env) -> Option<Address> {
 }
 
 fn set_main_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::MainContract, address);
+    env.storage()
+        .persistent()
+        .set(&DataKey::MainContract, address);
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
@@ -110,11 +114,7 @@ impl ProductTransferContract {
     }
 
     /// Verify if an address is the owner of a specific product.
-    pub fn is_product_owner(
-        env: Env,
-        product_id: String,
-        address: Address,
-    ) -> Result<bool, Error> {
+    pub fn is_product_owner(env: Env, product_id: String, address: Address) -> Result<bool, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
         let product = match pr_client.try_get_product(&product_id) {
@@ -194,14 +194,21 @@ impl ProductTransferContract {
 #[cfg(test)]
 mod test_product_transfer {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, Map, String, Vec};
     use crate::{
-        AuthorizationContract, AuthorizationContractClient,
-        ProductRegistryContract, ProductRegistryContractClient,
-        ProductConfig,
+        AuthorizationContract, AuthorizationContractClient, ProductConfig, ProductRegistryContract,
+        ProductRegistryContractClient,
     };
+    use soroban_sdk::{testutils::Address as _, Address, Env, Map, String, Vec};
 
-    fn setup(env: &Env) -> (ProductRegistryContractClient, AuthorizationContractClient, Address, ProductTransferContractClient, Address) {
+    fn setup(
+        env: &Env,
+    ) -> (
+        ProductRegistryContractClient,
+        AuthorizationContractClient,
+        Address,
+        ProductTransferContractClient,
+        Address,
+    ) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let pr_id = env.register_contract(None, ProductRegistryContract);
         let transfer_id = env.register_contract(None, ProductTransferContract);

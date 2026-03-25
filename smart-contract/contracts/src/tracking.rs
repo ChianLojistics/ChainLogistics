@@ -13,7 +13,9 @@ fn get_main_contract(env: &Env) -> Option<Address> {
 }
 
 fn set_main_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::MainContract, address);
+    env.storage()
+        .persistent()
+        .set(&DataKey::MainContract, address);
 }
 
 fn require_not_paused(env: &Env) -> Result<(), Error> {
@@ -44,7 +46,7 @@ impl TrackingContract {
     /// Add a new tracking event to a product.
     /// Requires authentication from the actor.
     /// Validates metadata and emits tracking event.
-    pub fn add_tracking_event(
+    pub fn tracking_add_event(
         env: Env,
         actor: Address,
         product_id: String,
@@ -103,22 +105,26 @@ impl TrackingContract {
 
     /// Get a single event by its ID.
     /// Returns EventNotFound error if the event doesn't exist.
-    pub fn get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
+    pub fn tracking_get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
         storage::get_event(&env, event_id).ok_or(Error::EventNotFound)
     }
 
     /// Get all event IDs for a product.
-    pub fn get_product_event_ids(env: Env, product_id: String) -> Vec<u64> {
+    pub fn tracking_get_product_event_ids(env: Env, product_id: String) -> Vec<u64> {
         storage::get_product_event_ids(&env, &product_id)
     }
 
     /// Get the total event count for a product.
-    pub fn get_event_count(env: Env, product_id: String) -> u64 {
+    pub fn tracking_get_event_count(env: Env, product_id: String) -> u64 {
         storage::get_product_event_ids(&env, &product_id).len() as u64
     }
 
     /// Get the count of events by type for a product.
-    pub fn get_event_count_by_type(env: Env, product_id: String, event_type: Symbol) -> u64 {
+    pub fn tracking_get_event_count_by_type(
+        env: Env,
+        product_id: String,
+        event_type: Symbol,
+    ) -> u64 {
         storage::get_event_count_by_type(&env, &product_id, &event_type)
     }
 }
@@ -126,13 +132,22 @@ impl TrackingContract {
 #[cfg(test)]
 mod test_tracking {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, Map};
     use crate::{
-        AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract, ChainLogisticsContractClient,
-        ProductConfig, ProductRegistryContract, ProductRegistryContractClient,
+        AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract,
+        ChainLogisticsContractClient, ProductConfig, ProductRegistryContract,
+        ProductRegistryContractClient,
     };
+    use soroban_sdk::{testutils::Address as _, Address, Env, Map};
 
-    fn setup_uninitialized(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractClient, Address, Address, super::TrackingContractClient) {
+    fn setup_uninitialized(
+        env: &Env,
+    ) -> (
+        ChainLogisticsContractClient,
+        ProductRegistryContractClient,
+        Address,
+        Address,
+        super::TrackingContractClient,
+    ) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let cl_id = env.register_contract(None, ChainLogisticsContract);
         let registry_id = env.register_contract(None, ProductRegistryContract);
@@ -152,7 +167,15 @@ mod test_tracking {
         (cl_client, registry_client, admin, cl_id, tracking_client)
     }
 
-    fn setup_initialized(env: &Env) -> (ChainLogisticsContractClient, ProductRegistryContractClient, Address, Address, super::TrackingContractClient) {
+    fn setup_initialized(
+        env: &Env,
+    ) -> (
+        ChainLogisticsContractClient,
+        ProductRegistryContractClient,
+        Address,
+        Address,
+        super::TrackingContractClient,
+    ) {
         let (cl_client, registry_client, admin, cl_id, tracking_client) = setup_uninitialized(env);
         tracking_client.init(&cl_id);
         (cl_client, registry_client, admin, cl_id, tracking_client)
@@ -187,7 +210,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) =
+            setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -198,7 +222,7 @@ mod test_tracking {
         let note = String::from_str(&env, "Product created");
         let metadata = Map::new(&env);
 
-        let event_id = tracking_client.add_tracking_event(
+        let event_id = tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -212,7 +236,7 @@ mod test_tracking {
         assert_eq!(event_id, 1);
 
         // Verify event count
-        let count = tracking_client.get_event_count(&product_id);
+        let count = tracking_client.tracking_get_event_count(&product_id);
         assert_eq!(count, 1);
     }
 
@@ -221,7 +245,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) =
+            setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -232,7 +257,7 @@ mod test_tracking {
         let note = String::from_str(&env, "Product created");
         let metadata = Map::new(&env);
 
-        let event_id = tracking_client.add_tracking_event(
+        let event_id = tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -243,7 +268,7 @@ mod test_tracking {
         );
 
         // Get event
-        let event = tracking_client.get_event(&event_id);
+        let event = tracking_client.tracking_get_event(&event_id);
         assert_eq!(event.event_id, event_id);
         assert_eq!(event.product_id, product_id);
         assert_eq!(event.actor, owner);
@@ -255,10 +280,11 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _registry_client, _admin, _cl_id, tracking_client) = setup_uninitialized(&env);
+        let (_cl_client, _registry_client, _admin, _cl_id, tracking_client) =
+            setup_uninitialized(&env);
 
         // Get non-existent event
-        let res = tracking_client.try_get_event(&999);
+        let res = tracking_client.try_tracking_get_event(&999);
         assert_eq!(res, Err(Ok(Error::EventNotFound)));
     }
 
@@ -280,7 +306,7 @@ mod test_tracking {
         let note = String::from_str(&env, "Product created");
         let metadata = Map::new(&env);
 
-        let res = tracking_client.try_add_tracking_event(
+        let res = tracking_client.try_tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -293,7 +319,7 @@ mod test_tracking {
 
         cl_client.unpause(&admin);
 
-        let event_id = tracking_client.add_tracking_event(
+        let event_id = tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -310,7 +336,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) =
+            setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -320,7 +347,7 @@ mod test_tracking {
         let data_hash = BytesN::from_array(&env, &[0; 32]);
         let metadata = Map::new(&env);
 
-        let event_id1 = tracking_client.add_tracking_event(
+        let event_id1 = tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -330,7 +357,7 @@ mod test_tracking {
             &metadata,
         );
 
-        let event_id2 = tracking_client.add_tracking_event(
+        let event_id2 = tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -345,7 +372,7 @@ mod test_tracking {
         assert_eq!(event_id2, 2);
 
         // Verify event count
-        let count = tracking_client.get_event_count(&product_id);
+        let count = tracking_client.tracking_get_event_count(&product_id);
         assert_eq!(count, 2);
     }
 
@@ -354,7 +381,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) =
+            setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -364,7 +392,7 @@ mod test_tracking {
         let data_hash = BytesN::from_array(&env, &[0; 32]);
         let metadata = Map::new(&env);
 
-        tracking_client.add_tracking_event(
+        tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -374,7 +402,7 @@ mod test_tracking {
             &metadata,
         );
 
-        tracking_client.add_tracking_event(
+        tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -385,7 +413,7 @@ mod test_tracking {
         );
 
         // Get event IDs
-        let event_ids = tracking_client.get_product_event_ids(&product_id);
+        let event_ids = tracking_client.tracking_get_product_event_ids(&product_id);
         assert_eq!(event_ids.len(), 2);
         assert_eq!(event_ids.get(0), Some(1));
         assert_eq!(event_ids.get(1), Some(2));
@@ -396,7 +424,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) =
+            setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -405,7 +434,7 @@ mod test_tracking {
         let metadata = Map::new(&env);
 
         // Add events of different types
-        tracking_client.add_tracking_event(
+        tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &Symbol::new(&env, "created"),
@@ -415,7 +444,7 @@ mod test_tracking {
             &metadata,
         );
 
-        tracking_client.add_tracking_event(
+        tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &Symbol::new(&env, "shipped"),
@@ -425,7 +454,7 @@ mod test_tracking {
             &metadata,
         );
 
-        tracking_client.add_tracking_event(
+        tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &Symbol::new(&env, "shipped"),
@@ -436,8 +465,10 @@ mod test_tracking {
         );
 
         // Verify counts by type
-        let created_count = tracking_client.get_event_count_by_type(&product_id, &Symbol::new(&env, "created"));
-        let shipped_count = tracking_client.get_event_count_by_type(&product_id, &Symbol::new(&env, "shipped"));
+        let created_count = tracking_client
+            .tracking_get_event_count_by_type(&product_id, &Symbol::new(&env, "created"));
+        let shipped_count = tracking_client
+            .tracking_get_event_count_by_type(&product_id, &Symbol::new(&env, "shipped"));
 
         assert_eq!(created_count, 1);
         assert_eq!(shipped_count, 2);
@@ -448,7 +479,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) =
+            setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -458,10 +490,13 @@ mod test_tracking {
         let data_hash = BytesN::from_array(&env, &[0; 32]);
 
         let mut metadata = Map::new(&env);
-        metadata.set(Symbol::new(&env, "temperature"), String::from_str(&env, "20C"));
+        metadata.set(
+            Symbol::new(&env, "temperature"),
+            String::from_str(&env, "20C"),
+        );
         metadata.set(Symbol::new(&env, "humidity"), String::from_str(&env, "50%"));
 
-        let event_id = tracking_client.add_tracking_event(
+        let event_id = tracking_client.tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -472,7 +507,7 @@ mod test_tracking {
         );
 
         // Verify event
-        let event = tracking_client.get_event(&event_id);
+        let event = tracking_client.tracking_get_event(&event_id);
         assert_eq!(event.metadata.len(), 2);
     }
 
@@ -481,7 +516,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) = setup_initialized(&env);
+        let (_cl_client, registry_client, _admin, _cl_id, tracking_client) =
+            setup_initialized(&env);
         let owner = Address::generate(&env);
         let product_id = register_test_product(&env, &registry_client, &owner, "PROD1");
 
@@ -518,7 +554,7 @@ mod test_tracking {
         let location = String::from_str(&env, "Warehouse A");
         let data_hash = BytesN::from_array(&env, &[0; 32]);
 
-        let res = tracking_client.try_add_tracking_event(
+        let res = tracking_client.try_tracking_add_event(
             &owner,
             &product_id,
             &event_type,
@@ -536,7 +572,8 @@ mod test_tracking {
         let env = Env::default();
         env.mock_all_auths();
 
-        let (_cl_client, _registry_client, _admin, cl_id, tracking_client) = setup_uninitialized(&env);
+        let (_cl_client, _registry_client, _admin, cl_id, tracking_client) =
+            setup_uninitialized(&env);
 
         tracking_client.init(&cl_id);
 
@@ -562,7 +599,7 @@ mod test_tracking {
 
         // Adding event without initialization should fail because pause enforcement requires
         // the main contract address to be set via init.
-        let res = tracking_client.try_add_tracking_event(
+        let res = tracking_client.try_tracking_add_event(
             &owner,
             &product_id,
             &event_type,

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Keypair } from "@stellar/stellar-sdk";
 
 import {
   formatFirstErrorMessage,
@@ -22,7 +21,7 @@ describe("validation schemas", () => {
   });
 
   it("validates Stellar public key", () => {
-    const valid = Keypair.random().publicKey();
+    const valid = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
     expect(stellarPublicKeySchema.safeParse(valid).success).toBe(true);
 
     expect(stellarPublicKeySchema.safeParse("not-a-key").success).toBe(false);

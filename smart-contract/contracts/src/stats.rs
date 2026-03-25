@@ -1,5 +1,5 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec, contracttype};
- 
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Symbol, Vec};
+
 use crate::error::Error;
 use crate::types::{DataKey, ProductStats};
 use crate::{ProductRegistryContractClient, TrackingContractClient};
@@ -14,19 +14,27 @@ enum StatsDataKey {
 // ─── Storage helpers for StatsContract ───────────────────────────────────────
 
 fn get_registry_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&StatsDataKey::RegistryContract)
+    env.storage()
+        .persistent()
+        .get(&StatsDataKey::RegistryContract)
 }
 
 fn set_registry_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&StatsDataKey::RegistryContract, address);
+    env.storage()
+        .persistent()
+        .set(&StatsDataKey::RegistryContract, address);
 }
 
 fn get_tracking_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&StatsDataKey::TrackingContract)
+    env.storage()
+        .persistent()
+        .get(&StatsDataKey::TrackingContract)
 }
 
 fn set_tracking_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&StatsDataKey::TrackingContract, address);
+    env.storage()
+        .persistent()
+        .set(&StatsDataKey::TrackingContract, address);
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
@@ -37,7 +45,11 @@ pub struct StatsContract;
 #[contractimpl]
 impl StatsContract {
     /// Initialize the StatsContract with the main contract address.
-    pub fn init(env: Env, registry_contract: Address, tracking_contract: Address) -> Result<(), Error> {
+    pub fn init(
+        env: Env,
+        registry_contract: Address,
+        tracking_contract: Address,
+    ) -> Result<(), Error> {
         if get_registry_contract(&env).is_some() || get_tracking_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
@@ -48,7 +60,7 @@ impl StatsContract {
 
     /// Get global product statistics.
     /// Returns total and active product counts.
-    pub fn get_stats(env: Env) -> Result<ProductStats, Error> {
+    pub fn stats_get_stats(env: Env) -> Result<ProductStats, Error> {
         let registry_contract = get_registry_contract(&env).ok_or(Error::NotInitialized)?;
         let registry_client = ProductRegistryContractClient::new(&env, &registry_contract);
         Ok(registry_client.get_stats())
@@ -108,7 +120,7 @@ impl StatsContract {
             _ => return Err(Error::ProductNotFound),
         };
 
-        let event_count = tracking_client.get_event_count(&product_id);
+        let event_count = tracking_client.tracking_get_event_count(&product_id);
 
         Ok((event_count, is_active))
     }
@@ -155,7 +167,7 @@ impl StatsContract {
         ];
 
         for event_type in event_types.iter() {
-            let count = tracking_client.get_event_count_by_type(&product_id, &event_type);
+            let count = tracking_client.tracking_get_event_count_by_type(&product_id, event_type);
             if count > 0 {
                 type_counts.push_back((event_type.clone(), count));
             }
@@ -168,14 +180,19 @@ impl StatsContract {
 #[cfg(test)]
 mod test_stats {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, Map};
     use crate::{
-        AuthorizationContract, AuthorizationContractClient,
-        ProductRegistryContract, ProductRegistryContractClient,
-        ProductConfig, TrackingContract, TrackingContractClient,
+        AuthorizationContract, AuthorizationContractClient, ProductConfig, ProductRegistryContract,
+        ProductRegistryContractClient, TrackingContract, TrackingContractClient,
     };
+    use soroban_sdk::{testutils::Address as _, Address, Env, Map};
 
-    fn setup(env: &Env) -> (ProductRegistryContractClient, TrackingContractClient, super::StatsContractClient) {
+    fn setup(
+        env: &Env,
+    ) -> (
+        ProductRegistryContractClient,
+        TrackingContractClient,
+        super::StatsContractClient,
+    ) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let registry_id = env.register_contract(None, ProductRegistryContract);
         let tracking_id = env.register_contract(None, TrackingContract);
@@ -227,7 +244,7 @@ mod test_stats {
         let (registry_client, _tracking_client, stats_client) = setup(&env);
 
         // Initial stats
-        let stats = stats_client.get_stats();
+        let stats = stats_client.stats_get_stats();
         assert_eq!(stats.total_products, 0);
         assert_eq!(stats.active_products, 0);
 
@@ -237,7 +254,7 @@ mod test_stats {
         register_test_product(&env, &registry_client, &owner, "PROD2");
 
         // Updated stats
-        let stats = stats_client.get_stats();
+        let stats = stats_client.stats_get_stats();
         assert_eq!(stats.total_products, 2);
         assert_eq!(stats.active_products, 2);
     }
@@ -420,7 +437,7 @@ mod test_stats {
         let stats_client = super::StatsContractClient::new(&env, &stats_id);
 
         // Get stats without initialization should fail
-        let res = stats_client.try_get_stats();
+        let res = stats_client.try_stats_get_stats();
         assert_eq!(res, Err(Ok(Error::NotInitialized)));
     }
 }
