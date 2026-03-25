@@ -110,6 +110,7 @@ fn generate_unique_id(env: &Env, index: u32) -> String {
 // ─── Batch Operations Load Tests ───────────────────────────────────────────────
 
 #[test]
+#[ignore = "stress workload, run manually in performance pipeline"]
 fn test_batch_transfer_max_limits() {
     let env = Env::default();
     let (owner, _pr_client, transfer_client) = setup_load_test_env(&env);
