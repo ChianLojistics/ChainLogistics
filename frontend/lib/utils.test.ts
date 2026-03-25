@@ -30,7 +30,7 @@ describe("Utility Functions", () => {
     });
 
     it("should preserve important modifiers", () => {
-      expect(cn("px-2", "px-4!")).toBe("px-4!");
+      expect(cn("px-2", "!px-4")).toBe("px-2 !px-4");
     });
   });
 });

@@ -1,19 +1,26 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol};
 
 use crate::error::Error;
-use crate::types::{ContractVersion, UpgradeInfo, UpgradeStatus, DataKey};
+use crate::types::{ContractVersion, DataKey, UpgradeInfo, UpgradeStatus};
 use crate::ChainLogisticsContractClient;
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
 fn get_contract_version(env: &Env) -> ContractVersion {
-    env.storage().persistent()
+    env.storage()
+        .persistent()
         .get(&DataKey::ContractVersion)
-        .unwrap_or(ContractVersion { major: 1, minor: 0, patch: 0 })
+        .unwrap_or(ContractVersion {
+            major: 1,
+            minor: 0,
+            patch: 0,
+        })
 }
 
 fn set_contract_version(env: &Env, version: &ContractVersion) {
-    env.storage().persistent().set(&DataKey::ContractVersion, version);
+    env.storage()
+        .persistent()
+        .set(&DataKey::ContractVersion, version);
 }
 
 fn get_upgrade_info(env: &Env) -> Option<UpgradeInfo> {
@@ -25,23 +32,29 @@ fn set_upgrade_info(env: &Env, info: &UpgradeInfo) {
 }
 
 fn get_upgrade_status(env: &Env) -> UpgradeStatus {
-    env.storage().persistent()
+    env.storage()
+        .persistent()
         .get(&DataKey::UpgradeStatus)
         .unwrap_or(UpgradeStatus::NotStarted)
 }
 
 fn set_upgrade_status(env: &Env, status: &UpgradeStatus) {
-    env.storage().persistent().set(&DataKey::UpgradeStatus, status);
+    env.storage()
+        .persistent()
+        .set(&DataKey::UpgradeStatus, status);
 }
 
 fn get_emergency_pause(env: &Env) -> bool {
-    env.storage().persistent()
+    env.storage()
+        .persistent()
         .get(&DataKey::EmergencyPause)
         .unwrap_or(false)
 }
 
 fn set_emergency_pause(env: &Env, paused: &bool) {
-    env.storage().persistent().set(&DataKey::EmergencyPause, paused);
+    env.storage()
+        .persistent()
+        .set(&DataKey::EmergencyPause, paused);
 }
 
 fn get_admin(env: &Env) -> Option<Address> {
@@ -70,7 +83,10 @@ fn require_not_emergency_paused(env: &Env) -> Result<(), Error> {
     Ok(())
 }
 
-fn validate_version_upgrade(old_version: &ContractVersion, new_version: &ContractVersion) -> Result<(), Error> {
+fn validate_version_upgrade(
+    old_version: &ContractVersion,
+    new_version: &ContractVersion,
+) -> Result<(), Error> {
     // Ensure new version is actually newer
     if new_version.major < old_version.major {
         return Err(Error::InvalidUpgrade);
@@ -78,15 +94,18 @@ fn validate_version_upgrade(old_version: &ContractVersion, new_version: &Contrac
     if new_version.major == old_version.major && new_version.minor < old_version.minor {
         return Err(Error::InvalidUpgrade);
     }
-    if new_version.major == old_version.major && new_version.minor == old_version.minor && new_version.patch <= old_version.patch {
+    if new_version.major == old_version.major
+        && new_version.minor == old_version.minor
+        && new_version.patch <= old_version.patch
+    {
         return Err(Error::InvalidUpgrade);
     }
-    
+
     // Ensure version jump is reasonable (no major jumps without proper process)
     if new_version.major > old_version.major + 1 {
         return Err(Error::InvalidUpgrade);
     }
-    
+
     Ok(())
 }
 
@@ -181,7 +200,11 @@ impl UpgradeContract {
         // Emit upgrade completed event
         env.events().publish(
             (Symbol::new(&env, "upgrade_completed"),),
-            (upgrade_info.new_version, upgrade_info.new_contract_address, caller),
+            (
+                upgrade_info.new_version,
+                upgrade_info.new_contract_address,
+                caller,
+            ),
         );
 
         Ok(())
@@ -201,10 +224,8 @@ impl UpgradeContract {
         set_upgrade_status(&env, &UpgradeStatus::Failed);
 
         // Emit upgrade failed event
-        env.events().publish(
-            (Symbol::new(&env, "upgrade_failed"),),
-            (&caller, &reason),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "upgrade_failed"),), (&caller, &reason));
 
         Ok(())
     }
@@ -229,10 +250,8 @@ impl UpgradeContract {
         }
 
         // Emit emergency pause event
-        env.events().publish(
-            (Symbol::new(&env, "emergency_pause"),),
-            (&caller, &reason),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "emergency_pause"),), (&caller, &reason));
 
         Ok(())
     }
@@ -257,10 +276,8 @@ impl UpgradeContract {
         }
 
         // Emit emergency unpause event
-        env.events().publish(
-            (Symbol::new(&env, "emergency_unpause"),),
-            &caller,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "emergency_unpause"),), &caller);
 
         Ok(())
     }
@@ -280,10 +297,8 @@ impl UpgradeContract {
         set_upgrade_status(&env, &UpgradeStatus::NotStarted);
 
         // Emit upgrade reset event
-        env.events().publish(
-            (Symbol::new(&env, "upgrade_reset"),),
-            &caller,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "upgrade_reset"),), &caller);
 
         Ok(())
     }
@@ -310,7 +325,9 @@ mod test_upgrade {
         let upgrade_contract_address = contract_id;
         env.as_contract(&upgrade_contract_address, || {
             env.storage().persistent().set(&DataKey::Admin, &admin);
-            env.storage().persistent().set(&DataKey::MainContract, &cl_id);
+            env.storage()
+                .persistent()
+                .set(&DataKey::MainContract, &cl_id);
         });
 
         (client, admin)
@@ -361,7 +378,11 @@ mod test_upgrade {
         assert!(client.get_upgrade_info().is_none());
 
         // Initiate upgrade
-        let new_version = ContractVersion { major: 1, minor: 1, patch: 0 };
+        let new_version = ContractVersion {
+            major: 1,
+            minor: 1,
+            patch: 0,
+        };
         let new_contract = Address::generate(&env);
         client.initiate_upgrade(&admin, &new_version, &new_contract, &false);
 
@@ -388,13 +409,21 @@ mod test_upgrade {
         let (client, admin) = setup(&env);
 
         // Try to downgrade (should fail)
-        let old_version = ContractVersion { major: 0, minor: 9, patch: 0 };
+        let old_version = ContractVersion {
+            major: 0,
+            minor: 9,
+            patch: 0,
+        };
         let new_contract = Address::generate(&env);
         let res = client.try_initiate_upgrade(&admin, &old_version, &new_contract, &false);
         assert_eq!(res, Err(Ok(Error::InvalidUpgrade)));
 
         // Try major version jump (should fail)
-        let jump_version = ContractVersion { major: 3, minor: 0, patch: 0 };
+        let jump_version = ContractVersion {
+            major: 3,
+            minor: 0,
+            patch: 0,
+        };
         let res = client.try_initiate_upgrade(&admin, &jump_version, &new_contract, &false);
         assert_eq!(res, Err(Ok(Error::InvalidUpgrade)));
     }
@@ -408,7 +437,11 @@ mod test_upgrade {
         let attacker = Address::generate(&env);
 
         // Unauthorized upgrade attempt should fail
-        let new_version = ContractVersion { major: 1, minor: 1, patch: 0 };
+        let new_version = ContractVersion {
+            major: 1,
+            minor: 1,
+            patch: 0,
+        };
         let new_contract = Address::generate(&env);
         let res = client.try_initiate_upgrade(&attacker, &new_version, &new_contract, &false);
         assert!(res.is_err());

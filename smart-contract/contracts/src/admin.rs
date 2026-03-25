@@ -23,7 +23,9 @@ fn get_main_contract(env: &Env) -> Option<Address> {
 }
 
 fn set_main_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::MainContract, address);
+    env.storage()
+        .persistent()
+        .set(&DataKey::MainContract, address);
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -55,10 +57,8 @@ impl AdminContract {
         set_main_contract(&env, &main_contract);
 
         // Emit initialization event
-        env.events().publish(
-            (Symbol::new(&env, "admin_initialized"),),
-            admin,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "admin_initialized"),), admin);
 
         Ok(())
     }
@@ -93,10 +93,8 @@ impl AdminContract {
         }
 
         // Emit pause event
-        env.events().publish(
-            (Symbol::new(&env, "contract_paused"),),
-            caller,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "contract_paused"),), caller);
 
         Ok(())
     }
@@ -116,17 +114,19 @@ impl AdminContract {
         }
 
         // Emit unpause event
-        env.events().publish(
-            (Symbol::new(&env, "contract_unpaused"),),
-            caller,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "contract_unpaused"),), caller);
 
         Ok(())
     }
 
     /// Transfer admin privileges to a new address.
     /// Requires authentication from both current and new admin.
-    pub fn transfer_admin(env: Env, current_admin: Address, new_admin: Address) -> Result<(), Error> {
+    pub fn transfer_admin(
+        env: Env,
+        current_admin: Address,
+        new_admin: Address,
+    ) -> Result<(), Error> {
         require_admin(&env, &current_admin)?;
         new_admin.require_auth();
 

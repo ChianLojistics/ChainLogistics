@@ -1,14 +1,8 @@
-#![cfg(test)]
-
-use soroban_sdk::{
-    testutils::Address as _,
-    Address, Env, Map, String, Symbol, Vec,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, Map, String, Symbol, Vec};
 
 use crate::{
-    AuthorizationContract, AuthorizationContractClient,
+    AuthorizationContract, AuthorizationContractClient, Error, ProductConfig,
     ProductRegistryContract, ProductRegistryContractClient,
-    Error, ProductConfig,
 };
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -64,7 +58,10 @@ fn test_register_and_get_product() {
     assert_eq!(p.id, id);
     assert_eq!(p.owner, owner);
     assert!(p.active, "new products must be active");
-    assert!(p.deactivation_info.is_empty(), "no deactivation info on new product");
+    assert!(
+        p.deactivation_info.is_empty(),
+        "no deactivation info on new product"
+    );
 }
 
 #[test]
@@ -180,7 +177,10 @@ fn test_owner_can_deactivate_product() {
     assert!(!p.active, "product should be inactive after deactivation");
 
     let info = p.deactivation_info.get_unchecked(0);
-    assert_eq!(info.reason, String::from_str(&env, "Reached final destination"));
+    assert_eq!(
+        info.reason,
+        String::from_str(&env, "Reached final destination")
+    );
     assert_eq!(info.deactivated_by, owner);
 }
 
@@ -196,11 +196,7 @@ fn test_deactivation_updates_active_counter() {
     assert_eq!(client.get_stats().active_products, 1);
     assert_eq!(client.get_stats().total_products, 1);
 
-    client.deactivate_product(
-        &owner,
-        &id,
-        &String::from_str(&env, "Lifecycle complete"),
-    );
+    client.deactivate_product(&owner, &id, &String::from_str(&env, "Lifecycle complete"));
 
     let stats = client.get_stats();
     assert_eq!(stats.total_products, 1);
@@ -249,11 +245,7 @@ fn test_deactivate_requires_nonempty_reason() {
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
 
-    let res = client.try_deactivate_product(
-        &owner,
-        &id,
-        &String::from_str(&env, ""),
-    );
+    let res = client.try_deactivate_product(&owner, &id, &String::from_str(&env, ""));
     assert_eq!(res, Err(Ok(Error::DeactivationReasonRequired)));
 }
 
@@ -266,11 +258,7 @@ fn test_deactivate_already_inactive_product() {
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
 
-    client.deactivate_product(
-        &owner,
-        &id,
-        &String::from_str(&env, "First deactivation"),
-    );
+    client.deactivate_product(&owner, &id, &String::from_str(&env, "First deactivation"));
 
     let res = client.try_deactivate_product(
         &owner,
@@ -293,11 +281,7 @@ fn test_owner_can_reactivate_product() {
     let owner = Address::generate(&env);
     let id = register_test_product(&env, &client, &owner);
 
-    client.deactivate_product(
-        &owner,
-        &id,
-        &String::from_str(&env, "Temporary suspension"),
-    );
+    client.deactivate_product(&owner, &id, &String::from_str(&env, "Temporary suspension"));
     assert!(!client.get_product(&id).active);
 
     client.reactivate_product(&owner, &id);
@@ -423,7 +407,7 @@ fn test_search_products_by_name() {
 
     // Register test products
     let coffee_id = register_test_product(&env, &client, &owner);
-    
+
     let tea_id = String::from_str(&env, "TEA-CHN-001");
     let tea_config = ProductConfig {
         id: tea_id.clone(),
@@ -464,7 +448,7 @@ fn test_search_products_by_origin() {
 
     // Register test products
     let coffee_id = register_test_product(&env, &client, &owner);
-    
+
     let tea_id = String::from_str(&env, "TEA-CHN-001");
     let tea_config = ProductConfig {
         id: tea_id.clone(),
@@ -499,7 +483,7 @@ fn test_search_products_by_category() {
 
     // Register test products
     let coffee_id = register_test_product(&env, &client, &owner);
-    
+
     let tea_id = String::from_str(&env, "TEA-CHN-001");
     let tea_config = ProductConfig {
         id: tea_id.clone(),
@@ -533,7 +517,13 @@ fn test_search_products_with_limit() {
     let owner = Address::generate(&env);
 
     // Register multiple products with same category
-    let product_names = ["COFFEE-001", "COFFEE-002", "COFFEE-003", "COFFEE-004", "COFFEE-005"];
+    let product_names = [
+        "COFFEE-001",
+        "COFFEE-002",
+        "COFFEE-003",
+        "COFFEE-004",
+        "COFFEE-005",
+    ];
     for name in &product_names {
         let id = String::from_str(&env, name);
         let config = ProductConfig {

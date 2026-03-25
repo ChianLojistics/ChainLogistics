@@ -1,4 +1,4 @@
- #![allow(dead_code)]
+#![allow(dead_code)]
 use soroban_sdk::String;
 
 use crate::validation_contract::ValidationContract;

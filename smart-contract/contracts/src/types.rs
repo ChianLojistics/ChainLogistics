@@ -96,10 +96,10 @@ pub enum DataKey {
     TotalProducts,
     ActiveProducts,
     SearchIndex(IndexKey), // For product search functionality
-    ContractVersion, // Current contract version
-    UpgradeInfo, // Current upgrade information
-    UpgradeStatus, // Current upgrade status
-    EmergencyPause, // Emergency pause flag
+    ContractVersion,       // Current contract version
+    UpgradeInfo,           // Current upgrade information
+    UpgradeStatus,         // Current upgrade status
+    EmergencyPause,        // Emergency pause flag
 }
 
 #[contracttype]

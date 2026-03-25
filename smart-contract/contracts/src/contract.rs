@@ -1,11 +1,9 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
-use crate::types::{
-    Product, TrackingEvent, TrackingEventFilter, TrackingEventPage,
-};
 use crate::error::Error;
-use crate::{storage, AuthorizationContractClient};
+use crate::types::{Product, TrackingEvent, TrackingEventFilter, TrackingEventPage};
 use crate::validation_contract::ValidationContract;
+use crate::{storage, AuthorizationContractClient};
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -55,12 +53,12 @@ fn require_can_add_event(
 
     let auth_contract = storage::get_auth_contract(env).ok_or(Error::NotInitialized)?;
     let auth_client = AuthorizationContractClient::new(env, &auth_contract);
-    
+
     // Delegate check to AuthorizationContract
     if !auth_client.is_authorized(product_id, caller) {
         return Err(Error::Unauthorized);
     }
-    
+
     Ok(())
 }
 
@@ -104,7 +102,11 @@ impl ChainLogisticsContract {
         Ok(())
     }
 
-    pub fn transfer_admin(env: Env, current_admin: Address, new_admin: Address) -> Result<(), Error> {
+    pub fn transfer_admin(
+        env: Env,
+        current_admin: Address,
+        new_admin: Address,
+    ) -> Result<(), Error> {
         require_admin(&env, &current_admin)?;
         new_admin.require_auth();
         storage::set_admin(&env, &new_admin);
@@ -184,8 +186,7 @@ impl ChainLogisticsContract {
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let total_count = all_ids.len() as u64;
 
-        let event_ids =
-            storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
+        let event_ids = storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
 
         let mut events = Vec::new(&env);
         for i in 0..event_ids.len() {
@@ -213,8 +214,7 @@ impl ChainLogisticsContract {
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
 
-        let total_count =
-            storage::get_event_count_by_type(&env, &product_id, &event_type);
+        let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
         let event_ids =
             storage::get_event_ids_by_type(&env, &product_id, &event_type, offset, limit);
 
@@ -357,6 +357,10 @@ impl ChainLogisticsContract {
         event_type: Symbol,
     ) -> Result<u64, Error> {
         let _ = read_product(&env, &product_id)?;
-        Ok(storage::get_event_count_by_type(&env, &product_id, &event_type))
+        Ok(storage::get_event_count_by_type(
+            &env,
+            &product_id,
+            &event_type,
+        ))
     }
 }
