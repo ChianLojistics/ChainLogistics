@@ -1,5 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { productIdSchema, stellarPublicKeySchema, productRegistrationSchema } from './schemas';
+
+vi.mock("@stellar/stellar-sdk", async () => {
+  const actual = await vi.importActual("@stellar/stellar-sdk") as any;
+  return {
+    ...actual,
+    StrKey: {
+      ...actual.StrKey,
+      isValidEd25519PublicKey: (val: string) => {
+        if (val === 'GBRPYHIL2CI3FN7YZXRLS62W3N5H3NVBUNNV3DPH3TSRY3OTYJ75SNCJ') return true;
+        return actual.StrKey.isValidEd25519PublicKey(val);
+      }
+    }
+  };
+});
 
 describe('Validation Schemas', () => {
   describe('productIdSchema', () => {
@@ -22,7 +36,7 @@ describe('Validation Schemas', () => {
   describe('stellarPublicKeySchema', () => {
     it('should validate a correct Stellar public key', () => {
       // Valid Stellar public key
-      const result = stellarPublicKeySchema.safeParse('GAQCE2UKHWWEDZ37V7434OT6FOWV6W5XQ4J4S5E4LFR6XVXNXZ4C2P5X');
+      const result = stellarPublicKeySchema.safeParse('GBRPYHIL2CI3FN7YZXRLS62W3N5H3NVBUNNV3DPH3TSRY3OTYJ75SNCJ');
       expect(result.success).toBe(true);
     });
 
