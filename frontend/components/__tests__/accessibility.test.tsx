@@ -1,18 +1,17 @@
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { axe } from "vitest-axe";
-import type { AxeResults } from "vitest-axe";
+import { axe, AxeCore } from "vitest-axe";
 import { describe, it, expect } from "vitest";
 
 import { Input } from "@/components/ui/input";
 import { FormStepIndicator } from "@/components/forms/FormStepIndicator";
 import EventTypeSelector from "@/components/forms/EventTypeSelector";
 
-function expectNoViolations(results: AxeResults) {
+function expectNoViolations(results: AxeCore.AxeResults) {
   const violations = results.violations;
   if (violations.length > 0) {
     const messages = violations.map(
-      (v) => `${v.id}: ${v.description} (${v.nodes.length} node(s))`
+      (v: AxeCore.Result) => `${v.id}: ${v.description} (${v.nodes.length} node(s))`
     );
     throw new Error(
       `Expected no accessibility violations but found ${violations.length}:\n${messages.join("\n")}`
