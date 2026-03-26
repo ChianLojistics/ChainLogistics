@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import EventTypeSelector, { EventType } from './EventTypeSelector';
 import { LocationInput } from "./LocationInput";
+import { sanitizeInput, apiRateLimiter, eventTrackingSchema, EVENT_NOTE_MAX_LEN } from "@/lib/validation";
 
 export default function EventTrackingForm() {
     const [eventType, setEventType] = useState<EventType | ''>('');
@@ -22,8 +23,30 @@ export default function EventTrackingForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!productId || !eventType || !location) {
-            setError('Please fill in all required fields');
+
+        const result = eventTrackingSchema.safeParse({
+            productId,
+            eventType,
+            location,
+            note: note || undefined,
+            timestamp: Date.now(),
+        });
+
+        if (!result.success) {
+            setError(result.error.issues[0].message);
+            return;
+        }
+
+        if (!apiRateLimiter.check("trackEvent")) {
+            setError('Too many requests. Please wait before trying again.');
+            return;
+        }
+
+        const sanitizedLocation = sanitizeInput(location);
+        const sanitizedNote = sanitizeInput(note);
+
+        if (!sanitizedLocation) {
+            setError('Location is required');
             return;
         }
 
@@ -31,6 +54,8 @@ export default function EventTrackingForm() {
         setError('');
 
         try {
+            setLocation(sanitizedLocation);
+            setNote(sanitizedNote);
             // Dummy transaction delay mirroring freighter confirm
             await new Promise((resolve) => setTimeout(resolve, 1500));
             setSuccess(true);
@@ -45,7 +70,7 @@ export default function EventTrackingForm() {
         return (
             <div className="bg-white p-8 md:p-12 rounded-3xl shadow border border-gray-100 max-w-2xl mx-auto text-center">
                 <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-green-50">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">Event Recorded!</h2>
                 <p className="text-gray-600 text-lg mb-8">The tracking event has been immutably recorded.</p>
@@ -84,8 +109,8 @@ export default function EventTrackingForm() {
             </div>
 
             {error && (
-                <div className="mb-8 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex gap-3 items-center">
-                    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div role="alert" className="mb-8 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex gap-3 items-center">
+                    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     {error}
                 </div>
             )}
@@ -139,10 +164,11 @@ export default function EventTrackingForm() {
                             id="note"
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
+                            maxLength={EVENT_NOTE_MAX_LEN}
                             placeholder="e.g. Temperature checked at 4°C"
                             className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50 border p-4"
                         />
-                        <p className="text-sm text-gray-500 mt-1">Additional conditions or remarks during operation.</p>
+                        <p className="text-sm text-gray-500 mt-1">Additional conditions or remarks during operation. ({note.length}/{EVENT_NOTE_MAX_LEN})</p>
                     </div>
                 </div>
 
@@ -165,7 +191,7 @@ export default function EventTrackingForm() {
                             </>
                         ) : (
                             <>
-                                <svg className="w-5 h-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                <svg className="w-5 h-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                                 Sign & Submit Event
                             </>
                         )}

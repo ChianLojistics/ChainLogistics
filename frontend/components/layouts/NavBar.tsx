@@ -5,7 +5,7 @@ import { WalletStatus } from "../wallet";
 
 export function NavBar() {
     return (
-        <nav className="border-b bg-white dark:bg-zinc-950 px-6 py-4">
+        <nav aria-label="Main navigation" className="border-b bg-white dark:bg-zinc-950 px-6 py-4">
             <div className="mx-auto max-w-7xl flex items-center justify-between">
                 <Link href="/dashboard" className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                     ChainLogistics

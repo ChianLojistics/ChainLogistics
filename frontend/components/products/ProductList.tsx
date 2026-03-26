@@ -144,6 +144,7 @@ export function ProductList({
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -168,7 +169,7 @@ export function ProductList({
     <div>
       {/* Sort and results count */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-        <p className="text-sm text-zinc-600">
+        <p className="text-sm text-zinc-600" aria-live="polite" aria-atomic="true">
           Showing {startIndex + 1}-{Math.min(endIndex, sortedProducts.length)}{" "}
           of {sortedProducts.length} product{sortedProducts.length !== 1 ? "s" : ""}
         </p>
@@ -201,15 +202,16 @@ export function ProductList({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+        <nav aria-label="Product list pagination" className="flex flex-col sm:flex-row items-center justify-center gap-2">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
+            aria-label="Go to previous page"
             className="px-4 py-2 border border-zinc-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-50 transition-colors text-sm"
           >
             Previous
           </button>
-          <div className="flex items-center gap-1 flex-wrap justify-center">
+          <div className="flex items-center gap-1 flex-wrap justify-center" role="list">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
               if (
                 page === 1 ||
@@ -220,6 +222,8 @@ export function ProductList({
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
+                    aria-label={currentPage === page ? `Page ${page}, current page` : `Go to page ${page}`}
+                    aria-current={currentPage === page ? "page" : undefined}
                     className={`px-3 py-2 border rounded-lg transition-colors text-sm ${currentPage === page
                       ? "bg-blue-500 text-white border-blue-500"
                       : "border-zinc-300 hover:bg-zinc-50"
@@ -233,7 +237,7 @@ export function ProductList({
                 page === currentPage + 2
               ) {
                 return (
-                  <span key={page} className="px-2 text-zinc-400 text-sm">
+                  <span key={page} className="px-2 text-zinc-400 text-sm" aria-hidden="true">
                     ...
                   </span>
                 );
@@ -244,11 +248,12 @@ export function ProductList({
           <button
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
+            aria-label="Go to next page"
             className="px-4 py-2 border border-zinc-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-50 transition-colors text-sm"
           >
             Next
           </button>
-        </div>
+        </nav>
       )}
     </div>
   );

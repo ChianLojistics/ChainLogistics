@@ -17,7 +17,12 @@ export function FormStepIndicator({ steps, currentStep }: FormStepIndicatorProps
         <nav aria-label="Progress" className="mb-8">
             <ol role="list" className="flex items-center justify-center space-x-8">
                 {steps.map((step, stepIdx) => (
-                    <li key={step.name} className="relative flex items-center">
+                    <li
+                        key={step.name}
+                        className="relative flex items-center"
+                        aria-current={step.id === currentStep ? "step" : undefined}
+                        aria-label={`Step ${step.id}: ${step.name}${step.id < currentStep ? " (completed)" : step.id === currentStep ? " (current)" : ""}`}
+                    >
                         <div className="flex flex-col items-center">
                             <div
                                 className={`
@@ -32,12 +37,12 @@ export function FormStepIndicator({ steps, currentStep }: FormStepIndicatorProps
                                 {step.id < currentStep ? (
                                     <Check className="h-6 w-6 text-white" aria-hidden="true" />
                                 ) : (
-                                    <span className={`text-sm font-semibold ${step.id === currentStep ? "text-blue-600" : "text-gray-500"}`}>
+                                    <span aria-hidden="true" className={`text-sm font-semibold ${step.id === currentStep ? "text-blue-600" : "text-gray-500"}`}>
                                         {step.id}
                                     </span>
                                 )}
                             </div>
-                            <span className={`mt-2 text-xs font-medium ${step.id <= currentStep ? "text-blue-600" : "text-gray-500"}`}>
+                            <span aria-hidden="true" className={`mt-2 text-xs font-medium ${step.id <= currentStep ? "text-blue-600" : "text-gray-500"}`}>
                                 {step.name}
                             </span>
                         </div>

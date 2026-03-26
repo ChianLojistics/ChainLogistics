@@ -26,15 +26,34 @@ interface EventTypeSelectorProps {
 }
 
 export default function EventTypeSelector({ value, onChange, error }: EventTypeSelectorProps) {
+    const groupId = React.useId();
+    const errorId = error ? `${groupId}-error` : undefined;
+
+    const handleKeyDown = (e: React.KeyboardEvent, typeId: EventType) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onChange(typeId);
+        }
+    };
+
     return (
         <div className="w-full">
-            <label className="block text-sm font-medium text-gray-700 mb-3">Event Type *</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div id={groupId} className="block text-sm font-medium text-gray-700 mb-3">Event Type *</div>
+            <div
+                role="radiogroup"
+                aria-labelledby={groupId}
+                aria-describedby={errorId}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
+            >
                 {EVENT_TYPES.map((type) => (
                     <div
                         key={type.id}
+                        role="radio"
+                        aria-checked={value === type.id}
+                        tabIndex={0}
                         onClick={() => onChange(type.id)}
-                        className={`cursor-pointer rounded-xl border p-4 transition-all flex flex-col items-start gap-2 ${value === type.id
+                        onKeyDown={(e) => handleKeyDown(e, type.id)}
+                        className={`cursor-pointer rounded-xl border p-4 transition-all flex flex-col items-start gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${value === type.id
                                 ? 'border-indigo-600 bg-indigo-50 shadow-sm ring-1 ring-indigo-600'
                                 : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 shadow-sm block'
                             }`}
@@ -51,7 +70,7 @@ export default function EventTypeSelector({ value, onChange, error }: EventTypeS
                     </div>
                 ))}
             </div>
-            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+            {error && <p id={errorId} role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
         </div>
     );
 }

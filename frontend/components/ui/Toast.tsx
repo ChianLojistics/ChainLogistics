@@ -58,7 +58,7 @@ export const ToastComponent: React.FC<ToastComponentProps> = ({ toast, onDismiss
       )}
     >
       {/* Icon */}
-      <div className={cn('flex-shrink-0', iconVariants[toast.type])}>
+      <div className={cn('flex-shrink-0', iconVariants[toast.type])} aria-hidden="true">
         <Icon className="h-5 w-5" />
       </div>
 

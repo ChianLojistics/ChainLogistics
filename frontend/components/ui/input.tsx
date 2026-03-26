@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
@@ -6,19 +6,26 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     icon?: React.ReactNode;
 }
 
-export function Input({ label, error, icon, className = '', ...props }: InputProps) {
+export function Input({ label, error, icon, className = '', id, ...props }: InputProps) {
+    const generatedId = React.useId();
+    const inputId = id ?? generatedId;
+    const errorId = error ? `${inputId}-error` : undefined;
+
     return (
         <div className="w-full space-y-1.5">
-            {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
+            {label && <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">{label}</label>}
             <div className="relative">
                 {icon && (
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400" aria-hidden="true">
                         {icon}
                     </div>
                 )}
                 <input
+                    id={inputId}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={errorId}
                     className={`
-            block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900 
+            block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900
             transition-colors placeholder:text-gray-400
             focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500
             ${icon ? 'pl-10' : ''}
@@ -28,7 +35,7 @@ export function Input({ label, error, icon, className = '', ...props }: InputPro
                     {...props}
                 />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p id={errorId} role="alert" className="text-sm text-red-600">{error}</p>}
         </div>
     );
 }

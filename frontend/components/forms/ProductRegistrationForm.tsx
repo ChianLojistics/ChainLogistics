@@ -11,6 +11,8 @@ import { Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 import {
     productRegistrationSchema,
     type ProductRegistrationValues,
+    sanitizeFormData,
+    apiRateLimiter,
 } from "@/lib/validation";
 
 const STEPS = [
@@ -56,13 +58,19 @@ export function ProductRegistrationForm() {
             return;
         }
 
+        if (!apiRateLimiter.check("registerProduct")) {
+            alert("Too many requests. Please wait before trying again.");
+            return;
+        }
+
+        const sanitizedData = sanitizeFormData(data);
+
         setIsSubmitting(true);
         try {
-            const hash = await registerProductOnChain(publicKey, data);
+            const hash = await registerProductOnChain(publicKey, sanitizedData);
             setTxHash(hash);
             setStep(4); // Success step
-        } catch (err) {
-            console.error(err);
+        } catch {
             alert("Failed to register product");
         } finally {
             setIsSubmitting(false);
@@ -99,22 +107,28 @@ export function ProductRegistrationForm() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         <h2 className="text-xl font-semibold mb-6">Basic Product Information</h2>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Product ID</label>
+                            <label htmlFor="product-id" className="block text-sm font-medium text-zinc-700 mb-1">Product ID</label>
                             <input
                                 {...register("id")}
+                                id="product-id"
+                                aria-invalid={errors.id ? true : undefined}
+                                aria-describedby={errors.id ? "product-id-error" : undefined}
                                 className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 placeholder="e.g. SKU-12345"
                             />
-                            {errors.id && <p className="text-xs text-red-500 mt-1">{errors.id.message}</p>}
+                            {errors.id && <p id="product-id-error" role="alert" className="text-xs text-red-500 mt-1">{errors.id.message}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Product Name</label>
+                            <label htmlFor="product-name" className="block text-sm font-medium text-zinc-700 mb-1">Product Name</label>
                             <input
                                 {...register("name")}
+                                id="product-name"
+                                aria-invalid={errors.name ? true : undefined}
+                                aria-describedby={errors.name ? "product-name-error" : undefined}
                                 className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 placeholder="e.g. Premium Coffee Beans"
                             />
-                            {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
+                            {errors.name && <p id="product-name-error" role="alert" className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
                         </div>
                     </div>
                 )}
@@ -123,18 +137,24 @@ export function ProductRegistrationForm() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         <h2 className="text-xl font-semibold mb-6">Origin & Category</h2>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Origin Location</label>
+                            <label htmlFor="product-origin" className="block text-sm font-medium text-zinc-700 mb-1">Origin Location</label>
                             <input
                                 {...register("origin")}
+                                id="product-origin"
+                                aria-invalid={errors.origin ? true : undefined}
+                                aria-describedby={errors.origin ? "product-origin-error" : undefined}
                                 className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 placeholder="e.g. Ethiopia, Yirgacheffe"
                             />
-                            {errors.origin && <p className="text-xs text-red-500 mt-1">{errors.origin.message}</p>}
+                            {errors.origin && <p id="product-origin-error" role="alert" className="text-xs text-red-500 mt-1">{errors.origin.message}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Category</label>
+                            <label htmlFor="product-category" className="block text-sm font-medium text-zinc-700 mb-1">Category</label>
                             <select
                                 {...register("category")}
+                                id="product-category"
+                                aria-invalid={errors.category ? true : undefined}
+                                aria-describedby={errors.category ? "product-category-error" : undefined}
                                 className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
                             >
                                 <option value="Electronics">Electronics</option>
@@ -143,17 +163,20 @@ export function ProductRegistrationForm() {
                                 <option value="Industrial">Industrial</option>
                                 <option value="Other">Other</option>
                             </select>
-                            {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category.message}</p>}
+                            {errors.category && <p id="product-category-error" role="alert" className="text-xs text-red-500 mt-1">{errors.category.message}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Description (Optional)</label>
+                            <label htmlFor="product-description" className="block text-sm font-medium text-zinc-700 mb-1">Description (Optional)</label>
                             <textarea
                                 {...register("description")}
+                                id="product-description"
+                                aria-invalid={errors.description ? true : undefined}
+                                aria-describedby={errors.description ? "product-description-error" : undefined}
                                 rows={4}
                                 className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 placeholder="Describe the product details..."
                             />
-                            {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description.message}</p>}
+                            {errors.description && <p id="product-description-error" role="alert" className="text-xs text-red-500 mt-1">{errors.description.message}</p>}
                         </div>
                     </div>
                 )}
@@ -182,7 +205,7 @@ export function ProductRegistrationForm() {
                         )}
 
                         {walletStatus !== "connected" && (
-                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-orange-800">
+                            <div role="alert" className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-orange-800">
                                 Please connect your wallet to submit this registration.
                             </div>
                         )}
