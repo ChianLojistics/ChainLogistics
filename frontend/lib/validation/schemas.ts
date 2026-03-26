@@ -41,11 +41,41 @@ export const productRegistrationSchema = z.object({
 
 export type ProductRegistrationValues = z.infer<typeof productRegistrationSchema>;
 
+export const ALLOWED_EVENT_TYPES = [
+  "HARVEST",
+  "PROCESS",
+  "PACKAGE",
+  "SHIP",
+  "RECEIVE",
+  "QUALITY_CHECK",
+  "TRANSFER",
+  "REGISTER",
+  "CHECKPOINT",
+] as const;
+
+export type AllowedEventType = (typeof ALLOWED_EVENT_TYPES)[number];
+
+export const EVENT_NOTE_MAX_LEN = 256;
+
+export const eventTypeSchema = z
+  .string()
+  .min(1, VALIDATION_MESSAGES.required("Event type"))
+  .refine((value): value is AllowedEventType => ALLOWED_EVENT_TYPES.includes(value as AllowedEventType), {
+    message: VALIDATION_MESSAGES.eventTypeInvalid,
+  });
+
+export const eventTimestampSchema = z
+  .number()
+  .refine((value) => value <= Date.now(), {
+    message: VALIDATION_MESSAGES.timestampFuture,
+  });
+
 export const eventTrackingSchema = z.object({
   productId: productIdSchema,
-  eventType: requiredString("Event type"),
+  eventType: eventTypeSchema,
   location: requiredString("Location"),
-  note: z.string().max(512, VALIDATION_MESSAGES.maxLength("Note", 512)).optional(),
+  note: z.string().max(EVENT_NOTE_MAX_LEN, VALIDATION_MESSAGES.maxLength("Note", EVENT_NOTE_MAX_LEN)).optional(),
+  timestamp: eventTimestampSchema.optional(),
 });
 
 export type EventTrackingValues = z.infer<typeof eventTrackingSchema>;

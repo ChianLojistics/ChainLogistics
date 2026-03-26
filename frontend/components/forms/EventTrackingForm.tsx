@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import EventTypeSelector, { EventType } from './EventTypeSelector';
 import { LocationInput } from "./LocationInput";
-import { sanitizeInput, apiRateLimiter } from "@/lib/validation";
+import { sanitizeInput, apiRateLimiter, eventTrackingSchema, EVENT_NOTE_MAX_LEN } from "@/lib/validation";
 
 export default function EventTrackingForm() {
     const [eventType, setEventType] = useState<EventType | ''>('');
@@ -23,8 +23,17 @@ export default function EventTrackingForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!productId || !eventType || !location) {
-            setError('Please fill in all required fields');
+
+        const result = eventTrackingSchema.safeParse({
+            productId,
+            eventType,
+            location,
+            note: note || undefined,
+            timestamp: Date.now(),
+        });
+
+        if (!result.success) {
+            setError(result.error.issues[0].message);
             return;
         }
 
@@ -155,10 +164,11 @@ export default function EventTrackingForm() {
                             id="note"
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
+                            maxLength={EVENT_NOTE_MAX_LEN}
                             placeholder="e.g. Temperature checked at 4°C"
                             className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50 border p-4"
                         />
-                        <p className="text-sm text-gray-500 mt-1">Additional conditions or remarks during operation.</p>
+                        <p className="text-sm text-gray-500 mt-1">Additional conditions or remarks during operation. ({note.length}/{EVENT_NOTE_MAX_LEN})</p>
                     </div>
                 </div>
 

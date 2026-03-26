@@ -11,6 +11,9 @@ export const VALIDATION_MESSAGES = {
 
   stellarAddressInvalid:
     "Address must be a valid Stellar public key (starts with 'G' and is 56 characters)",
+
+  eventTypeInvalid: "Event type must be one of the allowed types",
+  timestampFuture: "Timestamp must not be in the future",
 } as const;
 
 export type ValidationMessageFormatter = (fieldLabel: string) => string;
