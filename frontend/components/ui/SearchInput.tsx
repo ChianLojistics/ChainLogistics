@@ -61,14 +61,14 @@ function HighlightedText({
         const isMatch = part.toLowerCase() === q.toLowerCase();
         return isMatch ? (
           <mark
-            // eslint-disable-next-line react/no-array-index-key
+             
             key={idx}
             className="rounded-sm bg-primary/10 px-0.5 text-foreground"
           >
             {part}
           </mark>
         ) : (
-          // eslint-disable-next-line react/no-array-index-key
+           
           <React.Fragment key={idx}>{part}</React.Fragment>
         );
       })}
@@ -301,6 +301,7 @@ export function SearchInput<
               <li
                 role="option"
                 aria-disabled="true"
+                aria-selected="false"
                 className="px-2 py-2 text-sm text-muted-foreground"
               >
                 {emptyText}

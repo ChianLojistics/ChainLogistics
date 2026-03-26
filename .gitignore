@@ -2,3 +2,4 @@ smart-contract/contracts/src/simple_test.rs
 smart-contract/contracts/test_snapshots/
 issue.md
 pr.md
+checks.md

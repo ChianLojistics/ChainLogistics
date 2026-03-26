@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Product } from "@/lib/types/product";
 
 export type FilterState = {
   search: string;
@@ -34,6 +33,7 @@ export function ProductFilters({
     }, 300);
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSearch]);
 
   const updateFilter = (key: keyof FilterState, value: string) => {
