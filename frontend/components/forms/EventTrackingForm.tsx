@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import EventTypeSelector, { EventType } from './EventTypeSelector';
 import { LocationInput } from "./LocationInput";
+import { sanitizeInput, apiRateLimiter } from "@/lib/validation";
 
 export default function EventTrackingForm() {
     const [eventType, setEventType] = useState<EventType | ''>('');
@@ -27,10 +28,25 @@ export default function EventTrackingForm() {
             return;
         }
 
+        if (!apiRateLimiter.check("trackEvent")) {
+            setError('Too many requests. Please wait before trying again.');
+            return;
+        }
+
+        const sanitizedLocation = sanitizeInput(location);
+        const sanitizedNote = sanitizeInput(note);
+
+        if (!sanitizedLocation) {
+            setError('Location is required');
+            return;
+        }
+
         setIsSubmitting(true);
         setError('');
 
         try {
+            setLocation(sanitizedLocation);
+            setNote(sanitizedNote);
             // Dummy transaction delay mirroring freighter confirm
             await new Promise((resolve) => setTimeout(resolve, 1500));
             setSuccess(true);

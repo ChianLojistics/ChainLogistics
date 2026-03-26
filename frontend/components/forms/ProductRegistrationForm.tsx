@@ -11,6 +11,8 @@ import { Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 import {
     productRegistrationSchema,
     type ProductRegistrationValues,
+    sanitizeFormData,
+    apiRateLimiter,
 } from "@/lib/validation";
 
 const STEPS = [
@@ -56,13 +58,19 @@ export function ProductRegistrationForm() {
             return;
         }
 
+        if (!apiRateLimiter.check("registerProduct")) {
+            alert("Too many requests. Please wait before trying again.");
+            return;
+        }
+
+        const sanitizedData = sanitizeFormData(data);
+
         setIsSubmitting(true);
         try {
-            const hash = await registerProductOnChain(publicKey, data);
+            const hash = await registerProductOnChain(publicKey, sanitizedData);
             setTxHash(hash);
             setStep(4); // Success step
-        } catch (err) {
-            console.error(err);
+        } catch {
             alert("Failed to register product");
         } finally {
             setIsSubmitting(false);

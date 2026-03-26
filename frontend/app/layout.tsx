@@ -44,6 +44,10 @@ export const metadata: Metadata = {
     description:
       "Track products from origin to consumer with immutable blockchain records.",
   },
+  other: {
+    "Content-Security-Policy":
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://horizon-testnet.stellar.org https://soroban-testnet.stellar.org https://nominatim.openstreetmap.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  },
 };
 
 export default function RootLayout({
