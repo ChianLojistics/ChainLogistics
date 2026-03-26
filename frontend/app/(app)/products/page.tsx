@@ -22,20 +22,17 @@ export default function ProductsPage() {
   });
 
   const fetchProducts = useCallback(async () => {
+    if (!publicKey) {
+      setProducts([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // For now, if no wallet is connected, we'll fetch from a default owner
-      // In production, you might want to fetch from multiple owners or use an indexer
-      const owner = publicKey || "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-
-      // TODO: In production, fetch from multiple owners or use an indexer
-      // For now, we'll fetch from the connected wallet's address
-      const fetchedProducts = await getProductsByOwner(owner);
-
-      // If we have a connected wallet, only show their products by default
-      // Otherwise, show all products (when indexer is implemented)
+      const fetchedProducts = await getProductsByOwner(publicKey);
       setProducts(fetchedProducts);
     } catch (err) {
       console.error("Error fetching products:", err);
@@ -94,8 +91,7 @@ export default function ProductsPage() {
       {!publicKey && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <p className="text-blue-800 text-sm">
-            Connect your wallet to view your products, or browse all products
-            below.
+            Please connect your wallet to view your products.
           </p>
         </div>
       )}

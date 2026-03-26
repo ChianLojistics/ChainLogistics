@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useMemo, useState, useEffect } from "react";
 import type { Product } from "@/lib/types/product";
 import type { FilterState } from "./ProductFilters";
@@ -93,7 +93,7 @@ export function ProductList({
 
   // Reset to page 1 when filters or sort change
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setCurrentPage(1);
   }, [filters, sortBy]);
 
