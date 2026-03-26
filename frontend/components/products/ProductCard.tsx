@@ -32,7 +32,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-xl">
-              <Package className="h-5 w-5 text-muted-foreground" />
+              <Package className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
               {product.name}
             </CardTitle>
             <CardDescription className="text-sm font-mono">ID: {product.id}</CardDescription>
@@ -49,22 +49,22 @@ export function ProductCard({ product }: ProductCardProps) {
       <CardContent className="pb-4">
         <div className="flex flex-col space-y-2 text-sm text-zinc-600">
           <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
+            <MapPin className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Origin:</span>
             <span>{product.origin.location}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4" />
+            <Tag className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Category:</span>
             <span>{product.category}</span>
           </div>
           <div className="flex items-center gap-2">
-            <User className="h-4 w-4" />
+            <User className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Owner:</span>
             <span className="font-mono">{shortenPublicKey(product.owner)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <CalendarPlus className="h-4 w-4" />
+            <CalendarPlus className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Created:</span>
             <span>{formatDate(product.created_at)}</span>
           </div>

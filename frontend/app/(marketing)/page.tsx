@@ -14,7 +14,7 @@ export default function MarketingHomePage() {
   return (
     <>
       <Navigation />
-      <main>
+      <main id="main-content">
         <Hero />
         <ProblemStats />
         <Features />

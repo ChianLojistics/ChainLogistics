@@ -151,7 +151,7 @@ function StepRow({
           state === "error" && "border-destructive/30 bg-destructive/10 text-destructive"
         )}
       >
-        <Icon className={cn("h-4 w-4", state === "active" && "animate-spin")} />
+        <Icon className={cn("h-4 w-4", state === "active" && "animate-spin")} aria-hidden="true" />
       </span>
       <span
         className={cn(
@@ -215,7 +215,14 @@ export function TransactionModal({
                 <span className="text-sm font-medium">Progress</span>
                 <span className="text-sm text-muted-foreground">{progress}%</span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                role="progressbar"
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Transaction progress: ${progress}%`}
+                className="h-2 w-full overflow-hidden rounded-full bg-muted"
+              >
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-500",
@@ -227,7 +234,7 @@ export function TransactionModal({
               </div>
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid gap-2" aria-live="polite" aria-atomic="false">
               <StepRow label={STEP_LABEL.preparing} state={stepState("preparing")} />
               <StepRow label={STEP_LABEL.signing} state={stepState("signing")} />
               <StepRow label={STEP_LABEL.submitting} state={stepState("submitting")} />
