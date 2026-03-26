@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { productIdSchema, stellarPublicKeySchema, productRegistrationSchema } from './schemas';
 
 vi.mock("@stellar/stellar-sdk", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actual = await vi.importActual("@stellar/stellar-sdk") as any;
   return {
     ...actual,
