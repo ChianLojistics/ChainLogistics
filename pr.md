@@ -39,3 +39,5 @@ This PR implements several key features from the issues backlog:
 - Closes #137
 - Closes #123
 - Closes #21AH
+- fixes: #77
+- fixes: #55
