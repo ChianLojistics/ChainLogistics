@@ -3,10 +3,31 @@ import { createContractClient } from "@/lib/stellar/contractClient";
 import { trackContractInteraction, trackError } from "@/lib/analytics";
 import { CONTRACT_CONFIG, validateContractConfig } from "./config";
 
-export async function fetchProductEvents(
-  productId: string
-): Promise<TimelineEvent[]> {
+export type ProductEventsPage = {
+  events: TimelineEvent[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+};
+
+const DEFAULT_EVENTS_PAGE_SIZE = 20;
+const MAX_EVENTS_PAGE_SIZE = 50;
+
+export async function fetchProductEventsPage(
+  productId: string,
+  options?: {
+    offset?: number;
+    limit?: number;
+  }
+): Promise<ProductEventsPage> {
   const startedAt = Date.now();
+  const offset = Math.max(0, options?.offset ?? 0);
+  const limit = Math.min(
+    MAX_EVENTS_PAGE_SIZE,
+    Math.max(1, options?.limit ?? DEFAULT_EVENTS_PAGE_SIZE)
+  );
+
   try {
     validateContractConfig();
 
@@ -17,45 +38,64 @@ export async function fetchProductEvents(
     });
 
     const eventIds = await contractClient.get_product_event_ids(productId);
+    const sortedIds = [...eventIds].sort((a, b) => b - a);
+    const pagedIds = sortedIds.slice(offset, offset + limit);
 
-    if (eventIds.length === 0) {
-      trackContractInteraction({
-        method: "fetch_product_events",
-        durationMs: Date.now() - startedAt,
-        success: true,
-        context: { productId, resultCount: 0 },
-      });
-      return [];
-    }
+    const events = await Promise.all(pagedIds.map((id) => contractClient.get_event(id)));
+    const validEvents = events
+      .filter((e): e is TimelineEvent => e !== null)
+      .sort((a, b) => b.timestamp - a.timestamp);
 
-    const events = await Promise.all(
-      eventIds.map((id) => contractClient.get_event(id))
-    );
+    const page: ProductEventsPage = {
+      events: validEvents,
+      total: sortedIds.length,
+      offset,
+      limit,
+      hasMore: offset + limit < sortedIds.length,
+    };
 
-    const validEvents = events.filter(
-      (e): e is TimelineEvent => e !== null
-    );
-
-    const sorted = validEvents.sort((a, b) => b.timestamp - a.timestamp);
     trackContractInteraction({
-      method: "fetch_product_events",
+      method: "fetch_product_events_page",
       durationMs: Date.now() - startedAt,
       success: true,
-      context: { productId, resultCount: sorted.length },
+      context: {
+        productId,
+        offset,
+        limit,
+        resultCount: validEvents.length,
+        totalCount: sortedIds.length,
+      },
     });
 
-    return sorted;
+    return page;
   } catch (error) {
-    console.error("Failed to fetch product events:", error);
+    console.error("Failed to fetch paged product events:", error);
     trackContractInteraction({
-      method: "fetch_product_events",
+      method: "fetch_product_events_page",
       durationMs: Date.now() - startedAt,
       success: false,
       errorMessage: error instanceof Error ? error.message : String(error),
-      context: { productId },
+      context: { productId, offset, limit },
     });
-    trackError(error, { source: "fetchProductEvents", productId });
+    trackError(error, { source: "fetchProductEventsPage", productId, offset, limit });
     throw error;
+  }
+}
+
+export async function fetchProductEvents(
+  productId: string
+): Promise<TimelineEvent[]> {
+  const allEvents: TimelineEvent[] = [];
+  let offset = 0;
+  const limit = MAX_EVENTS_PAGE_SIZE;
+
+  while (true) {
+    const page = await fetchProductEventsPage(productId, { offset, limit });
+    allEvents.push(...page.events);
+    if (!page.hasMore) {
+      return allEvents.sort((a, b) => b.timestamp - a.timestamp);
+    }
+    offset += limit;
   }
 }
 
