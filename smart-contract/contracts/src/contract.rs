@@ -69,6 +69,8 @@ pub struct ChainLogisticsContract;
 
 #[contractimpl]
 impl ChainLogisticsContract {
+    const MAX_EVENT_ID_PAGE_LIMIT: u32 = 100;
+
     pub fn init(env: Env, admin: Address, auth_contract: Address) -> Result<(), Error> {
         if storage::has_admin(&env) {
             return Err(Error::AlreadyInitialized);
@@ -343,6 +345,31 @@ impl ChainLogisticsContract {
     pub fn get_product_event_ids(env: Env, id: String) -> Result<Vec<u64>, Error> {
         let _ = read_product(&env, &id)?;
         Ok(storage::get_product_event_ids(&env, &id))
+    }
+
+    pub fn get_product_event_ids_paginated(
+        env: Env,
+        product_id: String,
+        offset: u32,
+        limit: u32,
+    ) -> Result<Vec<u64>, Error> {
+        let _ = read_product(&env, &product_id)?;
+        if limit == 0 {
+            return Ok(Vec::new(&env));
+        }
+
+        let bounded_limit = limit.min(Self::MAX_EVENT_ID_PAGE_LIMIT);
+        Ok(storage::get_product_event_ids_paginated(
+            &env,
+            &product_id,
+            offset as u64,
+            bounded_limit as u64,
+        ))
+    }
+
+    pub fn get_product_event_count(env: Env, product_id: String) -> Result<u32, Error> {
+        let _ = read_product(&env, &product_id)?;
+        Ok(storage::get_product_event_ids(&env, &product_id).len())
     }
 
     pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
