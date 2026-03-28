@@ -48,4 +48,15 @@ pub enum Error {
     NoUpgradeInProgress = 52,
     EmergencyPaused = 53,
     NotEmergencyPaused = 54,
+
+    // --- Multi-Signature (60-70) ---
+    MultiSigNotConfigured = 60,
+    NotSigner = 61,
+    ProposalNotFound = 62,
+    AlreadyApproved = 63,
+    ProposalAlreadyExecuted = 64,
+    ThresholdNotReached = 65,
+    InvalidThreshold = 66,
+    TooManySigners = 67,
+    DuplicateSigner = 68,
 }
