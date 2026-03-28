@@ -60,7 +60,7 @@ fn is_signer(env: &Env, address: &Address) -> bool {
 
 fn threshold_reached(env: &Env, approvals: &Vec<Address>) -> bool {
     if let Some(config) = get_multisig_config(env) {
-        approvals.len() as u32 >= config.threshold
+        approvals.len() >= config.threshold
     } else {
         false
     }
@@ -84,7 +84,7 @@ impl MultiSigContract {
             return Err(Error::InvalidInput);
         }
 
-        if threshold == 0 || threshold > signers.len() as u32 {
+        if threshold == 0 || threshold > signers.len() {
             return Err(Error::InvalidThreshold);
         }
 
