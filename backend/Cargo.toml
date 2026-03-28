@@ -21,6 +21,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1.0"
 anyhow = "1.0"
 config = "0.14"
+async-trait = "0.1"
 # Stellar/Soroban dependencies
 stellar-sdk = "0.24"
 soroban-sdk = "21.0"

@@ -69,11 +69,22 @@ fn get_main_contract(env: &Env) -> Option<Address> {
 
 fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
     let admin = get_admin(env).ok_or(Error::NotInitialized)?;
-    caller.require_auth();
-    if &admin != caller {
-        return Err(Error::Unauthorized);
+    if &admin == caller {
+        caller.require_auth();
+        return Ok(());
     }
-    Ok(())
+
+    if let Some(multisig) = env
+        .storage()
+        .persistent()
+        .get::<crate::types::DataKey, Address>(&crate::types::DataKey::MultiSigContract)
+    {
+        if &multisig == caller && env.current_contract_address() == multisig {
+            return Ok(());
+        }
+    }
+
+    Err(Error::Unauthorized)
 }
 
 fn require_not_emergency_paused(env: &Env) -> Result<(), Error> {
@@ -124,6 +135,19 @@ impl UpgradeContract {
     /// Get current upgrade status
     pub fn get_upgrade_status(env: Env) -> UpgradeStatus {
         get_upgrade_status(&env)
+    }
+
+    /// Set multisig contract
+    pub fn set_multisig_contract(
+        env: Env,
+        caller: Address,
+        multisig_contract: Address,
+    ) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        env.storage()
+            .persistent()
+            .set(&DataKey::MultiSigContract, &multisig_contract);
+        Ok(())
     }
 
     /// Get current upgrade information

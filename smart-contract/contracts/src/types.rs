@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Val, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -93,6 +93,7 @@ pub enum DataKey {
     AuthContract, // Added for cross-contract delegation
     MainContract, // Added for ProductTransferContract
     TransferContract,
+    MultiSigContract, // Multi-signature contract address
     TotalProducts,
     ActiveProducts,
     SearchIndex(IndexKey), // For product search functionality
@@ -100,6 +101,9 @@ pub enum DataKey {
     UpgradeInfo,           // Current upgrade information
     UpgradeStatus,         // Current upgrade status
     EmergencyPause,        // Emergency pause flag
+    MultiSigConfig,        // Multi-signature configuration
+    Proposal(u64),         // Proposal by ID
+    NextProposalId,        // Next proposal ID counter
 }
 
 #[contracttype]
@@ -151,4 +155,25 @@ pub enum UpgradeStatus {
     InProgress,
     Completed,
     Failed,
+}
+
+// ─── Multi-Signature Types ─────────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultiSigConfig {
+    pub signers: Vec<Address>,
+    pub threshold: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Proposal {
+    pub id: u64,
+    pub kind: Symbol, // "transfer_admin", "initiate_upgrade", "complete_upgrade", "fail_upgrade", "pause", "unpause"
+    pub args: Vec<Val>,
+    pub proposer: Address,
+    pub created_at: u64,
+    pub executed: bool,
+    pub approvals: Vec<Address>,
 }

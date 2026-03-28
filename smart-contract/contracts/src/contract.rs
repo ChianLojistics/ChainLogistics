@@ -16,11 +16,18 @@ fn require_not_paused(env: &Env) -> Result<(), Error> {
 
 fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
     let admin = storage::get_admin(env).ok_or(Error::NotInitialized)?;
-    caller.require_auth();
-    if &admin != caller {
-        return Err(Error::Unauthorized);
+    if &admin == caller {
+        caller.require_auth();
+        return Ok(());
     }
-    Ok(())
+
+    if let Some(multisig) = storage::get_multisig_contract(env) {
+        if &multisig == caller && env.current_contract_address() == multisig {
+            return Ok(());
+        }
+    }
+
+    Err(Error::Unauthorized)
 }
 
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
@@ -112,6 +119,16 @@ impl ChainLogisticsContract {
         require_admin(&env, &current_admin)?;
         new_admin.require_auth();
         storage::set_admin(&env, &new_admin);
+        Ok(())
+    }
+
+    pub fn set_multisig_contract(
+        env: Env,
+        caller: Address,
+        multisig_contract: Address,
+    ) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        storage::set_multisig_contract(&env, &multisig_contract);
         Ok(())
     }
 
@@ -389,5 +406,35 @@ impl ChainLogisticsContract {
             &product_id,
             &event_type,
         ))
+    }
+
+    // Helper to simulate a multisig contract invoking pause via as_contract
+    pub fn __simulate_multisig_pause(env: Env, caller: Address) -> Result<(), Error> {
+        Self::pause(env, caller)
+    }
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{Address, Env};
+
+    #[test]
+    fn test_multisig_invoker_can_pause() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+
+        // Register the contract as the multisig address for this test
+        let contract_id = env.register_contract(None, ChainLogisticsContract);
+        env.as_contract(&contract_id.clone(), || {
+            storage::set_admin(&env, &admin);
+            // Set multisig contract to the contract itself and use contract_id as caller
+            storage::set_multisig_contract(&env, &contract_id);
+            assert!(!storage::is_paused(&env));
+            ChainLogisticsContract::__simulate_multisig_pause(env.clone(), contract_id).unwrap();
+            assert!(storage::is_paused(&env));
+        });
     }
 }

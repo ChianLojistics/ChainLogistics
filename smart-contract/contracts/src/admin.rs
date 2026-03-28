@@ -18,6 +18,16 @@ fn has_admin(env: &Env) -> bool {
     env.storage().persistent().has(&DataKey::Admin)
 }
 
+fn get_multisig_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::MultiSigContract)
+}
+
+fn set_multisig_contract(env: &Env, address: &Address) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::MultiSigContract, address);
+}
+
 fn get_main_contract(env: &Env) -> Option<Address> {
     env.storage().persistent().get(&DataKey::MainContract)
 }
