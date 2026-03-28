@@ -13,6 +13,7 @@ mod models;
 mod database;
 mod utils;
 mod error;
+mod docs;
 
 use config::Config;
 use database::Database;
@@ -60,23 +61,6 @@ impl AppState {
     }
 }
 
-async fn health_check(state: axum::extract::State<AppState>) -> Result<&'static str, AppError> {
-    // Check database health
-    state.db.health_check().await
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    
-    Ok("OK")
-}
-
-// Dummy middlewares
-async fn auth_middleware(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
-    next.run(req).await
-}
-
-async fn rate_limit_middleware(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
-    next.run(req).await
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
@@ -93,14 +77,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Build router
     let app = Router::new()
-        .route("/health", get(health_check))
-        // .nest("/api/v1", routes::api_routes())
+        .merge(crate::routes::health_routes())
+        .merge(crate::routes::api_routes())
+        .merge(crate::docs::create_swagger_ui())
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(CorsLayer::permissive())
-                .layer(middleware::from_fn(auth_middleware))
-                .layer(middleware::from_fn(rate_limit_middleware))
         )
         .with_state(app_state);
     

@@ -1,8 +1,8 @@
-// Placeholder handlers for compilation
-// These will be implemented in the next phase (REST API)
+// REST API handlers for ChainLogistics backend
 
 pub mod product;
 pub mod event;
 pub mod user;
 pub mod auth;
 pub mod stats;
+pub mod health;

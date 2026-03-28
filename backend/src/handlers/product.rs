@@ -1,24 +1,340 @@
-use axum::{extract::{State, Path}, response::Json};
-use super::super::{AppState, error::AppError};
+use axum::{
+    extract::{State, Path, Query},
+    http::StatusCode,
+    response::Json,
+};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use utoipa::ToSchema;
 
-// Placeholder handlers - will be implemented in REST API phase
+use crate::{
+    AppState,
+    error::AppError,
+    models::{Product, NewProduct, ProductFilters},
+};
 
-pub async fn list_products(State(_state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(serde_json::json!({"message": "Not implemented yet"})))
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ListProductsQuery {
+    pub offset: Option<i64>,
+    pub limit: Option<i64>,
+    pub owner_address: Option<String>,
+    pub category: Option<String>,
+    pub is_active: Option<bool>,
+    pub search: Option<String>,
 }
 
-pub async fn create_product(State(_state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(serde_json::json!({"message": "Not implemented yet"})))
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateProductRequest {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub origin_location: String,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub certifications: Vec<String>,
+    pub media_hashes: Vec<String>,
+    pub custom_fields: serde_json::Value,
 }
 
-pub async fn get_product(State(_state): State<AppState>, Path(_id): Path<String>) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(serde_json::json!({"message": "Not implemented yet"})))
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateProductRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub origin_location: Option<String>,
+    pub category: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub certifications: Option<Vec<String>>,
+    pub media_hashes: Option<Vec<String>>,
+    pub custom_fields: Option<serde_json::Value>,
+    pub is_active: Option<bool>,
 }
 
-pub async fn update_product(State(_state): State<AppState>, Path(_id): Path<String>) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(serde_json::json!({"message": "Not implemented yet"})))
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ProductResponse {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub origin_location: String,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub certifications: Vec<String>,
+    pub media_hashes: Vec<String>,
+    pub custom_fields: serde_json::Value,
+    pub owner_address: String,
+    pub is_active: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub created_by: String,
+    pub updated_by: String,
 }
 
-pub async fn delete_product(State(_state): State<AppState>, Path(_id): Path<String>) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(serde_json::json!({"message": "Not implemented yet"})))
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PaginatedProductsResponse {
+    pub products: Vec<ProductResponse>,
+    pub total: i64,
+    pub offset: i64,
+    pub limit: i64,
+}
+
+impl From<Product> for ProductResponse {
+    fn from(product: Product) -> Self {
+        Self {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            origin_location: product.origin_location,
+            category: product.category,
+            tags: product.tags,
+            certifications: product.certifications,
+            media_hashes: product.media_hashes,
+            custom_fields: product.custom_fields,
+            owner_address: product.owner_address,
+            is_active: product.is_active,
+            created_at: product.created_at,
+            updated_at: product.updated_at,
+            created_by: product.created_by,
+            updated_by: product.updated_by,
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/products",
+    tag = "products",
+    params(ListProductsQuery),
+    responses(
+        (status = 200, description = "Products listed successfully", body = PaginatedProductsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
+pub async fn list_products(
+    State(state): State<AppState>,
+    Query(query): Query<ListProductsQuery>,
+) -> Result<Json<PaginatedProductsResponse>, AppError> {
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(20).min(100); // Cap at 100
+
+    let products = if let Some(search_query) = query.search {
+        state.product_service
+            .search_products(&search_query, limit)
+            .await?
+            .into_iter()
+            .map(ProductResponse::from)
+            .collect()
+    } else {
+        let filters = ProductFilters {
+            owner_address: query.owner_address,
+            category: query.category,
+            is_active: query.is_active,
+            created_after: None,
+            created_before: None,
+        };
+
+        state.product_service
+            .list_products(offset, limit, Some(filters))
+            .await?
+            .into_iter()
+            .map(ProductResponse::from)
+            .collect()
+    };
+
+    let total = if query.search.is_some() {
+        // For search, we don't have an efficient count, so we use the length
+        products.len() as i64
+    } else {
+        let filters = ProductFilters {
+            owner_address: query.owner_address,
+            category: query.category,
+            is_active: query.is_active,
+            created_after: None,
+            created_before: None,
+        };
+        state.product_service
+            .count_products(Some(filters))
+            .await?
+    };
+
+    Ok(Json(PaginatedProductsResponse {
+        products,
+        total,
+        offset,
+        limit,
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/products",
+    tag = "products",
+    request_body = CreateProductRequest,
+    responses(
+        (status = 201, description = "Product created successfully", body = ProductResponse),
+        (status = 400, description = "Bad request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
+pub async fn create_product(
+    State(state): State<AppState>,
+    Json(request): Json<CreateProductRequest>,
+) -> Result<Json<ProductResponse>, AppError> {
+    // Get auth context
+    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
+    
+    let new_product = NewProduct {
+        id: request.id,
+        name: request.name,
+        description: request.description,
+        origin_location: request.origin_location,
+        category: request.category,
+        tags: request.tags,
+        certifications: request.certifications,
+        media_hashes: request.media_hashes,
+        custom_fields: request.custom_fields,
+        owner_address: auth_context.stellar_address.clone().unwrap_or_default(),
+        created_by: auth_context.user_id.to_string(),
+    };
+
+    let product = state.product_service.create_product(new_product).await?;
+    Ok(Json(ProductResponse::from(product)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/products/{id}",
+    tag = "products",
+    params(
+        ("id" = String, Path, description = "Product ID")
+    ),
+    responses(
+        (status = 200, description = "Product retrieved successfully", body = ProductResponse),
+        (status = 404, description = "Product not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
+pub async fn get_product(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<ProductResponse>, AppError> {
+    let product = state
+        .product_service
+        .get_product(&id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Product {} not found", id)))?;
+
+    Ok(Json(ProductResponse::from(product)))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/admin/products/{id}",
+    tag = "products",
+    params(
+        ("id" = String, Path, description = "Product ID")
+    ),
+    request_body = UpdateProductRequest,
+    responses(
+        (status = 200, description = "Product updated successfully", body = ProductResponse),
+        (status = 404, description = "Product not found"),
+        (status = 400, description = "Bad request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
+pub async fn update_product(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<UpdateProductRequest>,
+) -> Result<Json<ProductResponse>, AppError> {
+    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
+    
+    let mut product = state
+        .product_service
+        .get_product(&id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Product {} not found", id)))?;
+
+    // Update fields if provided
+    if let Some(name) = request.name {
+        product.name = name;
+    }
+    if let Some(description) = request.description {
+        product.description = description;
+    }
+    if let Some(origin_location) = request.origin_location {
+        product.origin_location = origin_location;
+    }
+    if let Some(category) = request.category {
+        product.category = category;
+    }
+    if let Some(tags) = request.tags {
+        product.tags = tags;
+    }
+    if let Some(certifications) = request.certifications {
+        product.certifications = certifications;
+    }
+    if let Some(media_hashes) = request.media_hashes {
+        product.media_hashes = media_hashes;
+    }
+    if let Some(custom_fields) = request.custom_fields {
+        product.custom_fields = custom_fields;
+    }
+    if let Some(is_active) = request.is_active {
+        product.is_active = is_active;
+    }
+
+    product.updated_by = auth_context.user_id.to_string();
+
+    let updated = state.product_service.update_product(&id, product).await?;
+    Ok(Json(ProductResponse::from(updated)))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/admin/products/{id}",
+    tag = "products",
+    params(
+        ("id" = String, Path, description = "Product ID")
+    ),
+    responses(
+        (status = 204, description = "Product deleted successfully"),
+        (status = 404, description = "Product not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
+pub async fn delete_product(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, AppError> {
+    // Check if product exists
+    state
+        .product_service
+        .get_product(&id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Product {} not found", id)))?;
+
+    state.product_service.delete_product(&id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
