@@ -3,7 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import en from '../../locales/en.json';
 import es from '../../locales/es.json';
 
-const getInitialLanguage = () => {
+const getInitialLanguage = (): string => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('i18nextLng') || 'en';
   }
@@ -27,7 +27,7 @@ i18n
 
 // Setup RTL logic when language changes
 if (typeof window !== 'undefined') {
-  i18n.on('languageChanged', (lng) => {
+  i18n.on('languageChanged', (lng: string) => {
     localStorage.setItem('i18nextLng', lng);
     document.documentElement.dir = i18n.dir(lng);
   });

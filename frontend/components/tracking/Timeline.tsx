@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { TimelineEvent } from "@/lib/types/tracking";
-import { fetchProductEvents } from "@/lib/contract/events";
+import { fetchProductEventsPage } from "@/lib/contract/events";
 import { EventCard } from "./EventCard";
 
 interface TimelineProps {
@@ -10,18 +10,25 @@ interface TimelineProps {
 }
 
 export function Timeline({ productId }: Readonly<TimelineProps>) {
+  const PAGE_SIZE = 20;
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const fetchedEvents = await fetchProductEvents(productId);
-      // Sort by timestamp descending (newest first)
-      const sorted = fetchedEvents.toSorted((a, b) => b.timestamp - a.timestamp);
-      setEvents(sorted);
+      const firstPage = await fetchProductEventsPage(productId, {
+        offset: 0,
+        limit: PAGE_SIZE,
+      });
+      setEvents(firstPage.events);
+      setOffset(firstPage.offset + firstPage.events.length);
+      setHasMore(firstPage.hasMore);
     } catch (err) {
       setError(
         err instanceof Error
@@ -31,7 +38,28 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
     } finally {
       setLoading(false);
     }
-  }, [productId]);
+  }, [productId, PAGE_SIZE]);
+
+  const loadMore = useCallback(async () => {
+    try {
+      setLoadingMore(true);
+      const nextPage = await fetchProductEventsPage(productId, {
+        offset,
+        limit: PAGE_SIZE,
+      });
+      setEvents((prev) => [...prev, ...nextPage.events]);
+      setOffset(nextPage.offset + nextPage.events.length);
+      setHasMore(nextPage.hasMore);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load more events. Please try again."
+      );
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [productId, offset, PAGE_SIZE]);
 
   useEffect(() => {
     loadEvents();
@@ -71,7 +99,6 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
-            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -92,15 +119,29 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
   }
 
   return (
-    <div className="space-y-0">
-      {events.map((event, index) => (
-        <EventCard
-          key={event.event_id}
-          event={event}
-          isFirst={index === 0}
-          isLast={index === events.length - 1}
-        />
-      ))}
+    <div>
+      <div className="space-y-0">
+        {events.map((event, index) => (
+          <EventCard
+            key={event.event_id}
+            event={event}
+            isFirst={index === 0}
+            isLast={index === events.length - 1}
+          />
+        ))}
+      </div>
+      {hasMore ? (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadingMore ? "Loading..." : "Load more"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
