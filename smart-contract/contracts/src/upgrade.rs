@@ -136,7 +136,13 @@ impl UpgradeContract {
     pub fn get_upgrade_status(env: Env) -> UpgradeStatus {
         get_upgrade_status(&env)
     }
-pub fn set_multisig_contract(env: Env, caller: Address, multisig_contract: Address) -> Result<(), Error> {
+
+    /// Set multisig contract
+    pub fn set_multisig_contract(
+        env: Env,
+        caller: Address,
+        multisig_contract: Address,
+    ) -> Result<(), Error> {
         require_admin(&env, &caller)?;
         env.storage()
             .persistent()
@@ -144,7 +150,6 @@ pub fn set_multisig_contract(env: Env, caller: Address, multisig_contract: Addre
         Ok(())
     }
 
-    
     /// Get current upgrade information
     pub fn get_upgrade_info(env: Env) -> Option<UpgradeInfo> {
         get_upgrade_info(&env)

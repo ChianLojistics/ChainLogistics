@@ -23,7 +23,9 @@ fn get_multisig_contract(env: &Env) -> Option<Address> {
 }
 
 fn set_multisig_contract(env: &Env, address: &Address) {
-    env.storage().persistent().set(&DataKey::MultiSigContract, address);
+    env.storage()
+        .persistent()
+        .set(&DataKey::MultiSigContract, address);
 }
 
 fn get_main_contract(env: &Env) -> Option<Address> {

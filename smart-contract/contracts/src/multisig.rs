@@ -10,7 +10,9 @@ fn get_multisig_config(env: &Env) -> Option<MultiSigConfig> {
 }
 
 fn set_multisig_config(env: &Env, config: &MultiSigConfig) {
-    env.storage().persistent().set(&DataKey::MultiSigConfig, config);
+    env.storage()
+        .persistent()
+        .set(&DataKey::MultiSigConfig, config);
 }
 
 fn get_next_proposal_id(env: &Env) -> u64 {
@@ -21,11 +23,15 @@ fn get_next_proposal_id(env: &Env) -> u64 {
 }
 
 fn set_next_proposal_id(env: &Env, id: u64) {
-    env.storage().persistent().set(&DataKey::NextProposalId, &id);
+    env.storage()
+        .persistent()
+        .set(&DataKey::NextProposalId, &id);
 }
 
 fn get_proposal(env: &Env, proposal_id: u64) -> Option<Proposal> {
-    env.storage().persistent().get(&DataKey::Proposal(proposal_id))
+    env.storage()
+        .persistent()
+        .get(&DataKey::Proposal(proposal_id))
 }
 
 fn put_proposal(env: &Env, proposal: &Proposal) {
@@ -69,11 +75,7 @@ pub struct MultiSigContract;
 impl MultiSigContract {
     /// Initialize multi-signature configuration.
     /// Can only be called once and requires authentication from all initial signers.
-    pub fn init_multisig(
-        env: Env,
-        signers: Vec<Address>,
-        threshold: u32,
-    ) -> Result<(), Error> {
+    pub fn init_multisig(env: Env, signers: Vec<Address>, threshold: u32) -> Result<(), Error> {
         if get_multisig_config(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
@@ -112,8 +114,10 @@ impl MultiSigContract {
         set_next_proposal_id(&env, 1);
 
         // Emit initialization event
-        env.events()
-            .publish((Symbol::new(&env, "multisig_initialized"),), (signers, threshold));
+        env.events().publish(
+            (Symbol::new(&env, "multisig_initialized"),),
+            (signers, threshold),
+        );
 
         Ok(())
     }
@@ -238,16 +242,19 @@ impl MultiSigContract {
                 (&proposal.args, &executor),
             );
         } else if proposal.kind == complete_upgrade {
-            env.events().publish((Symbol::new(&env, "upgrade_complete_executed"),), ());
+            env.events()
+                .publish((Symbol::new(&env, "upgrade_complete_executed"),), ());
         } else if proposal.kind == fail_upgrade {
             env.events().publish(
                 (Symbol::new(&env, "upgrade_fail_executed"),),
                 &proposal.args,
             );
         } else if proposal.kind == pause {
-            env.events().publish((Symbol::new(&env, "pause_executed"),), ());
+            env.events()
+                .publish((Symbol::new(&env, "pause_executed"),), ());
         } else if proposal.kind == unpause {
-            env.events().publish((Symbol::new(&env, "unpause_executed"),), ());
+            env.events()
+                .publish((Symbol::new(&env, "unpause_executed"),), ());
         } else {
             return Err(Error::InvalidInput);
         }
@@ -284,7 +291,6 @@ impl MultiSigContract {
 
         ids
     }
-
 }
 
 #[cfg(test)]
