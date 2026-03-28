@@ -19,10 +19,17 @@ fn set_main_contract(env: &Env, address: &Address) {
 }
 
 fn require_not_paused(env: &Env) -> Result<(), Error> {
-    let main_contract = get_main_contract(env).ok_or(Error::NotInitialized)?;
+    let main_contract = get_main_contract(env).unwrap();
     let main_client = ChainLogisticsContractClient::new(env, &main_contract);
     if main_client.is_paused() {
         return Err(Error::ContractPaused);
+    }
+    Ok(())
+}
+
+fn require_init(env: &Env) -> Result<(), Error> {
+    if get_main_contract(env).is_none() {
+        return Err(Error::NotInitialized);
     }
     Ok(())
 }
@@ -56,6 +63,7 @@ impl TrackingContract {
         note: String,
         metadata: Map<Symbol, String>,
     ) -> Result<u64, Error> {
+        require_init(&env)?;
         require_not_paused(&env)?;
         actor.require_auth();
 
@@ -597,8 +605,7 @@ mod test_tracking {
         let data_hash = BytesN::from_array(&env, &[0; 32]);
         let metadata = Map::new(&env);
 
-        // Adding event without initialization should fail because pause enforcement requires
-        // the main contract address to be set via init.
+        // Adding event without initialization should fail with NotInitialized
         let res = tracking_client.try_tracking_add_event(
             &owner,
             &product_id,
