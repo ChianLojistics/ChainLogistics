@@ -25,7 +25,7 @@ ChainLojistic is a decentralized supply chain tracker built on Stellar's Soroban
 
 1. **Smart Contracts** (Rust/Soroban) - On-chain logic
 2. **Frontend** (Next.js 15/React 19/TypeScript) - Web UI
-3. **Backend** (Node.js/Express/TypeScript) - API (optional)
+3. **Backend** (Rust/Axum/SQLx) - High-Performance API Server
 
 **New contributors**: Look for issues labeled `good first issue`!
 
@@ -48,7 +48,10 @@ rustup target add wasm32-unknown-unknown
 ```
 
 #### Frontend & Backend:
-- Node.js 18+
+- Node.js 18+ (for frontend)
+- Rust 1.70+ (for backend)
+- PostgreSQL 14+ (for backend database)
+- Redis 6+ (for backend caching)
 - npm or yarn
 - Git
 
@@ -74,11 +77,12 @@ cd ../frontend
 npm install
 npm run dev  # http://localhost:3000
 
-# 6. Backend (optional)
+# 6. Backend (Rust/Axum)
 cd ../backend
-npm install
+cargo build
+cargo test
 cp .env.example .env
-npm run dev  # http://localhost:3001
+cargo run  # http://localhost:3001
 ```
 
 ---
@@ -184,32 +188,40 @@ ChainLojistic/
 │   ├── tailwind.config.ts
 │   └── next.config.ts
 │
-├── backend/                             # API Server (Optional)
+├── backend/                             # Rust API Server (Axum)
 │   ├── src/
-│   │   ├── index.ts                   # Server entry point
+│   │   ├── main.rs                    # Server entry point
+│   │   ├── lib.rs                     # Library exports
 │   │   ├── routes/
-│   │   │   ├── products.ts            # Product routes
-│   │   │   ├── events.ts              # Event routes
-│   │   │   └── analytics.ts           # Analytics routes
+│   │   │   ├── mod.rs                 # Route module
+│   │   │   ├── products.rs            # Product routes
+│   │   │   ├── events.rs              # Event routes
+│   │   │   ├── analytics.rs           # Analytics routes
+│   │   │   └── webhooks.rs            # Webhook routes
 │   │   ├── services/
-│   │   │   ├── contractService.ts     # Contract interactions
-│   │   │   ├── cacheService.ts        # Redis caching
-│   │   │   └── webhookService.ts      # Webhook handling
+│   │   │   ├── soroban_service.rs     # Contract interactions
+│   │   │   ├── cache_service.rs        # Redis caching
+│   │   │   └── webhook_service.rs      # Webhook handling
 │   │   ├── middleware/
-│   │   │   ├── auth.ts                # Authentication
-│   │   │   ├── rateLimiter.ts         # Rate limiting
-│   │   │   └── validation.ts          # Request validation
-│   │   ├── utils/
-│   │   │   ├── logger.ts              # Logging
-│   │   │   └── errors.ts              # Error handling
-│   │   └── types/
-│   │       └── index.ts               # TypeScript types
+│   │   │   ├── mod.rs                 # Middleware module
+│   │   │   ├── auth.rs                # Authentication
+│   │   │   └── rate_limit.rs          # Rate limiting
+│   │   ├── models/
+│   │   │   ├── mod.rs                 # Model exports
+│   │   │   ├── product.rs              # Product structs
+│   │   │   └── event.rs               # Event structs
+│   │   ├── config/
+│   │   │   └── mod.rs                 # Configuration
+│   │   ├── database/
+│   │   │   └── mod.rs                 # Database layer
+│   │   └── utils/
+│   │       └── mod.rs                 # Utilities
+│   ├── migrations/                     # SQLx migrations
 │   ├── tests/
 │   │   ├── unit/
 │   │   └── integration/
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── .env.example
+│   ├── Cargo.toml                      # Rust dependencies
+│   └── .env.example                    # Environment variables
 │
 ├── docs/                                # Documentation
 │   ├── ARCHITECTURE.md
@@ -271,7 +283,7 @@ ChainLojistic/
    cd frontend && npm run build
    
    # Backend
-   cd backend && npm test
+   cd backend && cargo test
    ```
 
 6. **Commit & Push**
@@ -306,7 +318,7 @@ ChainLojistic/
 | `documentation` | Docs work | ⭐ Easy |
 | `smart-contract` | Soroban/Rust | ⭐⭐⭐ Hard |
 | `frontend` | Next.js/React | ⭐⭐ Medium |
-| `backend` | Node.js/API | ⭐⭐ Medium |
+| `backend` | Rust/Axum/API | ⭐⭐ Medium |
 | `testing` | Test coverage | ⭐⭐ Medium |
 | `design` | UI/UX work | ⭐⭐ Medium |
 | `priority: high` | Urgent | - |
@@ -849,10 +861,10 @@ npm install -D @types/qrcode
 Build RESTful API endpoints for product CRUD operations.
 
 #### What You'll Learn
-- REST API design
-- Express.js routing
-- Soroban integration
-- Error handling
+- REST API design with Rust/Axum
+- Async Rust programming
+- Soroban integration from Rust
+- Error handling with thiserror
 
 #### Endpoints to Create
 ```
@@ -864,46 +876,54 @@ POST   /api/products/:id/events  - Add event
 ```
 
 #### Implementation
-```typescript
-// src/routes/products.ts
-import { Router } from 'express';
-import { Contract } from '@stellar/stellar-sdk';
+```rust
+// src/routes/products.rs
+use axum::{extract::Path, response::Json, routing::get, Router};
+use soroban_sdk::{Address, Env};
 
-const router = Router();
+pub fn product_routes() -> Router<AppState> {
+    Router::new()
+        .route("/products", get(list_products).post(create_product))
+        .route("/products/:id", get(get_product))
+        .route("/products/:id/events", get(get_product_events))
+}
 
-router.get('/products/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const contract = new Contract(process.env.CONTRACT_ID);
-    const product = await contract.get_product({ id });
-    res.json(product);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-export default router;
+async fn get_product(
+    Path(id): Path<String>,
+    State(app_state): State<AppState>,
+) -> Result<Json<Product>, AppError> {
+    let product = app_state.soroban_service.get_product(&id).await?;
+    Ok(Json(product))
+}
 ```
 
 #### Validation
-```typescript
-// src/middleware/validation.ts
-import { body, param, validationResult } from 'express-validator';
+```rust
+// src/middleware/validation.rs
+use axum::{extract::Request, middleware::Next, response::Response};
+use serde::{Deserialize, Serialize};
+use validator::Validate;
 
-export const validateProduct = [
-  body('id').isString().trim().notEmpty(),
-  body('name').isString().trim().isLength({ min: 3 }),
-  body('origin').isString().trim().notEmpty(),
-  (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-    next();
-  }
-];
+#[derive(Deserialize, Validate)]
+pub struct CreateProductRequest {
+    #[validate(length(min = 3, message = "Name must be at least 3 characters"))]
+    pub name: String,
+    
+    #[validate(length(min = 1, message = "Origin is required"))]
+    pub origin: String,
+    
+    #[validate(custom = "validate_stellar_address")]
+    pub owner: String,
+}
+
+pub async fn validate_product(
+    req: Request,
+    next: Next,
+) -> Result<Response, AppError> {
+    // Validation logic here
+    Ok(next.run(req).await)
+}
 ```
-
 #### Error Responses
 ```json
 {
@@ -914,20 +934,25 @@ export const validateProduct = [
 ```
 
 #### Acceptance Criteria
-- [ ] All endpoints work
-- [ ] Proper validation
-- [ ] Error handling
-- [ ] Correct HTTP status codes
-- [ ] API documented
+- [ ] All endpoints functional with proper validation
+- [ ] Error handling works correctly
+- [ ] Contract integration tested
+- [ ] API responses follow consistent format
+- [ ] Rate limiting applied
 
 #### Files to Create
-- `backend/src/routes/products.ts`
-- `backend/src/services/productService.ts`
-- `backend/src/middleware/validation.ts`
+- `backend/src/routes/products.rs`
+- `backend/src/services/soroban_service.rs`
+- `backend/src/middleware/validation.rs`
 
 #### Dependencies
-```bash
-npm install express-validator
+```toml
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+validator = "0.16"
+thiserror = "1.0"
+soroban-sdk = "21.0"
 ```
 
 #### Estimated Time
