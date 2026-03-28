@@ -11,6 +11,14 @@ pub fn set_auth_contract(env: &Env, address: &Address) {
     StorageContract::set_auth_contract(env, address)
 }
 
+pub fn get_multisig_contract(env: &Env) -> Option<Address> {
+    StorageContract::get_multisig_contract(env)
+}
+
+pub fn set_multisig_contract(env: &Env, address: &Address) {
+    StorageContract::set_multisig_contract(env, address)
+}
+
 // ─── Product ────────────────────────────────────────────────────────────────
 
 pub fn has_product(env: &Env, product_id: &String) -> bool {

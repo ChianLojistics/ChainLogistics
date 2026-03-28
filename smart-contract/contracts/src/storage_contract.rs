@@ -9,6 +9,10 @@ impl StorageContract {
         DataKey::AuthContract
     }
 
+    pub fn multisig_contract_key() -> DataKey {
+        DataKey::MultiSigContract
+    }
+
     pub fn product_key(product_id: &String) -> DataKey {
         DataKey::Product(product_id.clone())
     }
@@ -61,6 +65,18 @@ impl StorageContract {
         env.storage()
             .persistent()
             .set(&Self::auth_contract_key(), address);
+    }
+
+    pub fn get_multisig_contract(env: &Env) -> Option<Address> {
+        env.storage()
+            .persistent()
+            .get(&Self::multisig_contract_key())
+    }
+
+    pub fn set_multisig_contract(env: &Env, address: &Address) {
+        env.storage()
+            .persistent()
+            .set(&Self::multisig_contract_key(), address);
     }
 
     pub fn has_product(env: &Env, product_id: &String) -> bool {
