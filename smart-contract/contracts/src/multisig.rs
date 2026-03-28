@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
 
 use crate::error::Error;
 use crate::types::{DataKey, MultiSigConfig, Proposal};
@@ -129,7 +129,7 @@ impl MultiSigContract {
         env: Env,
         proposer: Address,
         kind: Symbol,
-        args: Vec<Symbol>,
+        args: Vec<Val>,
     ) -> Result<u64, Error> {
         require_signer(&env, &proposer)?;
         proposer.require_auth();
@@ -160,7 +160,7 @@ impl MultiSigContract {
                 &proposal_id,
                 &proposer,
             ),
-            (kind, args),
+            (&kind, &args),
         );
 
         Ok(proposal_id)
@@ -290,7 +290,7 @@ impl MultiSigContract {
 #[cfg(test)]
 mod test_multisig {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env};
+    use soroban_sdk::{testutils::Address as _, Address, Env, IntoVal};
 
     fn setup(env: &Env) -> (MultiSigContractClient, Vec<Address>) {
         let contract_id = env.register_contract(None, MultiSigContract);
@@ -349,8 +349,8 @@ mod test_multisig {
         let kind = Symbol::new(&env, "transfer_admin");
         let args = {
             let mut args = Vec::new(&env);
-            args.push_back(Symbol::new(&env, "current_admin"));
-            args.push_back(Symbol::new(&env, "new_admin"));
+            args.push_back(proposer.clone().into_val(&env));
+            args.push_back(new_admin.into_val(&env));
             args
         };
 
@@ -379,8 +379,8 @@ mod test_multisig {
         let kind = Symbol::new(&env, "transfer_admin");
         let args = {
             let mut args = Vec::new(&env);
-            args.push_back(Symbol::new(&env, "current_admin"));
-            args.push_back(Symbol::new(&env, "new_admin"));
+            args.push_back(proposer.clone().into_val(&env));
+            args.push_back(new_admin.into_val(&env));
             args
         };
 
@@ -411,8 +411,8 @@ mod test_multisig {
         let kind = Symbol::new(&env, "transfer_admin");
         let args = {
             let mut args = Vec::new(&env);
-            args.push_back(Symbol::new(&env, "current_admin"));
-            args.push_back(Symbol::new(&env, "new_admin"));
+            args.push_back(proposer.clone().into_val(&env));
+            args.push_back(new_admin.into_val(&env));
             args
         };
 

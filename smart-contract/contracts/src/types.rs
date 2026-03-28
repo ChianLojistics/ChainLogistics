@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Val, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -171,7 +171,7 @@ pub struct MultiSigConfig {
 pub struct Proposal {
     pub id: u64,
     pub kind: Symbol, // "transfer_admin", "initiate_upgrade", "complete_upgrade", "fail_upgrade", "pause", "unpause"
-    pub args: Vec<Symbol>, // Serialized arguments as symbols (e.g., ["current_admin", "new_admin"])
+    pub args: Vec<Val>,
     pub proposer: Address,
     pub created_at: u64,
     pub executed: bool,
