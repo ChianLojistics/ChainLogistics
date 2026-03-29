@@ -12,12 +12,12 @@ export class StellarProvider extends BaseBlockchainProvider {
                 throw new Error('Stellar wallet requires browser environment');
             }
 
-            const freighter = (window as Record<string, unknown>).freighter;
+            const freighter = (window as unknown as Record<string, unknown>).freighter as Record<string, unknown> | undefined;
             if (!freighter) {
                 throw new Error('Freighter wallet not installed');
             }
 
-            const publicKey = await freighter.getPublicKey();
+            const publicKey = await (freighter.getPublicKey as () => Promise<string>)();
             this.wallet = freighter;
 
             return {
@@ -58,8 +58,8 @@ export class StellarProvider extends BaseBlockchainProvider {
 
         try {
             // Stellar transaction signing via Freighter
-            const result = await this.wallet.signTransaction(tx.data);
-            return result.hash;
+            const result = await (this.wallet.signTransaction as (data: unknown) => Promise<Record<string, unknown>>)(tx.data);
+            return (result.hash as string) || '';
         } catch (error) {
             throw new Error(`Failed to send Stellar transaction: ${error}`);
         }
@@ -96,11 +96,11 @@ export class StellarProvider extends BaseBlockchainProvider {
 
         try {
             // Soroban contract invocation
-            const result = await (this.wallet as Record<string, unknown>).invokeContract?.({
+            const result = await (this.wallet.invokeContract as (args: Record<string, unknown>) => Promise<Record<string, unknown>>)({
                 method,
                 params,
             });
-            return result as Record<string, unknown>;
+            return result;
         } catch (error) {
             throw new Error(`Failed to call Stellar contract: ${error}`);
         }

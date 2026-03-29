@@ -21,17 +21,17 @@ export class EVMProvider extends BaseBlockchainProvider {
                 throw new Error('EVM wallet requires browser environment');
             }
 
-            const ethereum = (window as Record<string, unknown>).ethereum;
+            const ethereum = (window as unknown as Record<string, unknown>).ethereum as Record<string, unknown> | undefined;
             if (!ethereum) {
                 throw new Error('MetaMask or compatible wallet not installed');
             }
 
             const config = getBlockchainConfig(this.network);
-            const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+            const accounts = await (ethereum.request as (args: Record<string, unknown>) => Promise<string[]>)({ method: 'eth_requestAccounts' });
 
             // Switch to correct chain
             try {
-                await ethereum.request({
+                await (ethereum.request as (args: Record<string, unknown>) => Promise<void>)({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: `0x${config.chainId?.toString(16)}` }],
                 });
@@ -91,7 +91,7 @@ export class EVMProvider extends BaseBlockchainProvider {
         }
 
         try {
-            const hash = await this.provider.request({
+            const hash = await (this.provider.request as (args: Record<string, unknown>) => Promise<string>)({
                 method: 'eth_sendTransaction',
                 params: [{
                     from: tx.from,
@@ -153,7 +153,7 @@ export class EVMProvider extends BaseBlockchainProvider {
         try {
             const config = getBlockchainConfig(this.network);
             // This is a simplified call - actual implementation would use ethers.js or web3.js
-            const result = await (this.provider as Record<string, unknown>).request?.({
+            const result = await (this.provider.request as (args: Record<string, unknown>) => Promise<Record<string, unknown>>)({
                 method: 'eth_call',
                 params: [{
                     to: config.contractAddress,
@@ -161,7 +161,7 @@ export class EVMProvider extends BaseBlockchainProvider {
                 }],
             });
 
-            return result as Record<string, unknown>;
+            return result;
         } catch (error) {
             throw new Error(`Failed to call EVM contract: ${error}`);
         }

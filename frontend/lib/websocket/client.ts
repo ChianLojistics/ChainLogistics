@@ -69,10 +69,10 @@ export class WebSocketClient {
     private handleMessage(message: Record<string, unknown>): void {
         const { type, channel, data } = message;
 
-        if (type === 'event' && channel) {
+        if (type === 'event' && typeof channel === 'string') {
             const handlers = this.messageHandlers.get(channel);
             if (handlers) {
-                handlers.forEach((handler) => handler(data));
+                handlers.forEach((handler) => handler(data as Record<string, unknown>));
             }
         }
     }

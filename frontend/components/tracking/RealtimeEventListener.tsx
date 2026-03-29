@@ -31,8 +31,8 @@ export function RealtimeEventListener({ productId }: RealtimeEventListenerProps)
 
       // Subscribe to product events
       const channel = productId ? `product:${productId}` : 'events:all';
-      client.subscribe(channel, (data: RealtimeEvent) => {
-        setEvents((prev) => [data, ...prev].slice(0, 50)); // Keep last 50 events
+      client.subscribe(channel, (data: Record<string, unknown>) => {
+        setEvents((prev) => [data as unknown as RealtimeEvent, ...prev].slice(0, 50)); // Keep last 50 events
       });
     });
 
