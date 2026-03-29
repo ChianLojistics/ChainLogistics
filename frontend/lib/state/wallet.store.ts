@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { connectWallet, disconnectWallet, getCurrentAddress, getFreighterNetwork } from "../stellar/wallet";
 
+const E2E_MOCKS_ENABLED = process.env.NEXT_PUBLIC_E2E_MOCKS === "true";
+
 export type WalletState = {
   status: "disconnected" | "connecting" | "connected" | "error";
   publicKey: string | null;
@@ -112,6 +114,13 @@ export const useWalletStore = create<WalletState>()(
 
       initialize: async () => {
         const { status, publicKey } = get();
+
+        if (E2E_MOCKS_ENABLED) {
+          if (status === "connected" && publicKey) {
+            startAccountWatcher(get, set);
+          }
+          return;
+        }
 
         // If the page refreshed mid-connection, persisted state can be stuck at "connecting".
         // Reset to a safe state on boot so the UI doesn't spin forever.
