@@ -1,36 +1,42 @@
 import type { Product } from "@/lib/types/product";
+import { CONTRACT_CONFIG } from "./config";
+import { trackContractInteraction } from "@/lib/analytics";
 
 /**
  * Fetches products by owner address.
- * 
- * Note: Since blockchain doesn't support complex queries, this function
- * should ideally use an indexer service. For now, this is a placeholder
- * that can be replaced with actual contract calls or indexer API calls.
- * 
+ *
+ * The on-chain contract does not currently expose a "list products by owner"
+ * query, so this function returns mock data when a contract ID is not
+ * configured (development) and an empty array otherwise.
+ * Replace the body with a real indexer / contract call once one is available.
+ *
  * @param owner - The owner's public key/address
  * @returns Array of products owned by the given address
  */
 export async function getProductsByOwner(owner: string): Promise<Product[]> {
-  // TODO: Replace with actual contract call or indexer query
-  // For now, return empty array as placeholder
-  // 
-  // Example implementation with Soroban SDK:
-  // const contract = new Contract(CONTRACT_ID);
-  // const result = await contract.getProductsByOwner({ owner });
-  // return result.map(transformProduct);
-  
-  // Mock data for development - remove in production
-  if (process.env.NODE_ENV === "development") {
-    return getMockProducts(owner);
+  const startedAt = Date.now();
+
+  // When no contract is configured, return mock data in development.
+  if (!CONTRACT_CONFIG.CONTRACT_ID) {
+    if (process.env.NODE_ENV === "development") {
+      return getMockProducts(owner);
+    }
+    return [];
   }
-  
+
+  // Placeholder: until the contract/indexer exposes a "list by owner" method,
+  // return an empty array and track the call for observability.
+  trackContractInteraction({
+    method: "get_products_by_owner",
+    durationMs: Date.now() - startedAt,
+    success: true,
+    context: { owner, resultCount: 0, stub: true },
+  });
+
   return [];
 }
 
-/**
- * Mock products for development/testing.
- * Remove this function when connecting to real contract/indexer.
- */
+/** Mock products used during local development when no contract is configured. */
 function getMockProducts(owner: string): Product[] {
   const now = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;

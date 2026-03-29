@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useState, useEffect, useRef } from 'react';
 import { generateProductQR, generateProductQRSVG, getVerificationUrl } from '@/lib/qr';
+import { COPY_FEEDBACK_DURATION_MS } from '@/lib/constants';
 
 interface QRCodeGeneratorProps {
     productId: string;
@@ -22,7 +23,7 @@ export default function QRCodeGenerator({ productId }: QRCodeGeneratorProps) {
         try {
             await navigator.clipboard.writeText(url);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            setTimeout(() => setCopied(false), COPY_FEEDBACK_DURATION_MS);
         } catch (err) {
             console.error('Failed to copy text: ', err);
         }

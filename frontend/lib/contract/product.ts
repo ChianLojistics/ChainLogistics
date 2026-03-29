@@ -1,6 +1,7 @@
 import { TransactionBuilder, Networks, BASE_FEE, Asset, Operation } from "@stellar/stellar-sdk";
 import { signWithFreighter } from "../stellar/wallet";
 import { CONTRACT_CONFIG, validateContractConfig } from "./config";
+import { PRODUCT_REGISTRATION_DELAY_MS } from "@/lib/constants";
 
 export type ProductData = {
     id: string;
@@ -24,7 +25,7 @@ export async function registerProductOnChain(
     validateContractConfig();
 
     // Simulate a delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, PRODUCT_REGISTRATION_DELAY_MS));
 
     // Return a mock transaction hash
     return "t_" + Math.random().toString(36).substring(2, 15);
