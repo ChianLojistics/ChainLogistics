@@ -5,6 +5,9 @@ use crate::database::{ProductRepository, EventRepository, UserRepository, ApiKey
 use crate::models::*;
 use bcrypt::{hash, DEFAULT_COST};
 
+pub mod financial;
+pub use financial::FinancialService;
+
 pub struct ProductService {
     pool: PgPool,
 }

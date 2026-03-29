@@ -14,10 +14,13 @@ mod database;
 mod utils;
 mod error;
 mod docs;
+mod blockchain;
+mod websocket;
+mod compliance;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService};
 use utils::CronService;
 use error::AppError;
 
@@ -29,6 +32,7 @@ pub struct AppState {
     pub user_service: Arc<UserService>,
     pub api_key_service: Arc<ApiKeyService>,
     pub sync_service: Arc<SyncService>,
+    pub financial_service: Arc<FinancialService>,
     pub config: Config,
 }
 
@@ -48,6 +52,7 @@ impl AppState {
         let user_service = Arc::new(UserService::new(db.pool().clone()));
         let api_key_service = Arc::new(ApiKeyService::new(db.pool().clone()));
         let sync_service = Arc::new(SyncService::new(db.pool().clone()));
+        let financial_service = Arc::new(FinancialService::new(db.pool().clone()));
 
         Ok(Self {
             db,
@@ -56,6 +61,7 @@ impl AppState {
             user_service,
             api_key_service,
             sync_service,
+            financial_service,
             config,
         })
     }

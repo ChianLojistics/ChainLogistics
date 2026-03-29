@@ -6,3 +6,5 @@ pub mod user;
 pub mod auth;
 pub mod stats;
 pub mod health;
+pub mod financial;
+pub mod compliance;
