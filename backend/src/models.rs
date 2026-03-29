@@ -11,8 +11,8 @@ pub struct Product {
     pub origin_location: String,
     pub category: String,
     pub tags: Vec<String>,
-    pub certifications: Vec<String>,
-    pub media_hashes: Vec<String>,
+    pub certifications: Vec<String>, // Hash strings
+    pub media_hashes: Vec<String>,   // Hash strings
     pub custom_fields: serde_json::Value,
     pub owner_address: String,
     pub is_active: bool,
@@ -20,6 +20,16 @@ pub struct Product {
     pub updated_at: DateTime<Utc>,
     pub created_by: String,
     pub updated_by: String,
+}
+
+// Product model for API responses (includes computed fields)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductWithStats {
+    #[serde(flatten)]
+    pub product: Product,
+    pub event_count: Option<i64>,
+    pub last_event_at: Option<DateTime<Utc>>,
+    pub last_event_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
