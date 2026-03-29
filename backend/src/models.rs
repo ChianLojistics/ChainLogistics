@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+pub mod analytics;
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Product {
     pub id: String,
