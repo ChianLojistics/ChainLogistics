@@ -1,4 +1,4 @@
-export type MessageHandler = (message: any) => void;
+export type MessageHandler = (message: Record<string, unknown>) => void;
 
 export class WebSocketClient {
     private ws: WebSocket | null = null;
@@ -66,7 +66,7 @@ export class WebSocketClient {
         }
     }
 
-    private handleMessage(message: any): void {
+    private handleMessage(message: Record<string, unknown>): void {
         const { type, channel, data } = message;
 
         if (type === 'event' && channel) {
@@ -106,7 +106,7 @@ export class WebSocketClient {
         }
     }
 
-    send(message: any): void {
+    send(message: Record<string, unknown>): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         } else {

@@ -9,7 +9,7 @@ export abstract class BaseBlockchainProvider implements BlockchainProvider {
     abstract getBalance(address: string): Promise<string>;
     abstract sendTransaction(tx: Partial<Transaction>): Promise<string>;
     abstract getTransaction(hash: string): Promise<Transaction>;
-    abstract callContract(method: string, params: any[]): Promise<any>;
+    abstract callContract(method: string, params: Record<string, unknown>[]): Promise<Record<string, unknown>>;
     abstract estimateGas(tx: Partial<Transaction>): Promise<string>;
 
     protected validateAddress(address: string): boolean {

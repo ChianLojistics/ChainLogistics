@@ -11,7 +11,7 @@ interface RealtimeEvent {
   event_type: string;
   location: string;
   timestamp: number;
-  data: any;
+  data: Record<string, unknown>;
 }
 
 interface RealtimeEventListenerProps {
@@ -21,7 +21,6 @@ interface RealtimeEventListenerProps {
 export function RealtimeEventListener({ productId }: RealtimeEventListenerProps) {
   const [events, setEvents] = useState<RealtimeEvent[]>([]);
   const [connected, setConnected] = useState(false);
-  const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
 
   useEffect(() => {
     const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001'}/ws`;
@@ -36,8 +35,6 @@ export function RealtimeEventListener({ productId }: RealtimeEventListenerProps)
         setEvents((prev) => [data, ...prev].slice(0, 50)); // Keep last 50 events
       });
     });
-
-    setWsClient(client);
 
     return () => {
       client.disconnect();

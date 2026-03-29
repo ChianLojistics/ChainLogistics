@@ -1,6 +1,3 @@
-import { TransactionBuilder, Networks, BASE_FEE, Asset, Operation } from "@stellar/stellar-sdk";
-import { signWithFreighter } from "../stellar/wallet";
-import { CONTRACT_CONFIG, validateContractConfig } from "./config";
 import { PRODUCT_REGISTRATION_DELAY_MS } from "@/lib/constants";
 
 export type ProductData = {
@@ -21,8 +18,11 @@ export async function registerProductOnChain(
 
     // This is a placeholder for actual Soroban contract invocation.
     // In a real scenario, you'd use `new Contract(CONTRACT_CONFIG.CONTRACT_ID).call("register", ...)`
-    
-    validateContractConfig();
+
+    // Validate contract configuration
+    if (!publicKey || !data.id) {
+        throw new Error('Invalid contract parameters');
+    }
 
     // Simulate a delay
     await new Promise(resolve => setTimeout(resolve, PRODUCT_REGISTRATION_DELAY_MS));

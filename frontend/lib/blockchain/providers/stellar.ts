@@ -4,7 +4,7 @@ import { getBlockchainConfig } from '../config';
 
 export class StellarProvider extends BaseBlockchainProvider {
     network: BlockchainNetwork = 'stellar';
-    private wallet: any = null;
+    private wallet: Record<string, unknown> | null = null;
 
     async connect(): Promise<WalletConnection> {
         try {
@@ -12,7 +12,7 @@ export class StellarProvider extends BaseBlockchainProvider {
                 throw new Error('Stellar wallet requires browser environment');
             }
 
-            const freighter = (window as any).freighter;
+            const freighter = (window as Record<string, unknown>).freighter;
             if (!freighter) {
                 throw new Error('Freighter wallet not installed');
             }
@@ -44,7 +44,7 @@ export class StellarProvider extends BaseBlockchainProvider {
             const response = await fetch(`${config.rpcUrl}/accounts/${address}`);
             const data = await response.json();
 
-            const nativeBalance = data.balances.find((b: any) => b.asset_type === 'native');
+            const nativeBalance = data.balances.find((b: Record<string, unknown>) => b.asset_type === 'native');
             return nativeBalance?.balance || '0';
         } catch (error) {
             throw new Error(`Failed to get Stellar balance: ${error}`);
@@ -89,24 +89,25 @@ export class StellarProvider extends BaseBlockchainProvider {
         }
     }
 
-    async callContract(method: string, params: any[]): Promise<any> {
+    async callContract(method: string, params: Record<string, unknown>[]): Promise<Record<string, unknown>> {
         if (!this.wallet) {
             throw new Error('Wallet not connected');
         }
 
         try {
             // Soroban contract invocation
-            const result = await this.wallet.invokeContract({
+            const result = await (this.wallet as Record<string, unknown>).invokeContract?.({
                 method,
                 params,
             });
-            return result;
+            return result as Record<string, unknown>;
         } catch (error) {
             throw new Error(`Failed to call Stellar contract: ${error}`);
         }
     }
 
-    async estimateGas(tx: Partial<Transaction>): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async estimateGas(_tx: Partial<Transaction>): Promise<string> {
         // Stellar uses fixed fees
         return '100'; // stroops
     }

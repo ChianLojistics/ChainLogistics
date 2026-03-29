@@ -47,6 +47,6 @@ export interface BlockchainProvider {
     getBalance(address: string): Promise<string>;
     sendTransaction(tx: Partial<Transaction>): Promise<string>;
     getTransaction(hash: string): Promise<Transaction>;
-    callContract(method: string, params: any[]): Promise<any>;
+    callContract(method: string, params: Record<string, unknown>[]): Promise<Record<string, unknown>>;
     estimateGas(tx: Partial<Transaction>): Promise<string>;
 }

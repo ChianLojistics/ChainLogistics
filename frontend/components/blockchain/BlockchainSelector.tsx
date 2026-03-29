@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { getSupportedNetworks, getNetworkName } from '@/lib/blockchain/config';
 import { BlockchainNetwork } from '@/lib/blockchain/types';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 
 interface BlockchainSelectorProps {
   onNetworkChange: (network: BlockchainNetwork) => void;
