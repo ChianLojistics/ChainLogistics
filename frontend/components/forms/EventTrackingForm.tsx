@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import EventTypeSelector, { EventType } from './EventTypeSelector';
 import { LocationInput } from "./LocationInput";
 import { sanitizeInput, apiRateLimiter, eventTrackingSchema, EVENT_NOTE_MAX_LEN } from "@/lib/validation";
+import { EVENT_TRACKING_SUBMIT_DELAY_MS } from "@/lib/constants";
 
 export default function EventTrackingForm() {
     const [eventType, setEventType] = useState<EventType | ''>('');
@@ -57,7 +58,7 @@ export default function EventTrackingForm() {
             setLocation(sanitizedLocation);
             setNote(sanitizedNote);
             // Dummy transaction delay mirroring freighter confirm
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            await new Promise((resolve) => setTimeout(resolve, EVENT_TRACKING_SUBMIT_DELAY_MS));
             setSuccess(true);
         } catch (err) {
             setError((err as Error).message || 'Failed to submit transaction');

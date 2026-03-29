@@ -23,6 +23,7 @@ import { useWalletStore } from "@/lib/state/wallet.store";
 import { getProductsByOwner } from "@/lib/contract/products";
 import { fetchProductEvents } from "@/lib/contract/events";
 import { cn } from "@/lib/utils";
+import { DASHBOARD_REFRESH_INTERVAL_MS, DASHBOARD_RECENT_EVENTS_LIMIT } from "@/lib/constants";
 
 import { StatCard } from "@/components/analytics/StatCard";
 import { EventsChart } from "@/components/analytics/EventsChart";
@@ -95,10 +96,44 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     if (status !== "connected" || !publicKey) return;
-    const id = setInterval(() => {
-      void load();
-    }, 30000);
-    return () => clearInterval(id);
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        void load();
+      }, DASHBOARD_REFRESH_INTERVAL_MS);
+    };
+
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        // Refresh immediately when the user returns, then resume polling.
+        void load();
+        startPolling();
+      }
+    };
+
+    // Only poll while the tab is visible.
+    if (!document.hidden) {
+      startPolling();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [status, publicKey, load]);
 
   const totalProducts = products.length;
@@ -136,7 +171,7 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [products]);
 
-  const recentEvents = React.useMemo(() => events.slice(0, 12), [events]);
+  const recentEvents = React.useMemo(() => events.slice(0, DASHBOARD_RECENT_EVENTS_LIMIT), [events]);
 
   const topOriginDescription = React.useMemo(() => {
     if (isLoading) return undefined;
@@ -213,7 +248,7 @@ export default function DashboardPage() {
         <StatCard
           label="Last updated"
           value={lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : "—"}
-          description="Auto-refreshes every 30s while connected."
+          description="Auto-refreshes while tab is visible."
           icon={<TrendingUp className="h-6 w-6" />}
         />
       </div>
