@@ -68,22 +68,25 @@ fn index_product(env: &Env, product: &Product) {
     // Index name words
     let name_words = split_into_words(env, &product.name);
     for i in 0..name_words.len() {
-        let word = name_words.get(i).unwrap();
-        storage::add_to_search_index(env, word.clone(), &product.id);
+        if let Some(word) = name_words.get(i) {
+            storage::add_to_search_index(env, word.clone(), &product.id);
+        }
     }
 
     // Index origin words
     let origin_words = split_into_words(env, &product.origin.location);
     for i in 0..origin_words.len() {
-        let word = origin_words.get(i).unwrap();
-        storage::add_to_search_index(env, word.clone(), &product.id);
+        if let Some(word) = origin_words.get(i) {
+            storage::add_to_search_index(env, word.clone(), &product.id);
+        }
     }
 
     // Index category words
     let category_words = split_into_words(env, &product.category);
     for i in 0..category_words.len() {
-        let word = category_words.get(i).unwrap();
-        storage::add_to_search_index(env, word.clone(), &product.id);
+        if let Some(word) = category_words.get(i) {
+            storage::add_to_search_index(env, word.clone(), &product.id);
+        }
     }
 }
 
@@ -104,22 +107,25 @@ fn deindex_product(env: &Env, product: &Product) {
     // Remove from name index (using the same logic as indexing)
     let name_words = split_into_words(env, &product.name);
     for i in 0..name_words.len() {
-        let word = name_words.get(i).unwrap();
-        storage::remove_from_search_index(env, word.clone(), &product.id);
+        if let Some(word) = name_words.get(i) {
+            storage::remove_from_search_index(env, word.clone(), &product.id);
+        }
     }
 
     // Remove from origin index
     let origin_words = split_into_words(env, &product.origin.location);
     for i in 0..origin_words.len() {
-        let word = origin_words.get(i).unwrap();
-        storage::remove_from_search_index(env, word.clone(), &product.id);
+        if let Some(word) = origin_words.get(i) {
+            storage::remove_from_search_index(env, word.clone(), &product.id);
+        }
     }
 
     // Remove from category index
     let category_words = split_into_words(env, &product.category);
     for i in 0..category_words.len() {
-        let word = category_words.get(i).unwrap();
-        storage::remove_from_search_index(env, word.clone(), &product.id);
+        if let Some(word) = category_words.get(i) {
+            storage::remove_from_search_index(env, word.clone(), &product.id);
+        }
     }
 }
 
@@ -366,9 +372,10 @@ impl ProductRegistryContract {
             if results.len() >= limit {
                 return results;
             }
-            let product_id = exact_matches.get(i).unwrap();
-            if !results.contains(&product_id) {
-                results.push_back(product_id.clone());
+            if let Some(product_id) = exact_matches.get(i) {
+                if !results.contains(&product_id) {
+                    results.push_back(product_id.clone());
+                }
             }
         }
 

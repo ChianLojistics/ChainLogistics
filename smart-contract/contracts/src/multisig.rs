@@ -349,7 +349,9 @@ mod test_multisig {
         let (client, signers) = setup(&env);
         client.init_multisig(&signers, &2);
 
-        let proposer = signers.get(0).unwrap().clone();
+        let proposer = signers.get(0).cloned().unwrap_or_else(|| {
+            panic!("Test setup failed: No signers available");
+        });
         let new_admin = Address::generate(&env);
 
         let kind = Symbol::new(&env, "transfer_admin");
@@ -378,8 +380,12 @@ mod test_multisig {
         let (client, signers) = setup(&env);
         client.init_multisig(&signers, &2);
 
-        let proposer = signers.get(0).unwrap().clone();
-        let approver = signers.get(1).unwrap().clone();
+        let proposer = signers.get(0).cloned().unwrap_or_else(|| {
+            panic!("Test setup failed: No signers available");
+        });
+        let approver = signers.get(1).cloned().unwrap_or_else(|| {
+            panic!("Test setup failed: Insufficient signers for approval test");
+        });
         let new_admin = Address::generate(&env);
 
         let kind = Symbol::new(&env, "transfer_admin");
@@ -411,7 +417,9 @@ mod test_multisig {
         let (client, signers) = setup(&env);
         client.init_multisig(&signers, &2);
 
-        let proposer = signers.get(0).unwrap().clone();
+        let proposer = signers.get(0).cloned().unwrap_or_else(|| {
+            panic!("Test setup failed: No signers available");
+        });
         let new_admin = Address::generate(&env);
 
         let kind = Symbol::new(&env, "transfer_admin");

@@ -167,7 +167,7 @@ pub fn remove_from_search_index(env: &Env, keyword: String, product_id: &String)
     let mut found = false;
     let mut i = 0;
     while i < ids.len() {
-        if ids.get(i).unwrap() == product_id.clone() {
+        if let Some(id) = ids.get(i) && id == product_id {
             ids.remove(i);
             found = true;
             break;

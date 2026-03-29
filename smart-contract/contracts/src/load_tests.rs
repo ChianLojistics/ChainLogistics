@@ -79,7 +79,9 @@ fn register_test_product(
 
     // `try_` returns Result<Ok(T) | Err(E), HostError>. We only care that the
     // contract call succeeded and returned Ok.
-    let _product = res.unwrap().unwrap();
+    let _product = res.unwrap().unwrap_or_else(|_| {
+        panic!("Failed to register test product: {}", unique_id);
+    });
     id.clone()
 }
 
@@ -193,9 +195,10 @@ fn test_stress_1000_product_registration() {
 
         assert_eq!(product_ids.len(), 100);
         for i in 0..product_ids.len() {
-            let product_id = product_ids.get(i).unwrap();
-            let product = pr_client.get_product(&product_id);
-            assert!(product.owner == owner);
+            if let Some(product_id) = product_ids.get(i) {
+                let product = pr_client.get_product(&product_id);
+                assert!(product.owner == owner);
+            }
         }
     }
 }
@@ -221,9 +224,10 @@ fn test_stress_1000_product_batch_transfers() {
         assert_eq!(transferred, 100);
 
         for i in 0..product_ids.len() {
-            let product_id = product_ids.get(i).unwrap();
-            let product = pr_client.get_product(&product_id);
-            assert!(product.owner == new_owner);
+            if let Some(product_id) = product_ids.get(i) {
+                let product = pr_client.get_product(&product_id);
+                assert!(product.owner == new_owner);
+            }
         }
     }
 }
