@@ -12,6 +12,7 @@ mod services;
 mod models;
 mod database;
 mod utils;
+mod resilience;
 mod error;
 mod docs;
 mod blockchain;
@@ -20,7 +21,7 @@ mod compliance;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, ResilienceService};
 use utils::CronService;
 use error::AppError;
 
@@ -34,6 +35,7 @@ pub struct AppState {
     pub sync_service: Arc<SyncService>,
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
+    pub resilience_service: Arc<ResilienceService>,
     pub config: Config,
 }
 
@@ -58,6 +60,7 @@ impl AppState {
             db.pool().clone(),
             config.redis.url.clone(),
         ));
+        let resilience_service = Arc::new(ResilienceService::new(db.pool().clone()));
 
         Ok(Self {
             db,
@@ -68,6 +71,7 @@ impl AppState {
             sync_service,
             financial_service,
             analytics_service,
+            resilience_service,
             config,
         })
     }
@@ -91,6 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .merge(crate::routes::health_routes())
         .merge(crate::routes::api_routes())
+        .merge(crate::routes::resilience::resilience_routes())
         .merge(crate::docs::create_swagger_ui())
         .layer(
             ServiceBuilder::new()
