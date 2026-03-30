@@ -22,6 +22,7 @@ import type { TimelineEvent } from "@/lib/types/tracking";
 import { useWalletStore } from "@/lib/state/wallet.store";
 import { getProductsByOwner } from "@/lib/contract/products";
 import { fetchProductEvents } from "@/lib/contract/events";
+import { ContractClientError } from "@/lib/stellar/contractClient";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_REFRESH_INTERVAL_MS, DASHBOARD_RECENT_EVENTS_LIMIT } from "@/lib/constants";
 
@@ -46,7 +47,17 @@ export default function DashboardPage() {
   const [products, setProducts] = React.useState<Product[]>([]);
   const [events, setEvents] = React.useState<TimelineEvent[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<
+    | null
+    | {
+        title: string;
+        message: string;
+        detail?: string;
+        variant: "warning" | "error";
+        canRetry: boolean;
+        showConfigHint: boolean;
+      }
+  >(null);
   const [lastUpdatedAt, setLastUpdatedAt] = React.useState<number | null>(null);
 
   const load = React.useCallback(async () => {
@@ -72,18 +83,45 @@ export default function DashboardPage() {
         .filter((r): r is PromiseFulfilledResult<TimelineEvent[]> => r.status === "fulfilled")
         .flatMap((r) => r.value);
 
+      const firstRejected = settled.find(
+        (r): r is PromiseRejectedResult => r.status === "rejected"
+      );
+
       all.sort((a, b) => b.timestamp - a.timestamp);
       setEvents(all);
       setLastUpdatedAt(Date.now());
 
       const rejectedCount = settled.filter((r) => r.status === "rejected").length;
       if (rejectedCount > 0 && all.length === 0) {
-        setError(
-          "Events could not be loaded (contract not configured or unavailable). Showing product-only insights."
-        );
+        const reason = firstRejected?.reason;
+        const normalizedTitle = "Events unavailable";
+        const isContractNotConfigured =
+          reason instanceof ContractClientError && reason.code === "CONTRACT_NOT_CONFIGURED";
+
+        setError({
+          title: normalizedTitle,
+          message: isContractNotConfigured
+            ? "Contract is not configured. Dashboard will show product-only insights."
+            : "We couldn't load tracking events. Dashboard will show product-only insights.",
+          detail: reason instanceof Error ? reason.message : undefined,
+          variant: "warning",
+          canRetry: true,
+          showConfigHint: isContractNotConfigured,
+        });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard data");
+      const isContractNotConfigured =
+        e instanceof ContractClientError && e.code === "CONTRACT_NOT_CONFIGURED";
+      setError({
+        title: "Failed to load dashboard",
+        message: isContractNotConfigured
+          ? "Contract is not configured. Add NEXT_PUBLIC_CONTRACT_ID and reload."
+          : "Unable to load dashboard data. Please check your connection and try again.",
+        detail: e instanceof Error ? e.message : undefined,
+        variant: "error",
+        canRetry: true,
+        showConfigHint: isContractNotConfigured,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -221,8 +259,43 @@ export default function DashboardPage() {
       ) : null}
 
       {error ? (
-        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {error}
+        <div
+          className={cn(
+            "mt-6 rounded-xl border p-4 text-sm",
+            error.variant === "warning"
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-red-200 bg-red-50 text-red-900"
+          )}
+        >
+          <div className="font-semibold">{error.title}</div>
+          <div className="mt-1">{error.message}</div>
+          {error.detail ? (
+            <div className="mt-1 text-xs opacity-80">{error.detail}</div>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {error.canRetry ? (
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={!canLoad || isLoading}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50",
+                  error.variant === "warning"
+                    ? "bg-amber-900 text-amber-50 hover:bg-amber-950"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                )}
+              >
+                Retry
+              </button>
+            ) : null}
+
+            {error.showConfigHint ? (
+              <div className="text-xs opacity-80">
+                Set `NEXT_PUBLIC_CONTRACT_ID` in `.env.local`, restart the dev server, then refresh.
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

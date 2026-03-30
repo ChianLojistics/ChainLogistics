@@ -15,6 +15,11 @@ pub mod carbon_calculator;
 pub mod carbon;
 pub use carbon::CarbonService;
 
+pub mod digital_twin_service;
+pub use digital_twin_service::DigitalTwinService;
+
+/// Service layer for managing product operations and database interactions.
+/// Provides a clean abstraction over database operations for products.
 pub struct ProductService {
     pool: PgPool,
 }
@@ -27,6 +32,25 @@ impl ProductService {
 
 #[async_trait]
 impl ProductRepository for ProductService {
+/// Creates a new product in the database with all associated metadata.
+/// This function handles the complete product creation process including
+/// tags, certifications, media hashes, and custom fields.
+/// 
+/// # Arguments
+/// * `product` - NewProduct struct containing all product information
+/// 
+/// # Returns
+/// * `Result<Product, sqlx::Error>` - The created product or database error
+/// 
+/// # Example
+/// ```rust
+/// let new_product = NewProduct {
+///     id: "PROD-12345".to_string(),
+///     name: "Ethiopian Coffee".to_string(),
+///     // ... other fields
+/// };
+/// let product = service.create_product(new_product).await?;
+/// ```
     async fn create_product(&self, product: NewProduct) -> Result<Product, sqlx::Error> {
         sqlx::query_as!(
             Product,
@@ -54,6 +78,14 @@ impl ProductRepository for ProductService {
         .await
     }
 
+/// Retrieves a product by its unique identifier.
+/// Returns None if the product doesn't exist.
+/// 
+/// # Arguments
+/// * `id` - The unique product identifier
+/// 
+/// # Returns
+/// * `Result<Option<Product>, sqlx::Error>` - Product if found, None otherwise
     async fn get_product(&self, id: &str) -> Result<Option<Product>, sqlx::Error> {
         sqlx::query_as!(
             Product,
@@ -107,6 +139,29 @@ impl ProductRepository for ProductService {
         Ok(())
     }
 
+/// Lists products with optional filtering and pagination.
+/// Builds dynamic SQL queries based on provided filters to efficiently
+/// retrieve product data with proper ordering and limits.
+/// 
+/// # Arguments
+/// * `offset` - Number of records to skip (for pagination)
+/// * `limit` - Maximum number of records to return
+/// * `filters` - Optional ProductFilters for narrowing results
+/// 
+/// # Returns
+/// * `Result<Vec<Product>, sqlx::Error>` - List of products matching criteria
+/// 
+/// # Dynamic Query Building
+/// The function constructs SQL queries dynamically by:
+/// 1. Starting with base SELECT statement
+/// 2. Adding WHERE clauses based on active filters
+/// 3. Binding parameters in order to prevent SQL injection
+/// 4. Adding ORDER BY, LIMIT, and OFFSET clauses
+/// 
+/// # Performance Considerations
+/// - Uses parameterized queries to prevent SQL injection
+/// - Applies database indexes efficiently through WHERE clauses
+/// - Limits results to prevent memory issues with large datasets
     async fn list_products(
         &self,
         offset: i64,
@@ -203,6 +258,25 @@ impl ProductRepository for ProductService {
             .await
     }
 
+/// Performs full-text search across products using PostgreSQL's built-in search capabilities.
+/// Searches across product name, description, and category fields using both
+/// full-text search and ILIKE for comprehensive matching.
+/// 
+/// # Arguments
+/// * `query` - Search query string
+/// * `limit` - Maximum number of results to return
+/// 
+/// # Search Strategy
+/// Uses a two-pronged approach:
+/// 1. Full-text search with ranking for relevance scoring
+/// 2. ILIKE matching on ID and exact name matches
+/// 
+/// # Returns
+/// * `Result<Vec<Product>, sqlx::Error>` - Products ranked by relevance
+/// 
+/// # Performance
+/// - Utilizes PostgreSQL GIN indexes for efficient full-text search
+/// - Orders by ts_rank for most relevant results first
     async fn search_products(&self, query: &str, limit: i64) -> Result<Vec<Product>, sqlx::Error> {
         sqlx::query_as!(
             Product,
@@ -584,7 +658,9 @@ impl ApiKeyRepository for ApiKeyService {
     }
 }
 
-// Sync service for mirroring smart contract data
+/// Synchronization service for maintaining consistency between blockchain and database.
+/// This service handles bidirectional sync between smart contract data and
+/// the relational database, ensuring both systems stay in sync.
 pub struct SyncService {
     pool: PgPool,
     product_service: ProductService,
@@ -600,6 +676,25 @@ impl SyncService {
         }
     }
 
+/// Synchronizes a single product from smart contract to database.
+/// Implements an upsert pattern to handle both new and existing products.
+/// 
+/// # Synchronization Strategy
+/// 1. Check if product exists in database
+/// 2. If exists: Update all fields with blockchain data
+/// 3. If new: Create new product record
+/// 4. Preserve database-specific fields (created_by, updated_by)
+/// 
+/// # Arguments
+/// * `product` - NewProduct data from blockchain
+/// 
+/// # Returns
+/// * `Result<Product, sqlx::Error>` - Synchronized product record
+/// 
+/// # Data Integrity
+/// - Maintains referential integrity with existing records
+/// - Preserves audit trail through updated_by field
+/// - Handles concurrent access safely through database transactions
     pub async fn sync_product_from_contract(&self, product: NewProduct) -> Result<Product, sqlx::Error> {
         // Upsert product
         let existing = self.product_service.get_product(&product.id).await?;
@@ -628,6 +723,23 @@ impl SyncService {
         self.event_service.create_event(event).await
     }
 
+/// Synchronizes multiple products in a batch for efficient bulk operations.
+/// Processes products sequentially to maintain data consistency while
+/// providing better performance than individual calls.
+/// 
+/// # Arguments
+/// * `products` - Vector of NewProduct objects from blockchain
+/// 
+/// # Returns
+/// * `Result<Vec<Product>, sqlx::Error>` - All synchronized products
+/// 
+/// # Performance Considerations
+/// - Sequential processing prevents database overload
+/// - Each product sync is atomic (all or nothing)
+/// - Error handling stops processing on first failure
+/// 
+/// # Future Improvements
+/// Consider parallel processing with connection pooling for large batches
     pub async fn sync_batch_products(&self, products: Vec<NewProduct>) -> Result<Vec<Product>, sqlx::Error> {
         let mut results = Vec::new();
         for product in products {

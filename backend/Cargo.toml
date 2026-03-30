@@ -23,7 +23,6 @@ anyhow = "1.0"
 config = "0.14"
 async-trait = "0.1"
 # Stellar/Soroban dependencies
-stellar-sdk = "0.24"
 soroban-sdk = "21.0"
 # OpenAPI documentation
 utoipa = { version = "4.0", features = ["axum_extras"] }
