@@ -1,0 +1,80 @@
+version: 2
+
+updates:
+  # Rust dependencies (Soroban contracts)
+  - package-ecosystem: "cargo"
+    directory: "/smart-contract"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+
+    open-pull-requests-limit: 10
+
+    reviewers:
+      - "Lynndabel"
+
+    assignees:
+      - "Lynndabel"
+
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+    versioning-strategy: increase
+
+    labels:
+      - "dependencies"
+      - "rust"
+
+    groups:
+      rust-dependencies:
+        patterns:
+          - "*"
+
+  # Frontend dependencies (Next.js / TypeScript)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+
+    open-pull-requests-limit: 10
+
+    reviewers:
+      - "Lynndabel"
+
+    assignees:
+      - "Lynndabel"
+
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+    versioning-strategy: increase
+
+    labels:
+      - "dependencies"
+      - "javascript"
+
+    groups:
+      frontend-dependencies:
+        patterns:
+          - "*"
+
+    ignore:
+      # Ignore risky React major updates
+      - dependency-name: "react"
+        update-types:
+          - "version-update:semver-major"
+
+      - dependency-name: "react-dom"
+        update-types:
+          - "version-update:semver-major"
+
+      # Ignore Soroban SDK updates requiring manual testing
+      - dependency-name: "@stellar/*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"

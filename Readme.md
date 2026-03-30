@@ -4,6 +4,10 @@
 
 ChainLojistic is an open-source, blockchain-based supply chain provenance tracker built on Stellar's Soroban platform. It enables transparent, tamper-proof tracking of products from origin to consumer, solving trust and verification issues in global supply chains.
 
+## Contract Address
+
+CBUWSKT2UGOAXK4ZREVDJV5XHSYB42PZ3CERU2ZFUTUMAZLJEHNZIECA
+
 ## 🎯 The Problem
 
 Modern supply chains face critical trust challenges:
@@ -65,11 +69,13 @@ ChainLojistic provides a decentralized, immutable ledger for supply chain tracki
 - QR code generation
 - Search and analytics
 
-**Backend** (Node.js + Express + TypeScript) - Optional
-- REST API for integrations
-- Caching layer for performance
-- Webhook system for notifications
-- Rate limiting and security
+**Backend** (Rust + Axum + SQLx) - High-Performance API Server
+- REST API for integrations with 3-10x performance improvement
+- Async webhook system with Tokio runtime
+- PostgreSQL database with SQLx for type-safe queries
+- Real-time analytics and reporting
+- Third-party SDKs (Rust + Python via PyO3)
+- Comprehensive caching and rate limiting
 
 ### Data Flow
 
@@ -288,7 +294,7 @@ We welcome contributors of all skill levels! This project offers opportunities t
 - Join a growing community
 
 **Ways to Contribute:**
-- Code (smart contracts, frontend, backend)
+- Code (smart contracts, frontend, backend - Rust/Axum)
 - Documentation
 - Design (UI/UX)
 - Testing
@@ -424,10 +430,10 @@ This project is excellent for learning:
 - Real-time updates
 
 **Full-Stack Development**
-- REST API design
-- Database optimization
-- Caching strategies
-- Security best practices
+- Rust REST API design with Axum
+- PostgreSQL optimization with SQLx
+- Redis caching strategies
+- Async security best practices
 
 **System Design**
 - Distributed systems

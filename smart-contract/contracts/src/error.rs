@@ -4,38 +4,59 @@ use soroban_sdk::contracterror;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Error {
-    // --- Core ---
+    // --- Core (1-10) ---
     ProductAlreadyExists = 1,
     ProductNotFound = 2,
     Unauthorized = 3,
     InvalidInput = 4,
     EventNotFound = 5,
+    NotInitialized = 6,
+    AlreadyInitialized = 7,
+    ContractPaused = 8,
+    ContractNotPaused = 9,
 
-    // --- Validation ---
-    InvalidProductId = 6,
-    InvalidProductName = 7,
-    InvalidOrigin = 8,
-    InvalidCategory = 9,
+    // --- Validation (10-30) ---
+    InvalidProductId = 10,
+    InvalidProductName = 11,
+    InvalidOrigin = 12,
+    InvalidCategory = 13,
+    ProductIdTooLong = 14,
+    ProductNameTooLong = 15,
+    OriginTooLong = 16,
+    CategoryTooLong = 17,
+    DescriptionTooLong = 18,
+    TooManyTags = 19,
+    TagTooLong = 20,
+    TooManyCertifications = 21,
+    TooManyMediaHashes = 22,
+    TooManyCustomFields = 23,
+    CustomFieldValueTooLong = 24,
 
-    ProductIdTooLong = 10,
-    ProductNameTooLong = 11,
-    OriginTooLong = 12,
-    CategoryTooLong = 13,
-    DescriptionTooLong = 14,
+    // --- Batch (30-40) ---
+    EmptyBatch = 30,
+    BatchTooLarge = 31,
+    DuplicateProductIdInBatch = 32,
 
-    TooManyTags = 15,
-    TagTooLong = 16,
-    TooManyCertifications = 17,
-    TooManyMediaHashes = 18,
+    // --- Lifecycle (40-50) ---
+    ProductDeactivated = 40,
+    DeactivationReasonRequired = 41,
+    ProductAlreadyActive = 42,
 
-    TooManyCustomFields = 19,
-    CustomFieldValueTooLong = 20,
+    // --- Upgrade (50-60) ---
+    InvalidUpgrade = 50,
+    UpgradeInProgress = 51,
+    NoUpgradeInProgress = 52,
+    EmergencyPaused = 53,
+    NotEmergencyPaused = 54,
 
-    // --- Lifecycle ---
-    /// Attempted to add a tracking event to a deactivated product.
-    ProductDeactivated = 21,
-    /// Deactivation reason string is empty.
-    DeactivationReasonRequired = 22,
-    /// Attempted to reactivate a product that is already active.
-    ProductAlreadyActive = 23,
+    // --- Multi-Signature (60-70) ---
+    MultiSigNotConfigured = 60,
+    NotSigner = 61,
+    ProposalNotFound = 62,
+    AlreadyApproved = 63,
+    ProposalAlreadyExecuted = 64,
+    ThresholdNotReached = 65,
+    InvalidThreshold = 66,
+    TooManySigners = 67,
+    DuplicateSigner = 68,
 }

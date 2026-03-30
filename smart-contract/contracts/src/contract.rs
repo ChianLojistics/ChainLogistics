@@ -1,13 +1,34 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
-use crate::types::{
-    DeactInfo, Origin, Product, ProductConfig, ProductStats, TrackingEvent,
-    TrackingEventFilter, TrackingEventPage,
-};
 use crate::error::Error;
-use crate::{storage, validation};
+use crate::types::{Product, TrackingEvent, TrackingEventFilter, TrackingEventPage};
+use crate::validation_contract::ValidationContract;
+use crate::{storage, AuthorizationContractClient};
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
+
+fn require_not_paused(env: &Env) -> Result<(), Error> {
+    if storage::is_paused(env) {
+        return Err(Error::ContractPaused);
+    }
+    Ok(())
+}
+
+fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
+    let admin = storage::get_admin(env).ok_or(Error::NotInitialized)?;
+    if &admin == caller {
+        caller.require_auth();
+        return Ok(());
+    }
+
+    if let Some(multisig) = storage::get_multisig_contract(env) {
+        if &multisig == caller && env.current_contract_address() == multisig {
+            return Ok(());
+        }
+    }
+
+    Err(Error::Unauthorized)
+}
 
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
@@ -17,7 +38,6 @@ fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
 
-/// Require that `caller` is the product owner (also calls `require_auth()`).
 fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     caller.require_auth();
     if &product.owner != caller {
@@ -26,9 +46,6 @@ fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
-/// Verify that an actor is allowed to add events:
-///  - product must be active
-///  - caller must be the owner or an explicitly authorized actor
 fn require_can_add_event(
     env: &Env,
     product_id: &String,
@@ -37,18 +54,15 @@ fn require_can_add_event(
 ) -> Result<(), Error> {
     caller.require_auth();
 
-    // Deactivated products reject all new events
     if !product.active {
         return Err(Error::ProductDeactivated);
     }
 
-    // Owner always has permission
-    if &product.owner == caller {
-        return Ok(());
-    }
+    let auth_contract = storage::get_auth_contract(env).ok_or(Error::NotInitialized)?;
+    let auth_client = AuthorizationContractClient::new(env, &auth_contract);
 
-    // Check explicit authorization
-    if !storage::is_authorized(env, product_id, caller) {
+    // Delegate check to AuthorizationContract
+    if !auth_client.is_authorized(product_id, caller) {
         return Err(Error::Unauthorized);
     }
 
@@ -62,304 +76,69 @@ pub struct ChainLogisticsContract;
 
 #[contractimpl]
 impl ChainLogisticsContract {
-    // --- Lifecycle Management ---
-    // ═══════════════════════════════════════════════════════════════════════
-    // PRODUCT REGISTRATION
-    // ═══════════════════════════════════════════════════════════════════════
+    const MAX_EVENT_ID_PAGE_LIMIT: u32 = 100;
 
-    /// Register a new product.
-    pub fn register_product(
-        env: Env,
-        owner: Address,
-        config: ProductConfig,
-    ) -> Result<Product, Error> {
-        owner.require_auth();
-
-        // --- Validation ---
-        const MAX_ID_LEN: u32 = 64;
-        const MAX_NAME_LEN: u32 = 128;
-        const MAX_ORIGIN_LEN: u32 = 128;
-        const MAX_CATEGORY_LEN: u32 = 64;
-        const MAX_DESC_LEN: u32 = 512;
-        const MAX_TAGS: u32 = 20;
-        const MAX_TAG_LEN: u32 = 64;
-        const MAX_CERTS: u32 = 50;
-        const MAX_MEDIA: u32 = 50;
-        const MAX_CUSTOM: u32 = 20;
-        const MAX_CUSTOM_VAL_LEN: u32 = 256;
-
-        if !validation::non_empty(&config.id) {
-            return Err(Error::InvalidProductId);
+    pub fn init(env: Env, admin: Address, auth_contract: Address) -> Result<(), Error> {
+        if storage::has_admin(&env) {
+            return Err(Error::AlreadyInitialized);
         }
-        if !validation::max_len(&config.id, MAX_ID_LEN) {
-            return Err(Error::ProductIdTooLong);
-        }
-        if !validation::non_empty(&config.name) {
-            return Err(Error::InvalidProductName);
-        }
-        if !validation::max_len(&config.name, MAX_NAME_LEN) {
-            return Err(Error::ProductNameTooLong);
-        }
-        if !validation::non_empty(&config.origin_location) {
-            return Err(Error::InvalidOrigin);
-        }
-        if !validation::max_len(&config.origin_location, MAX_ORIGIN_LEN) {
-            return Err(Error::OriginTooLong);
-        }
-        if !validation::non_empty(&config.category) {
-            return Err(Error::InvalidCategory);
-        }
-        if !validation::max_len(&config.category, MAX_CATEGORY_LEN) {
-            return Err(Error::CategoryTooLong);
-        }
-        if !validation::max_len(&config.description, MAX_DESC_LEN) {
-            return Err(Error::DescriptionTooLong);
-        }
-        if config.tags.len() > MAX_TAGS {
-            return Err(Error::TooManyTags);
-        }
-        for i in 0..config.tags.len() {
-            if !validation::max_len(&config.tags.get_unchecked(i), MAX_TAG_LEN) {
-                return Err(Error::TagTooLong);
-            }
-        }
-        if config.certifications.len() > MAX_CERTS {
-            return Err(Error::TooManyCertifications);
-        }
-        if config.media_hashes.len() > MAX_MEDIA {
-            return Err(Error::TooManyMediaHashes);
-        }
-        if config.custom.len() > MAX_CUSTOM {
-            return Err(Error::TooManyCustomFields);
-        }
-        let custom_keys = config.custom.keys();
-        for i in 0..custom_keys.len() {
-            let k = custom_keys.get_unchecked(i);
-            let v = config.custom.get_unchecked(k);
-            if !validation::max_len(&v, MAX_CUSTOM_VAL_LEN) {
-                return Err(Error::CustomFieldValueTooLong);
-            }
-        }
-
-        // --- Duplicate check ---
-        if storage::has_product(&env, &config.id) {
-            return Err(Error::ProductAlreadyExists);
-        }
-
-        let product = Product {
-            id: config.id.clone(),
-            name: config.name,
-            description: config.description,
-            origin: Origin {
-                location: config.origin_location,
-            },
-            owner: owner.clone(),
-            created_at: env.ledger().timestamp(),
-            active: true,
-            category: config.category,
-            tags: config.tags,
-            certifications: config.certifications,
-            media_hashes: config.media_hashes,
-            custom: config.custom,
-            deactivation_info: Vec::new(&env),
-        };
-
-        write_product(&env, &product);
-        storage::put_product_event_ids(&env, &config.id, &Vec::new(&env));
-        // Owner is implicitly authorized — store explicit auth entry for lookup convenience
-        storage::set_auth(&env, &config.id, &owner, true);
-
-        // Update global counters
-        let total = storage::get_total_products(&env) + 1;
-        storage::set_total_products(&env, total);
-
-        let active = storage::get_active_products(&env) + 1;
-        storage::set_active_products(&env, active);
-
-        env.events().publish(
-            (Symbol::new(&env, "product_registered"), config.id.clone()),
-            product.clone(),
-        );
-
-        Ok(product)
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PRODUCT LIFECYCLE — DEACTIVATION & REACTIVATION
-    // ═══════════════════════════════════════════════════════════════════════
-
-    /// Deactivate a product.
-    pub fn deactivate_product(
-        env: Env,
-        owner: Address,
-        product_id: String,
-        reason: String,
-    ) -> Result<(), Error> {
-        let mut product = read_product(&env, &product_id)?;
-        require_owner(&product, &owner)?;
-
-        if !product.active {
-            return Err(Error::ProductDeactivated);
-        }
-
-        if !validation::non_empty(&reason) {
-            return Err(Error::DeactivationReasonRequired);
-        }
-
-        product.active = false;
-        let mut info = Vec::new(&env);
-        info.push_back(DeactInfo {
-            reason: reason.clone(),
-            deactivated_at: env.ledger().timestamp(),
-            deactivated_by: owner.clone(),
-        });
-        product.deactivation_info = info;
-
-        write_product(&env, &product);
-
-        // Decrement active counter
-        let active = storage::get_active_products(&env).saturating_sub(1);
-        storage::set_active_products(&env, active);
-
-        env.events().publish(
-            (Symbol::new(&env, "product_deactivated"), product_id.clone()),
-            (owner, reason),
-        );
-
+        admin.require_auth();
+        storage::set_admin(&env, &admin);
+        storage::set_paused(&env, false);
+        storage::set_auth_contract(&env, &auth_contract);
         Ok(())
     }
 
-    /// Reactivate a product.
-    pub fn reactivate_product(
-        env: Env,
-        owner: Address,
-        product_id: String,
-    ) -> Result<(), Error> {
-        let mut product = read_product(&env, &product_id)?;
-        require_owner(&product, &owner)?;
+    pub fn is_paused(env: Env) -> bool {
+        storage::is_paused(&env)
+    }
 
-        if product.active {
-            return Err(Error::ProductAlreadyActive);
+    pub fn pause(env: Env, caller: Address) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        if storage::is_paused(&env) {
+            return Err(Error::ContractPaused);
         }
-
-        product.active = true;
-        product.deactivation_info = Vec::new(&env);
-
-        write_product(&env, &product);
-
-        // Increment active counter
-        let active = storage::get_active_products(&env) + 1;
-        storage::set_active_products(&env, active);
-
-        env.events().publish(
-            (Symbol::new(&env, "product_reactivated"), product_id.clone()),
-            owner,
-        );
-
+        storage::set_paused(&env, true);
         Ok(())
     }
-}
 
-#[contractimpl]
-impl ChainLogisticsContract {
-    // --- Product Queries ---
-
-    /// Get a product by its string ID.
-    pub fn get_product(env: Env, id: String) -> Result<Product, Error> {
-        read_product(&env, &id)
-    }
-
-    /// Returns all event IDs associated with a product.
-    pub fn get_product_event_ids(env: Env, id: String) -> Result<Vec<u64>, Error> {
-        let _ = read_product(&env, &id)?;
-        Ok(storage::get_product_event_ids(&env, &id))
-    }
-
-    /// Get global product statistics.
-    pub fn get_stats(env: Env) -> ProductStats {
-        ProductStats {
-            total_products: storage::get_total_products(&env),
-            active_products: storage::get_active_products(&env),
+    pub fn unpause(env: Env, caller: Address) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        if !storage::is_paused(&env) {
+            return Err(Error::ContractNotPaused);
         }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // AUTHORIZATION MANAGEMENT
-    // ═══════════════════════════════════════════════════════════════════════
-
-    /// Grant an actor the right to add tracking events to a product.
-    pub fn add_authorized_actor(
-        env: Env,
-        owner: Address,
-        product_id: String,
-        actor: Address,
-    ) -> Result<(), Error> {
-        let product = read_product(&env, &product_id)?;
-        require_owner(&product, &owner)?;
-        storage::set_auth(&env, &product_id, &actor, true);
+        storage::set_paused(&env, false);
         Ok(())
     }
 
-    /// Revoke an actor's authorization to add events to a product.
-    pub fn remove_authorized_actor(
+    pub fn transfer_admin(
         env: Env,
-        owner: Address,
-        product_id: String,
-        actor: Address,
+        current_admin: Address,
+        new_admin: Address,
     ) -> Result<(), Error> {
-        let product = read_product(&env, &product_id)?;
-        require_owner(&product, &owner)?;
-        storage::set_auth(&env, &product_id, &actor, false);
+        require_admin(&env, &current_admin)?;
+        new_admin.require_auth();
+        storage::set_admin(&env, &new_admin);
         Ok(())
     }
 
-    /// Check whether an actor is authorized to add events to a product.
-    pub fn is_authorized(env: Env, product_id: String, actor: Address) -> Result<bool, Error> {
-        let product = read_product(&env, &product_id)?;
-        if product.owner == actor {
-            return Ok(true);
-        }
-        Ok(storage::is_authorized(&env, &product_id, &actor))
-    }
-}
-
-#[contractimpl]
-impl ChainLogisticsContract {
-    // --- Authorization & Transfer ---
-
-    /// Transfer product ownership to a new address.
-    pub fn transfer_product(
+    pub fn set_multisig_contract(
         env: Env,
-        owner: Address,
-        product_id: String,
-        new_owner: Address,
+        caller: Address,
+        multisig_contract: Address,
     ) -> Result<(), Error> {
-        let mut product = read_product(&env, &product_id)?;
-        require_owner(&product, &owner)?;
-
-        new_owner.require_auth();
-
-        // Remove old owner's explicit auth entry, add new owner's
-        storage::set_auth(&env, &product_id, &owner, false);
-        storage::set_auth(&env, &product_id, &new_owner, true);
-
-        product.owner = new_owner.clone();
-        write_product(&env, &product);
-
-        env.events().publish(
-            (Symbol::new(&env, "product_transferred"), product_id),
-            (owner, new_owner),
-        );
-
+        require_admin(&env, &caller)?;
+        storage::set_multisig_contract(&env, &multisig_contract);
         Ok(())
     }
-}
 
-#[contractimpl]
-impl ChainLogisticsContract {
-    // --- Tracking Events ---
+    // Note: register_product, deactivate_product, reactivate_product,
+    // get_product, and get_stats have been extracted to ProductRegistryContract
+    // in product_registry.rs
 
-    /// Add a tracking event to a product.
+    // Note: transfer_product is now in ProductTransferContract
+    // get_product_event_ids, get_event_count are now in ProductQueryContract
+
     pub fn add_tracking_event(
         env: Env,
         actor: Address,
@@ -370,47 +149,33 @@ impl ChainLogisticsContract {
         note: String,
         metadata: Map<Symbol, String>,
     ) -> Result<u64, Error> {
+        require_not_paused(&env)?;
         let product = read_product(&env, &product_id)?;
         require_can_add_event(&env, &product_id, &product, &actor)?;
 
-        // Validate metadata limits
-        const MAX_METADATA_FIELDS: u32 = 20;
-        const MAX_METADATA_VALUE_LEN: u32 = 256;
-
-        if metadata.len() > MAX_METADATA_FIELDS {
-            return Err(Error::TooManyCustomFields);
-        }
-
-        let meta_keys = metadata.keys();
-        for i in 0..meta_keys.len() {
-            let k = meta_keys.get_unchecked(i);
-            let v = metadata.get_unchecked(k);
-            if !validation::max_len(&v, MAX_METADATA_VALUE_LEN) {
-                return Err(Error::CustomFieldValueTooLong);
-            }
-        }
+        ValidationContract::validate_event_location(&location)?;
+        ValidationContract::validate_event_note(&note)?;
+        ValidationContract::validate_metadata(&metadata)?;
 
         let event_id = storage::next_event_id(&env);
         let event = TrackingEvent {
             event_id,
             product_id: product_id.clone(),
-            actor: actor.clone(),
+            actor,
             timestamp: env.ledger().timestamp(),
             event_type: event_type.clone(),
-            location: location.clone(),
+            location,
             data_hash,
-            note: note.clone(),
-            metadata: metadata.clone(),
+            note,
+            metadata,
         };
 
         storage::put_event(&env, &event);
 
-        // Append to the product's ordered event list
         let mut ids = storage::get_product_event_ids(&env, &product_id);
         ids.push_back(event_id);
         storage::put_product_event_ids(&env, &product_id, &ids);
 
-        // Index by event type for efficient type-based filtering
         storage::index_event_by_type(&env, &product_id, &event_type, event_id);
 
         env.events().publish(
@@ -425,12 +190,10 @@ impl ChainLogisticsContract {
         Ok(event_id)
     }
 
-    /// Get a single tracking event by its numeric ID.
     pub fn get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
         storage::get_event(&env, event_id).ok_or(Error::EventNotFound)
     }
 
-    /// Get all events for a product with cursor-based pagination.
     pub fn get_product_events(
         env: Env,
         product_id: String,
@@ -442,8 +205,7 @@ impl ChainLogisticsContract {
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let total_count = all_ids.len() as u64;
 
-        let event_ids =
-            storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
+        let event_ids = storage::get_product_event_ids_paginated(&env, &product_id, offset, limit);
 
         let mut events = Vec::new(&env);
         for i in 0..event_ids.len() {
@@ -462,7 +224,6 @@ impl ChainLogisticsContract {
         })
     }
 
-    /// Get events for a product filtered by event type, with pagination.
     pub fn get_events_by_type(
         env: Env,
         product_id: String,
@@ -472,8 +233,7 @@ impl ChainLogisticsContract {
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
 
-        let total_count =
-            storage::get_event_count_by_type(&env, &product_id, &event_type);
+        let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
         let event_ids =
             storage::get_event_ids_by_type(&env, &product_id, &event_type, offset, limit);
 
@@ -494,7 +254,6 @@ impl ChainLogisticsContract {
         })
     }
 
-    /// Get events filtered by time range with pagination.
     pub fn get_events_by_time_range(
         env: Env,
         product_id: String,
@@ -539,7 +298,6 @@ impl ChainLogisticsContract {
         })
     }
 
-    /// Get events with composite filter (type + time range + location).
     pub fn get_filtered_events(
         env: Env,
         product_id: String,
@@ -560,19 +318,15 @@ impl ChainLogisticsContract {
             if let Some(event) = storage::get_event(&env, eid) {
                 let mut matches = true;
 
-                // Event type filter
                 if filter.event_type != empty_sym && event.event_type != filter.event_type {
                     matches = false;
                 }
-                // Time lower bound
                 if filter.start_time > 0 && event.timestamp < filter.start_time {
                     matches = false;
                 }
-                // Time upper bound
                 if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
                     matches = false;
                 }
-                // Location filter
                 if filter.location != empty_loc && event.location != filter.location {
                     matches = false;
                 }
@@ -605,24 +359,82 @@ impl ChainLogisticsContract {
         })
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // EVENT COUNT HELPERS
-    // ═══════════════════════════════════════════════════════════════════════
+    pub fn get_product_event_ids(env: Env, id: String) -> Result<Vec<u64>, Error> {
+        let _ = read_product(&env, &id)?;
+        Ok(storage::get_product_event_ids(&env, &id))
+    }
 
-    /// Get total event count for a product.
+    pub fn get_product_event_ids_paginated(
+        env: Env,
+        product_id: String,
+        offset: u32,
+        limit: u32,
+    ) -> Result<Vec<u64>, Error> {
+        let _ = read_product(&env, &product_id)?;
+        if limit == 0 {
+            return Ok(Vec::new(&env));
+        }
+
+        let bounded_limit = limit.min(Self::MAX_EVENT_ID_PAGE_LIMIT);
+        Ok(storage::get_product_event_ids_paginated(
+            &env,
+            &product_id,
+            offset as u64,
+            bounded_limit as u64,
+        ))
+    }
+
+    pub fn get_product_event_count(env: Env, product_id: String) -> Result<u32, Error> {
+        let _ = read_product(&env, &product_id)?;
+        Ok(storage::get_product_event_ids(&env, &product_id).len())
+    }
+
     pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
         let _ = read_product(&env, &product_id)?;
         let ids = storage::get_product_event_ids(&env, &product_id);
         Ok(ids.len() as u64)
     }
 
-    /// Get event count for a specific event type on a product.
     pub fn get_event_count_by_type(
         env: Env,
         product_id: String,
         event_type: Symbol,
     ) -> Result<u64, Error> {
         let _ = read_product(&env, &product_id)?;
-        Ok(storage::get_event_count_by_type(&env, &product_id, &event_type))
+        Ok(storage::get_event_count_by_type(
+            &env,
+            &product_id,
+            &event_type,
+        ))
+    }
+
+    // Helper to simulate a multisig contract invoking pause via as_contract
+    pub fn __simulate_multisig_pause(env: Env, caller: Address) -> Result<(), Error> {
+        Self::pause(env, caller)
+    }
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{Address, Env};
+
+    #[test]
+    fn test_multisig_invoker_can_pause() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+
+        // Register the contract as the multisig address for this test
+        let contract_id = env.register_contract(None, ChainLogisticsContract);
+        env.as_contract(&contract_id.clone(), || {
+            storage::set_admin(&env, &admin);
+            // Set multisig contract to the contract itself and use contract_id as caller
+            storage::set_multisig_contract(&env, &contract_id);
+            assert!(!storage::is_paused(&env));
+            ChainLogisticsContract::__simulate_multisig_pause(env.clone(), contract_id).unwrap();
+            assert!(storage::is_paused(&env));
+        });
     }
 }

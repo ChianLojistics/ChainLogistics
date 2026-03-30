@@ -1,6 +1,5 @@
-use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Val, Vec};
 
-/// Information captured when a product is deactivated
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeactInfo {
@@ -15,7 +14,6 @@ pub struct Origin {
     pub location: String,
 }
 
-/// Input for product registration to avoid too many function arguments
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProductConfig {
@@ -45,7 +43,7 @@ pub struct Product {
     pub certifications: Vec<BytesN<32>>,
     pub media_hashes: Vec<BytesN<32>>,
     pub custom: Map<Symbol, String>,
-    pub deactivation_info: Vec<DeactInfo>, // Use Vec as a safer Option alternative
+    pub deactivation_info: Vec<DeactInfo>,
 }
 
 #[contracttype]
@@ -56,7 +54,7 @@ pub struct TrackingEvent {
     pub actor: Address,
     pub timestamp: u64,
     pub event_type: Symbol,
-    pub location: String,
+    pub location: String, // Added missing location field
     pub data_hash: BytesN<32>,
     pub note: String,
     pub metadata: Map<Symbol, String>,
@@ -72,9 +70,19 @@ pub struct TrackingEventPage {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProductStats {
+    pub total_products: u64,
+    pub active_products: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Product(String),
     ProductEventIds(String),
+    ProductEventTimestamps(String),
+    ProductEventIdsByType(String, Symbol),
+    ProductEventIdsByActor(String, Address),
     Event(u64),
     EventSeq,
     AllProductIds,
@@ -85,13 +93,23 @@ pub enum DataKey {
     EventActorCount(String, Address),
     TotalProducts,
     ActiveProducts,
+    SearchIndex(IndexKey), // For product search functionality
+    ContractVersion,       // Current contract version
+    UpgradeInfo,           // Current upgrade information
+    UpgradeStatus,         // Current upgrade status
+    EmergencyPause,        // Emergency pause flag
+    MultiSigConfig,        // Multi-signature configuration
+    Proposal(u64),         // Proposal by ID
+    NextProposalId,        // Next proposal ID counter
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProductStats {
-    pub total_products: u64,
-    pub active_products: u64,
+pub struct TrackingEventInput {
+    pub product_id: String,
+    pub event_type: Symbol,
+    pub data_hash: BytesN<32>,
+    pub note: String,
 }
 
 #[contracttype]
@@ -101,4 +119,58 @@ pub struct TrackingEventFilter {
     pub start_time: u64,
     pub end_time: u64,
     pub location: String,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IndexKey {
+    Keyword(String), // keyword -> Vec<product_id>
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractVersion {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeInfo {
+    pub new_version: ContractVersion,
+    pub new_contract_address: Address,
+    pub upgrade_timestamp: u64,
+    pub upgraded_by: Address,
+    pub migration_required: bool,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum UpgradeStatus {
+    NotStarted,
+    InProgress,
+    Completed,
+    Failed,
+}
+
+// ─── Multi-Signature Types ─────────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultiSigConfig {
+    pub signers: Vec<Address>,
+    pub threshold: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Proposal {
+    pub id: u64,
+    pub kind: Symbol, // "transfer_admin", "initiate_upgrade", "complete_upgrade", "fail_upgrade", "pause", "unpause"
+    pub args: Vec<Val>,
+    pub proposer: Address,
+    pub created_at: u64,
+    pub executed: bool,
+    pub approvals: Vec<Address>,
 }

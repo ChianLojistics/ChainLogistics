@@ -1,110 +1,77 @@
 use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
-use crate::types::{DataKey, Product, TrackingEvent};
+use crate::storage_contract::StorageContract;
+use crate::types::{Product, TrackingEvent};
+
+pub fn get_auth_contract(env: &Env) -> Option<Address> {
+    StorageContract::get_auth_contract(env)
+}
+
+pub fn set_auth_contract(env: &Env, address: &Address) {
+    StorageContract::set_auth_contract(env, address)
+}
+
+pub fn get_multisig_contract(env: &Env) -> Option<Address> {
+    StorageContract::get_multisig_contract(env)
+}
+
+pub fn set_multisig_contract(env: &Env, address: &Address) {
+    StorageContract::set_multisig_contract(env, address)
+}
 
 // ─── Product ────────────────────────────────────────────────────────────────
 
 pub fn has_product(env: &Env, product_id: &String) -> bool {
-    env.storage()
-        .persistent()
-        .has(&DataKey::Product(product_id.clone()))
+    StorageContract::has_product(env, product_id)
 }
 
 pub fn put_product(env: &Env, product: &Product) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::Product(product.id.clone()), product);
+    StorageContract::put_product(env, product)
 }
 
 pub fn get_product(env: &Env, product_id: &String) -> Option<Product> {
-    env.storage()
-        .persistent()
-        .get(&DataKey::Product(product_id.clone()))
+    StorageContract::get_product(env, product_id)
 }
 
 // ─── Event IDs per product ───────────────────────────────────────────────────
 
 pub fn put_product_event_ids(env: &Env, product_id: &String, ids: &Vec<u64>) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::ProductEventIds(product_id.clone()), ids);
+    StorageContract::put_product_event_ids(env, product_id, ids)
 }
 
 pub fn get_product_event_ids(env: &Env, product_id: &String) -> Vec<u64> {
-    env.storage()
-        .persistent()
-        .get(&DataKey::ProductEventIds(product_id.clone()))
-        .unwrap_or(Vec::new(env))
+    StorageContract::get_product_event_ids(env, product_id)
 }
 
-/// Returns a paginated slice of event IDs for a product.
 pub fn get_product_event_ids_paginated(
     env: &Env,
     product_id: &String,
     offset: u64,
     limit: u64,
 ) -> Vec<u64> {
-    let all_ids = get_product_event_ids(env, product_id);
-    let total = all_ids.len() as u64;
-
-    let mut result = Vec::new(env);
-
-    if offset >= total {
-        return result;
-    }
-
-    let end = ((offset + limit) as u32).min(all_ids.len());
-    let start = offset as u32;
-
-    for i in start..end {
-        result.push_back(all_ids.get_unchecked(i));
-    }
-
-    result
+    StorageContract::get_product_event_ids_paginated(env, product_id, offset, limit)
 }
 
 // ─── Events ─────────────────────────────────────────────────────────────────
 
 pub fn put_event(env: &Env, event: &TrackingEvent) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::Event(event.event_id), event);
+    StorageContract::put_event(env, event)
 }
 
 pub fn get_event(env: &Env, event_id: u64) -> Option<TrackingEvent> {
-    env.storage().persistent().get(&DataKey::Event(event_id))
+    StorageContract::get_event(env, event_id)
 }
 
 pub fn next_event_id(env: &Env) -> u64 {
-    let mut seq: u64 = env
-        .storage()
-        .persistent()
-        .get(&DataKey::EventSeq)
-        .unwrap_or(0);
-    seq += 1;
-    env.storage().persistent().set(&DataKey::EventSeq, &seq);
-    seq
+    StorageContract::next_event_id(env)
 }
 
 // ─── Event type index ────────────────────────────────────────────────────────
 
-/// Index an event ID under its event_type for efficient filtering.
-pub fn index_event_by_type(
-    env: &Env,
-    product_id: &String,
-    event_type: &Symbol,
-    event_id: u64,
-) {
-    let count_key = DataKey::EventTypeCount(product_id.clone(), event_type.clone());
-    let mut count: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
-    count += 1;
-    env.storage().persistent().set(&count_key, &count);
-
-    let index_key = DataKey::EventTypeIndex(product_id.clone(), event_type.clone(), count);
-    env.storage().persistent().set(&index_key, &event_id);
+pub fn index_event_by_type(env: &Env, product_id: &String, event_type: &Symbol, event_id: u64) {
+    StorageContract::index_event_by_type(env, product_id, event_type, event_id)
 }
 
-/// Returns paginated event IDs for a given product + event_type.
 pub fn get_event_ids_by_type(
     env: &Env,
     product_id: &String,
@@ -112,83 +79,102 @@ pub fn get_event_ids_by_type(
     offset: u64,
     limit: u64,
 ) -> Vec<u64> {
-    let count_key = DataKey::EventTypeCount(product_id.clone(), event_type.clone());
-    let total: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
-
-    let mut result = Vec::new(env);
-
-    if offset >= total {
-        return result;
-    }
-
-    let start = offset + 1; // 1-based
-    let end = (start + limit).min(total + 1);
-
-    for i in start..end {
-        let index_key = DataKey::EventTypeIndex(product_id.clone(), event_type.clone(), i);
-        if let Some(event_id) = env
-            .storage()
-            .persistent()
-            .get::<DataKey, u64>(&index_key)
-        {
-            result.push_back(event_id);
-        }
-    }
-
-    result
+    StorageContract::get_event_ids_by_type(env, product_id, event_type, offset, limit)
 }
 
-/// Returns the total number of events of a given type for a product.
 pub fn get_event_count_by_type(env: &Env, product_id: &String, event_type: &Symbol) -> u64 {
-    let count_key = DataKey::EventTypeCount(product_id.clone(), event_type.clone());
-    env.storage().persistent().get(&count_key).unwrap_or(0)
+    StorageContract::get_event_count_by_type(env, product_id, event_type)
 }
 
 // ─── Authorization ───────────────────────────────────────────────────────────
 
 pub fn set_auth(env: &Env, product_id: &String, actor: &Address, value: bool) {
-    if value {
-        env.storage()
-            .persistent()
-            .set(&DataKey::Auth(product_id.clone(), actor.clone()), &true);
-    } else {
-        env.storage()
-            .persistent()
-            .remove(&DataKey::Auth(product_id.clone(), actor.clone()));
-    }
+    StorageContract::set_auth(env, product_id, actor, value)
 }
 
 pub fn is_authorized(env: &Env, product_id: &String, actor: &Address) -> bool {
-    env.storage()
-        .persistent()
-        .get(&DataKey::Auth(product_id.clone(), actor.clone()))
-        .unwrap_or(false)
+    StorageContract::is_authorized(env, product_id, actor)
+}
+
+// ─── Global Management ───────────────────────────────────────────────────────
+
+pub fn has_admin(env: &Env) -> bool {
+    StorageContract::has_admin(env)
+}
+
+pub fn get_admin(env: &Env) -> Option<Address> {
+    StorageContract::get_admin(env)
+}
+
+pub fn set_admin(env: &Env, admin: &Address) {
+    StorageContract::set_admin(env, admin)
+}
+
+pub fn is_paused(env: &Env) -> bool {
+    StorageContract::is_paused(env)
+}
+
+pub fn set_paused(env: &Env, paused: bool) {
+    StorageContract::set_paused(env, paused)
 }
 
 // ─── Global counters ─────────────────────────────────────────────────────────
 
 pub fn get_total_products(env: &Env) -> u64 {
-    env.storage()
-        .instance()
-        .get(&DataKey::TotalProducts)
-        .unwrap_or(0)
+    StorageContract::get_total_products(env)
 }
 
 pub fn set_total_products(env: &Env, count: u64) {
-    env.storage()
-        .instance()
-        .set(&DataKey::TotalProducts, &count);
+    StorageContract::set_total_products(env, count)
 }
 
 pub fn get_active_products(env: &Env) -> u64 {
-    env.storage()
-        .instance()
-        .get(&DataKey::ActiveProducts)
-        .unwrap_or(0)
+    StorageContract::get_active_products(env)
 }
 
 pub fn set_active_products(env: &Env, count: u64) {
+    StorageContract::set_active_products(env, count)
+}
+
+// ─── Search Index ───────────────────────────────────────────────────────────
+
+pub fn put_search_index(env: &Env, keyword: &String, product_ids: &Vec<String>) {
+    env.storage().persistent().set(
+        &crate::types::DataKey::SearchIndex(crate::types::IndexKey::Keyword(keyword.clone())),
+        product_ids,
+    );
+}
+
+pub fn get_search_index(env: &Env, keyword: &String) -> Vec<String> {
     env.storage()
-        .instance()
-        .set(&DataKey::ActiveProducts, &count);
+        .persistent()
+        .get(&crate::types::DataKey::SearchIndex(
+            crate::types::IndexKey::Keyword(keyword.clone()),
+        ))
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn add_to_search_index(env: &Env, keyword: String, product_id: &String) {
+    let mut ids = get_search_index(env, &keyword);
+    if !ids.contains(product_id) {
+        ids.push_back(product_id.clone());
+        put_search_index(env, &keyword, &ids);
+    }
+}
+
+pub fn remove_from_search_index(env: &Env, keyword: String, product_id: &String) {
+    let mut ids = get_search_index(env, &keyword);
+    let mut found = false;
+    let mut i = 0;
+    while i < ids.len() {
+        if ids.get(i).unwrap() == product_id.clone() {
+            ids.remove(i);
+            found = true;
+            break;
+        }
+        i += 1;
+    }
+    if found {
+        put_search_index(env, &keyword, &ids);
+    }
 }
