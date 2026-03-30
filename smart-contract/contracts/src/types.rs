@@ -77,9 +77,12 @@ pub enum DataKey {
     ProductEventIds(String),
     Event(u64),
     EventSeq,
+    AllProductIds,
     Auth(String, Address),
     EventTypeIndex(String, Symbol, u64),
     EventTypeCount(String, Symbol),
+    EventActorIndex(String, Address, u64),
+    EventActorCount(String, Address),
     TotalProducts,
     ActiveProducts,
 }
