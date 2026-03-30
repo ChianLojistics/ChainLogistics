@@ -40,6 +40,8 @@ mod stats;
 mod tracking;
 #[cfg(not(target_arch = "wasm32"))]
 mod upgrade;
+#[cfg(not(target_arch = "wasm32"))]
+mod sustainability;
 
 #[cfg(test)]
 mod load_tests;
@@ -76,3 +78,5 @@ pub use stats::*;
 pub use tracking::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use upgrade::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use sustainability::*;

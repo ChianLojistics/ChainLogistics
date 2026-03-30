@@ -1,7 +1,7 @@
 use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
 use crate::storage_contract::StorageContract;
-use crate::types::{Product, TrackingEvent};
+use crate::types::{Product, SustainabilityRecord, TrackingEvent};
 
 pub fn get_auth_contract(env: &Env) -> Option<Address> {
     StorageContract::get_auth_contract(env)
@@ -177,4 +177,18 @@ pub fn remove_from_search_index(env: &Env, keyword: String, product_id: &String)
     if found {
         put_search_index(env, &keyword, &ids);
     }
+}
+
+// ─── Sustainability ──────────────────────────────────────────────────────────
+
+pub fn put_sustainability(env: &Env, product_id: &String, record: &SustainabilityRecord) {
+    StorageContract::put_sustainability(env, product_id, record)
+}
+
+pub fn get_sustainability(env: &Env, product_id: &String) -> Option<SustainabilityRecord> {
+    StorageContract::get_sustainability(env, product_id)
+}
+
+pub fn has_sustainability(env: &Env, product_id: &String) -> bool {
+    StorageContract::has_sustainability(env, product_id)
 }

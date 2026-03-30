@@ -59,4 +59,20 @@ pub enum Error {
     InvalidThreshold = 66,
     TooManySigners = 67,
     DuplicateSigner = 68,
+
+    // --- Sustainability (70-80) ---
+    /// No sustainability record exists for this product.
+    SustainabilityNotFound = 70,
+    /// Carbon footprint value is negative.
+    InvalidCarbonData = 71,
+    /// Water usage value is negative.
+    InvalidWaterData = 72,
+    /// Renewable energy percentage is out of range (must be 0–100).
+    InvalidRenewableEnergyData = 73,
+    /// Waste-recycled percentage is out of range (must be 0–100).
+    InvalidWasteData = 74,
+    /// Record has already been verified and cannot be updated.
+    SustainabilityAlreadyVerified = 75,
+    /// Operation requires a verified sustainability record.
+    SustainabilityClaimUnverified = 76,
 }

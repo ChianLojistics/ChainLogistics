@@ -1,6 +1,6 @@
 use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
-use crate::types::{DataKey, Product, TrackingEvent};
+use crate::types::{DataKey, Product, SustainabilityRecord, TrackingEvent};
 
 pub struct StorageContract;
 
@@ -278,6 +278,30 @@ impl StorageContract {
         env.storage()
             .instance()
             .set(&Self::active_products_key(), &count);
+    }
+
+    // ─── Sustainability ──────────────────────────────────────────────────────
+
+    pub fn sustainability_key(product_id: &String) -> DataKey {
+        DataKey::Sustainability(product_id.clone())
+    }
+
+    pub fn put_sustainability(env: &Env, product_id: &String, record: &SustainabilityRecord) {
+        env.storage()
+            .instance()
+            .set(&Self::sustainability_key(product_id), record);
+    }
+
+    pub fn get_sustainability(env: &Env, product_id: &String) -> Option<SustainabilityRecord> {
+        env.storage()
+            .instance()
+            .get(&Self::sustainability_key(product_id))
+    }
+
+    pub fn has_sustainability(env: &Env, product_id: &String) -> bool {
+        env.storage()
+            .instance()
+            .has(&Self::sustainability_key(product_id))
     }
 }
 
