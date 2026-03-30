@@ -17,6 +17,7 @@ mod docs;
 mod blockchain;
 mod websocket;
 mod compliance;
+mod validation;
 
 use config::Config;
 use database::Database;

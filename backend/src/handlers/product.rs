@@ -11,6 +11,7 @@ use crate::{
     AppState,
     error::AppError,
     models::{Product, NewProduct, ProductFilters},
+    validation::{validate_string, sanitize_input},
 };
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -187,16 +188,25 @@ pub async fn create_product(
     State(state): State<AppState>,
     Json(request): Json<CreateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
+    // Validate inputs
+    validate_string("id", &request.id, 64)?;
+    validate_string("name", &request.name, 128)?;
+    validate_string("category", &request.category, 64)?;
+    validate_string("origin_location", &request.origin_location, 256)?;
+    if request.description.len() > 2048 {
+        return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
+    }
+
     // Get auth context
     let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
-    
+
     let new_product = NewProduct {
-        id: request.id,
-        name: request.name,
-        description: request.description,
-        origin_location: request.origin_location,
-        category: request.category,
-        tags: request.tags,
+        id: sanitize_input(&request.id),
+        name: sanitize_input(&request.name),
+        description: sanitize_input(&request.description),
+        origin_location: sanitize_input(&request.origin_location),
+        category: sanitize_input(&request.category),
+        tags: request.tags.iter().map(|t| sanitize_input(t)).collect(),
         certifications: request.certifications,
         media_hashes: request.media_hashes,
         custom_fields: request.custom_fields,
