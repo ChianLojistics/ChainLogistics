@@ -54,6 +54,10 @@ mod test_error_coverage;
 #[cfg(test)]
 mod test_integration;
 
+#[cfg(test)]
+#[path = "test/integration_tests.rs"]
+mod integration_tests;
+
 pub use authorization::*;
 pub use contract::*;
 pub use error::*;
