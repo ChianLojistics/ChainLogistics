@@ -3,6 +3,8 @@ use sqlx::PgPool;
 use chrono::{DateTime, Utc};
 use crate::services::{SyncService, ProductService, EventService};
 
+pub mod aggregation;
+
 pub struct BackupService {
     pool: PgPool,
 }
