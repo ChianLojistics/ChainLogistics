@@ -20,7 +20,7 @@ mod compliance;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService};
 use utils::CronService;
 use error::AppError;
 
@@ -33,6 +33,7 @@ pub struct AppState {
     pub api_key_service: Arc<ApiKeyService>,
     pub sync_service: Arc<SyncService>,
     pub financial_service: Arc<FinancialService>,
+    pub analytics_service: Arc<AnalyticsService>,
     pub config: Config,
 }
 
@@ -53,6 +54,10 @@ impl AppState {
         let api_key_service = Arc::new(ApiKeyService::new(db.pool().clone()));
         let sync_service = Arc::new(SyncService::new(db.pool().clone()));
         let financial_service = Arc::new(FinancialService::new(db.pool().clone()));
+        let analytics_service = Arc::new(AnalyticsService::new(
+            db.pool().clone(),
+            config.redis.url.clone(),
+        ));
 
         Ok(Self {
             db,
@@ -62,6 +67,7 @@ impl AppState {
             api_key_service,
             sync_service,
             financial_service,
+            analytics_service,
             config,
         })
     }

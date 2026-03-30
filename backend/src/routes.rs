@@ -1,10 +1,13 @@
 use axum::{Router, routing::{get, post, put, delete}, middleware};
 use super::AppState;
 
+pub mod analytics;
+
 pub fn api_routes() -> Router<AppState> {
     Router::new()
         .nest("/api/v1", public_api_routes())
         .nest("/api/v1/admin", admin_api_routes())
+        .nest("/api/v1/analytics", analytics_routes())
 }
 
 fn public_api_routes() -> Router<AppState> {
@@ -45,4 +48,15 @@ pub fn health_routes() -> Router<AppState> {
     Router::new()
         .route("/health", get(crate::handlers::health::health_check))
         .route("/health/db", get(crate::handlers::health::db_health_check))
+}
+
+fn analytics_routes() -> Router<AppState> {
+    Router::new()
+        .route("/dashboard", get(crate::routes::analytics::dashboard))
+        .route("/products/:id", get(crate::routes::analytics::product_analytics))
+        .route("/events", get(crate::routes::analytics::event_analytics))
+        .route("/users", get(crate::routes::analytics::user_analytics))
+        .route("/export", get(crate::routes::analytics::export))
+        .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }

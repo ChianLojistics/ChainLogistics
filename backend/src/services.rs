@@ -8,6 +8,9 @@ use bcrypt::{hash, DEFAULT_COST};
 pub mod financial;
 pub use financial::FinancialService;
 
+pub mod analytics_service;
+pub use analytics_service::AnalyticsService;
+
 pub struct ProductService {
     pool: PgPool,
 }
