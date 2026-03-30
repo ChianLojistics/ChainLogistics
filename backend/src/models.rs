@@ -4,6 +4,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 pub mod analytics;
+pub mod carbon;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Product {
