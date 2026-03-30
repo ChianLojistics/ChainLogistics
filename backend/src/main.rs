@@ -21,7 +21,11 @@ mod compliance;
 
 use config::Config;
 use database::Database;
+ 
 use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, ResilienceService};
+
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService};
+
 use utils::CronService;
 use error::AppError;
 
@@ -35,7 +39,9 @@ pub struct AppState {
     pub sync_service: Arc<SyncService>,
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
+ Chain-Resilience
     pub resilience_service: Arc<ResilienceService>,
+    pub carbon_service: Arc<CarbonService>,
     pub config: Config,
 }
 
@@ -60,7 +66,9 @@ impl AppState {
             db.pool().clone(),
             config.redis.url.clone(),
         ));
+ 
         let resilience_service = Arc::new(ResilienceService::new(db.pool().clone()));
+        let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
 
         Ok(Self {
             db,
@@ -71,7 +79,11 @@ impl AppState {
             sync_service,
             financial_service,
             analytics_service,
+ 
             resilience_service,
+
+            carbon_service,
+ 
             config,
         })
     }
