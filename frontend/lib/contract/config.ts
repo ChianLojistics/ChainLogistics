@@ -16,7 +16,7 @@ export const CONTRACT_CONFIG = {
 export function validateContractConfig(): void {
   if (!CONTRACT_CONFIG.CONTRACT_ID) {
     throw new Error(
-      "Contract ID not configured. Set NEXT_PUBLIC_CONTRACT_ID in your .env.local file."
+      "Missing contract configuration: NEXT_PUBLIC_CONTRACT_ID is not set. Add it to your .env.local (or CI environment) and restart the dev server."
     );
   }
 }
