@@ -11,6 +11,9 @@ pub use financial::FinancialService;
 pub mod analytics_service;
 pub use analytics_service::AnalyticsService;
 
+pub mod digital_twin_service;
+pub use digital_twin_service::DigitalTwinService;
+
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {
