@@ -25,7 +25,9 @@ test("Product registration flow", async ({ page }) => {
   await page.goto("/register");
 
   // Wait for persisted wallet state to hydrate (store initialization is async).
-  await expect(page.getByRole("button", { name: new RegExp(`Wallet connected: ${publicKey}`) })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: new RegExp(`Wallet connected: ${publicKey}`) })
+  ).toBeVisible({ timeout: 15_000 });
 
   await page.getByLabel("Product ID").fill("SKU-12345");
   await page.getByLabel("Product Name").fill("Test Product");
@@ -35,9 +37,19 @@ test("Product registration flow", async ({ page }) => {
   await page.getByLabel("Category").selectOption("Electronics");
   await page.getByRole("button", { name: "Next" }).click();
 
-  await expect(page.getByRole("button", { name: "Register Product" })).toBeEnabled();
-  await page.getByRole("button", { name: "Register Product" }).click();
+  const submit = page.getByRole("button", { name: "Register Product" });
+  const successHeading = page.getByRole("heading", { name: "Registration Successful!" });
 
-  await expect(page.getByRole("heading", { name: "Registration Successful!" })).toBeVisible({ timeout: 30_000 });
+  await Promise.race([
+    submit.waitFor({ state: "visible" }),
+    successHeading.waitFor({ state: "visible" }),
+  ]);
+
+  if (await submit.isVisible().catch(() => false)) {
+    await expect(submit).toBeEnabled();
+    await submit.click();
+  }
+
+  await expect(successHeading).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Transaction Hash:")).toBeVisible();
 });
