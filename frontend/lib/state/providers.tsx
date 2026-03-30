@@ -13,7 +13,8 @@ function ContractConfigGuard() {
     try {
       validateContractConfig();
     } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
+      const nextError = err instanceof Error ? err : new Error(String(err));
+      Promise.resolve().then(() => setError(nextError));
     }
   }, []);
 
