@@ -4,6 +4,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 pub mod analytics;
+pub mod carbon;
 pub mod digital_twin;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

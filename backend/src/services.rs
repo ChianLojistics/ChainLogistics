@@ -11,6 +11,10 @@ pub use financial::FinancialService;
 pub mod analytics_service;
 pub use analytics_service::AnalyticsService;
 
+pub mod carbon_calculator;
+pub mod carbon;
+pub use carbon::CarbonService;
+
 pub mod digital_twin_service;
 pub use digital_twin_service::DigitalTwinService;
 
