@@ -1,7 +1,0 @@
-    Blocking waiting for file lock on package cache
-    Updating crates.io index
-error: no matching package found
-searched package name: `stellar-sdk`
-perhaps you meant:      stellar_sdk
-location searched: crates.io index
-required by package `chainlojistic-backend v0.1.0 (/home/lynndabel/Nemenwa/ChainLogistics/backend)`

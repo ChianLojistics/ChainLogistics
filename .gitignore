@@ -1,4 +1,26 @@
-smart-contract/contracts/src/simple_test.rs
+# Rust
+/backend/target/
+/sdk/rust/target/
+**/*.rs.bk
+Cargo.lock
+
+# Node.js
+/frontend/node_modules/
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Others
 smart-contract/contracts/test_snapshots/
 issue.md
 checks.md
