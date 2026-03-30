@@ -1,10 +1,10 @@
 use soroban_sdk::{log, testutils::Address as _, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::{
-    AuthorizationContract, AuthorizationContractClient, Error, EventQueryContract,
-    EventQueryContractClient, ProductConfig, ProductRegistryContract,
-    ProductRegistryContractClient, ProductTransferContract, ProductTransferContractClient,
-    TrackingContract, TrackingContractClient, ChainLogisticsContract, ChainLogisticsContractClient,
+    AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract,
+    ChainLogisticsContractClient, Error, EventQueryContract, EventQueryContractClient,
+    ProductConfig, ProductRegistryContract, ProductRegistryContractClient, ProductTransferContract,
+    ProductTransferContractClient, TrackingContract, TrackingContractClient,
 };
 
 fn setup(
@@ -244,7 +244,8 @@ fn error_cases_integration() {
     let blocked = transfer.try_transfer_product(&owner, &id, &new_owner);
     assert_eq!(blocked, Err(Ok(Error::ProductDeactivated)));
 
-    let missing = query.try_query_get_product_events(&String::from_str(&env, "MISSING"), &0u64, &10u64);
+    let missing =
+        query.try_query_get_product_events(&String::from_str(&env, "MISSING"), &0u64, &10u64);
     assert_eq!(missing, Err(Ok(Error::ProductNotFound)));
 
     let unauthorized = auth.try_add_authorized_actor(&attacker, &id, &attacker);
