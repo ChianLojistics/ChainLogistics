@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { TransactionBuilder, Networks, BASE_FEE, Asset, Operation } from "@stellar/stellar-sdk";
-import { signWithFreighter } from "../stellar/wallet";
+import { PRODUCT_REGISTRATION_DELAY_MS } from "@/lib/constants";
 
 export type ProductData = {
     id: string;
@@ -9,9 +7,6 @@ export type ProductData = {
     description?: string;
     category: string;
 };
-
-// Placeholder for contract ID or anchor address
-const PRODUCT_CONTRACT_ID = process.env.NEXT_PUBLIC_PRODUCT_CONTRACT_ID || "";
 
 export async function registerProductOnChain(
     publicKey: string,
@@ -22,12 +17,15 @@ export async function registerProductOnChain(
     // to build a transaction that could be used for this.
 
     // This is a placeholder for actual Soroban contract invocation.
-    // In a real scenario, you'd use `new Contract(PRODUCT_CONTRACT_ID).call("register", ...)`
+    // In a real scenario, you'd use `new Contract(CONTRACT_CONFIG.CONTRACT_ID).call("register", ...)`
 
-    console.log("Registering product on chain:", data);
+    // Validate contract configuration
+    if (!publicKey || !data.id) {
+        throw new Error('Invalid contract parameters');
+    }
 
     // Simulate a delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, PRODUCT_REGISTRATION_DELAY_MS));
 
     // Return a mock transaction hash
     return "t_" + Math.random().toString(36).substring(2, 15);

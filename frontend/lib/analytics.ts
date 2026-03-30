@@ -6,12 +6,22 @@ type MonitoringEventType =
   | "error"
   | "performance_budget_breach";
 
+/** Structured data attached to monitoring payloads. */
+export type MonitoringData = Record<string, string | number | boolean | undefined>;
+
 type MonitoringPayload = {
   type: MonitoringEventType;
   timestamp: string;
   route?: string;
   environment: string;
-  data: Record<string, unknown>;
+  data: MonitoringData;
+};
+
+/** Context attached to a performance-budget alert. */
+export type BudgetAlertContext = {
+  method?: string;
+  success?: boolean;
+  [key: string]: string | number | boolean | undefined;
 };
 
 export type PerformanceBudgetAlert = {
@@ -20,7 +30,7 @@ export type PerformanceBudgetAlert = {
   value: number;
   warningThreshold: number;
   criticalThreshold: number;
-  context?: Record<string, unknown>;
+  context?: BudgetAlertContext;
 };
 
 const WEB_VITAL_BUDGETS = {
@@ -59,7 +69,7 @@ function checkBudget(
   metric: string,
   value: number,
   thresholds: { warning: number; critical: number },
-  context?: Record<string, unknown>
+  context?: BudgetAlertContext
 ): void {
   let severity: "warning" | "critical" | null = null;
 
@@ -84,14 +94,19 @@ function checkBudget(
   void sendMonitoringPayload({
     type: "performance_budget_breach",
     data: {
-      ...alert,
+      metric: alert.metric,
+      severity: alert.severity,
+      value: alert.value,
+      warningThreshold: alert.warningThreshold,
+      criticalThreshold: alert.criticalThreshold,
+      ...alert.context,
     },
   });
 }
 
 async function sendMonitoringPayload(event: {
   type: MonitoringEventType;
-  data: Record<string, unknown>;
+  data: MonitoringData;
 }): Promise<void> {
   const payload: MonitoringPayload = {
     type: event.type,
@@ -157,7 +172,7 @@ export function trackContractInteraction(params: {
   durationMs: number;
   success: boolean;
   errorMessage?: string;
-  context?: Record<string, unknown>;
+  context?: BudgetAlertContext;
 }): void {
   const durationMs = Number(params.durationMs);
   void sendMonitoringPayload({
@@ -177,7 +192,7 @@ export function trackContractInteraction(params: {
   });
 }
 
-export function trackError(error: unknown, context?: Record<string, unknown>): void {
+export function trackError(error: unknown, context?: MonitoringData): void {
   const normalizedError =
     error instanceof Error
       ? {

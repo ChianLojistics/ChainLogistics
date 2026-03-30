@@ -1,4 +1,5 @@
 import { isConnected, getAddress, requestAccess, signTransaction } from "@stellar/freighter-api";
+import { WALLET_CONNECTION_TIMEOUT_MS } from "@/lib/constants";
 
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -39,7 +40,7 @@ export async function connectWallet(): Promise<WalletConnectionResult> {
   try {
     const { address, error } = await withTimeout(
       requestAccess(),
-      20000,
+      WALLET_CONNECTION_TIMEOUT_MS,
       "Wallet connection timed out. Check that Freighter is installed/unlocked and that the popup wasn't blocked."
     );
     if (error || !address) {
@@ -64,15 +65,25 @@ export async function disconnectWallet(): Promise<void> {
 export async function getFreighterNetwork(): Promise<"testnet" | "mainnet" | "futurenet" | null> {
   try {
     const freighterApi = await import("@stellar/freighter-api");
-    const anyApi = freighterApi as unknown as {
-      getNetwork?: () => Promise<Record<string, unknown>>;
-      getNetworkDetails?: () => Promise<Record<string, unknown>>;
+
+    /** Shape returned by Freighter's network detail helpers. */
+    type FreighterNetworkResponse = {
+      error?: string;
+      networkPassphrase?: string;
+      passphrase?: string;
+      networkName?: string;
+      network?: string;
+      networkUrl?: string;
     };
 
-    const getErrorString = (res: unknown): string | null => {
+    const anyApi = freighterApi as unknown as {
+      getNetwork?: () => Promise<FreighterNetworkResponse>;
+      getNetworkDetails?: () => Promise<FreighterNetworkResponse>;
+    };
+
+    const getErrorString = (res: FreighterNetworkResponse | null | undefined): string | null => {
       if (!res || typeof res !== "object") return null;
-      const record = res as Record<string, unknown>;
-      return typeof record.error === "string" && record.error ? record.error : null;
+      return typeof res.error === "string" && res.error ? res.error : null;
     };
 
     const normalize = (value: string) => {
@@ -86,7 +97,7 @@ export async function getFreighterNetwork(): Promise<"testnet" | "mainnet" | "fu
       return null;
     };
 
-    const pickNetworkString = (res: Record<string, unknown>): string => {
+    const pickNetworkString = (res: FreighterNetworkResponse): string => {
       const candidates = [
         res.networkPassphrase,
         res.passphrase,
@@ -106,7 +117,7 @@ export async function getFreighterNetwork(): Promise<"testnet" | "mainnet" | "fu
       if (getErrorString(res)) {
         return null;
       }
-      const rawValue = res && typeof res === "object" ? pickNetworkString(res as Record<string, unknown>) : "";
+      const rawValue = res && typeof res === "object" ? pickNetworkString(res) : "";
       return normalize(rawValue) ?? null;
     }
 
@@ -115,7 +126,7 @@ export async function getFreighterNetwork(): Promise<"testnet" | "mainnet" | "fu
       if (getErrorString(res)) {
         return null;
       }
-      const rawValue = res && typeof res === "object" ? pickNetworkString(res as Record<string, unknown>) : "";
+      const rawValue = res && typeof res === "object" ? pickNetworkString(res) : "";
       return normalize(rawValue) ?? null;
     }
 
