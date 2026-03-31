@@ -101,6 +101,12 @@ pub enum DataKey {
     MultiSigConfig,        // Multi-signature configuration
     Proposal(u64),         // Proposal by ID
     NextProposalId,        // Next proposal ID counter
+    Admin,                 // Admin address
+    Paused,                // Pause status
+    AuthContract,          // Authorization contract address
+    MainContract,          // Main contract address
+    TransferContract,      // Transfer contract address
+    MultiSigContract,      // Multisig contract address
 }
 
 #[contracttype]
