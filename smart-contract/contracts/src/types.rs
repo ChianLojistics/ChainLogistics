@@ -85,15 +85,12 @@ pub enum DataKey {
     ProductEventIdsByActor(String, Address),
     Event(u64),
     EventSeq,
+    AllProductIds,
+    Auth(String, Address),
     EventTypeIndex(String, Symbol, u64),
     EventTypeCount(String, Symbol),
-    Auth(String, Address),
-    Admin,
-    Paused,
-    AuthContract, // Added for cross-contract delegation
-    MainContract, // Added for ProductTransferContract
-    TransferContract,
-    MultiSigContract, // Multi-signature contract address
+    EventActorIndex(String, Address, u64),
+    EventActorCount(String, Address),
     TotalProducts,
     ActiveProducts,
     SearchIndex(IndexKey), // For product search functionality
@@ -104,6 +101,12 @@ pub enum DataKey {
     MultiSigConfig,        // Multi-signature configuration
     Proposal(u64),         // Proposal by ID
     NextProposalId,        // Next proposal ID counter
+    Admin,                 // Admin address
+    Paused,                // Pause status
+    AuthContract,          // Authorization contract address
+    MainContract,          // Main contract address
+    TransferContract,      // Transfer contract address
+    MultiSigContract,      // Multisig contract address
 }
 
 #[contracttype]
