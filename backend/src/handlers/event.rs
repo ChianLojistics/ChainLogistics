@@ -9,6 +9,7 @@ use crate::{
     AppState,
     error::AppError,
     models::{TrackingEvent, NewTrackingEvent},
+    validation::{validate_string, validate_stellar_address, sanitize_input},
 };
 
 #[derive(Debug, Deserialize)]
@@ -110,18 +111,42 @@ pub async fn list_events(
     }))
 }
 
+const ALLOWED_EVENT_TYPES: &[&str] = &[
+    "HARVEST", "PROCESS", "PACKAGE", "SHIP", "RECEIVE",
+    "QUALITY_CHECK", "TRANSFER", "REGISTER", "CHECKPOINT",
+];
+
 pub async fn create_event(
     State(state): State<AppState>,
     Json(request): Json<CreateEventRequest>,
 ) -> Result<Json<EventResponse>, AppError> {
+    // Validate inputs
+    validate_string("product_id", &request.product_id, 64)?;
+    validate_stellar_address(&request.actor_address)?;
+    validate_string("location", &request.location, 256)?;
+    if request.note.len() > 256 {
+        return Err(AppError::Validation("note must not exceed 256 characters".to_string()));
+    }
+    if !ALLOWED_EVENT_TYPES.contains(&request.event_type.as_str()) {
+        return Err(AppError::Validation(format!(
+            "Invalid event_type '{}'. Allowed: {}",
+            request.event_type,
+            ALLOWED_EVENT_TYPES.join(", ")
+        )));
+    }
+    // Reject future timestamps
+    if request.timestamp > chrono::Utc::now() {
+        return Err(AppError::Validation("timestamp must not be in the future".to_string()));
+    }
+
     let new_event = NewTrackingEvent {
-        product_id: request.product_id,
+        product_id: sanitize_input(&request.product_id),
         actor_address: request.actor_address,
         timestamp: request.timestamp,
         event_type: request.event_type,
-        location: request.location,
+        location: sanitize_input(&request.location),
         data_hash: request.data_hash,
-        note: request.note,
+        note: sanitize_input(&request.note),
         metadata: request.metadata,
     };
 
