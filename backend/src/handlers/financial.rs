@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use crate::AppState;
 use crate::validation::{validate_amount, validate_string};
+use crate::middleware::auth::AuthContext;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTransactionRequest {
@@ -26,8 +27,15 @@ pub struct FinancingRequestBody {
     pub amount: String,
 }
 
+/// Create a new financial transaction for the authenticated user.
+///
+/// This handler:
+/// - Validates request fields (length/format)
+/// - Extracts the authenticated user from request extensions (set by `api_key_auth` middleware)
+/// - Delegates persistence/business rules to `FinancialService`
 pub async fn create_transaction(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<CreateTransactionRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = validate_string("transaction_type", &req.transaction_type, 64)
@@ -37,11 +45,10 @@ pub async fn create_transaction(
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
 
-    // TODO: Extract user_id from auth context
-    let user_id = "user_id";
+    let user_id = auth.user_id.to_string();
 
     match state.financial_service.create_transaction(
-        user_id,
+        &user_id,
         &req.transaction_type,
         &req.amount,
         &req.currency,
@@ -63,11 +70,11 @@ pub async fn get_transaction(
 
 pub async fn list_transactions(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
 ) -> impl IntoResponse {
-    // TODO: Extract user_id from auth context
-    let user_id = "user_id";
+    let user_id = auth.user_id.to_string();
 
-    match state.financial_service.list_user_transactions(user_id).await {
+    match state.financial_service.list_user_transactions(&user_id).await {
         Ok(txs) => (StatusCode::OK, Json(txs)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))).into_response(),
     }
@@ -75,6 +82,7 @@ pub async fn list_transactions(
 
 pub async fn create_invoice(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<CreateInvoiceRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = validate_amount(&req.amount)
@@ -83,10 +91,9 @@ pub async fn create_invoice(
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
 
-    // TODO: Extract user_id from auth context
-    let user_id = "user_id";
+    let user_id = auth.user_id.to_string();
 
-    match state.financial_service.create_invoice(user_id, &req.amount, &req.due_date).await {
+    match state.financial_service.create_invoice(&user_id, &req.amount, &req.due_date).await {
         Ok(invoice) => (StatusCode::CREATED, Json(invoice)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))).into_response(),
     }
@@ -94,6 +101,7 @@ pub async fn create_invoice(
 
 pub async fn request_financing(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<FinancingRequestBody>,
 ) -> impl IntoResponse {
     if let Err(e) = validate_string("financing_type", &req.financing_type, 64)
@@ -102,10 +110,9 @@ pub async fn request_financing(
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response();
     }
 
-    // TODO: Extract user_id from auth context
-    let user_id = "user_id";
+    let user_id = auth.user_id.to_string();
 
-    match state.financial_service.request_financing(user_id, &req.financing_type, &req.amount).await {
+    match state.financial_service.request_financing(&user_id, &req.financing_type, &req.amount).await {
         Ok(financing) => (StatusCode::CREATED, Json(financing)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))).into_response(),
     }
