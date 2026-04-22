@@ -57,20 +57,21 @@ pub async fn get_compliance_report(
     State(_state): State<AppState>,
     Path(product_id): Path<String>,
 ) -> impl IntoResponse {
-    // TODO: Fetch compliance records from database for product_id
+    // The current backend does not yet persist compliance checks.
+    // Returning a structured placeholder keeps the API stable while storage is implemented.
     let report = ComplianceReportResponse {
         product_id,
         compliance_checks: vec![],
-        overall_status: "pending".to_string(),
+        overall_status: "not_implemented".to_string(),
     };
 
-    (StatusCode::OK, Json(report)).into_response()
+    (StatusCode::NOT_IMPLEMENTED, Json(report)).into_response()
 }
 
 pub async fn generate_audit_report(
     State(_state): State<AppState>,
 ) -> impl IntoResponse {
-    // TODO: Generate comprehensive audit report from audit_logs table
+    // Audit log persistence/export is not implemented yet.
     let report = serde_json::json!({
         "report_type": "audit",
         "generated_at": chrono::Utc::now().to_rfc3339(),
@@ -78,5 +79,5 @@ pub async fn generate_audit_report(
         "events": []
     });
 
-    (StatusCode::OK, Json(report)).into_response()
+    (StatusCode::NOT_IMPLEMENTED, Json(report)).into_response()
 }
