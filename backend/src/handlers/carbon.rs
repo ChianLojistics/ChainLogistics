@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     error::AppError,
+    middleware::auth::AuthContext,
     models::carbon::{
         CalculateFootprintRequest, CreateTradeRequest, GenerateCreditRequest,
         GenerateReportRequest, ListCreditsQuery, ListTradesQuery, PurchaseCreditRequest,
@@ -49,10 +50,10 @@ pub async fn list_footprints(
 /// POST /api/v1/carbon/credits/generate
 pub async fn generate_credit(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<GenerateCreditRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    // TODO: extract real owner_id from auth context
-    let owner_id = Uuid::nil();
+    let owner_id = auth.user_id;
     let credit = state.carbon_service.generate_credit(owner_id, &req).await?;
     Ok((StatusCode::CREATED, Json(credit)))
 }
@@ -60,10 +61,10 @@ pub async fn generate_credit(
 /// GET /api/v1/carbon/credits
 pub async fn list_credits(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Query(query): Query<ListCreditsQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // TODO: extract real owner_id from auth context
-    let owner_id = Uuid::nil();
+    let owner_id = auth.user_id;
     let credits = state.carbon_service.list_credits(owner_id, &query).await?;
     Ok(Json(serde_json::json!({ "credits": credits, "total": credits.len() })))
 }
@@ -80,10 +81,10 @@ pub async fn get_credit(
 /// POST /api/v1/carbon/credits/retire
 pub async fn retire_credit(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<RetireCreditRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // TODO: extract real owner_id from auth context
-    let owner_id = Uuid::nil();
+    let owner_id = auth.user_id;
     let credit = state.carbon_service.retire_credit(owner_id, &req).await?;
     Ok(Json(serde_json::json!(credit)))
 }
@@ -110,10 +111,10 @@ pub async fn list_trades(
 /// POST /api/v1/carbon/market/list
 pub async fn list_credit_for_sale(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<CreateTradeRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    // TODO: extract real seller_id from auth context
-    let seller_id = Uuid::nil();
+    let seller_id = auth.user_id;
     let trade = state.carbon_service.create_trade(seller_id, &req).await?;
     Ok((StatusCode::CREATED, Json(trade)))
 }
@@ -121,10 +122,10 @@ pub async fn list_credit_for_sale(
 /// POST /api/v1/carbon/market/purchase
 pub async fn purchase_credit(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<PurchaseCreditRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // TODO: extract real buyer_id from auth context
-    let buyer_id = Uuid::nil();
+    let buyer_id = auth.user_id;
     let trade = state.carbon_service.purchase_credit(buyer_id, &req).await?;
     Ok(Json(serde_json::json!(trade)))
 }
@@ -134,10 +135,10 @@ pub async fn purchase_credit(
 /// POST /api/v1/carbon/verify
 pub async fn request_verification(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<RequestVerificationRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    // TODO: extract real requester_id from auth context
-    let requester_id = Uuid::nil();
+    let requester_id = auth.user_id;
     let verification = state
         .carbon_service
         .request_verification(requester_id, &req)
@@ -161,10 +162,10 @@ pub async fn list_verifications(
 /// POST /api/v1/carbon/reports
 pub async fn generate_report(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
     Json(req): Json<GenerateReportRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    // TODO: extract real owner_id from auth context
-    let owner_id = Uuid::nil();
+    let owner_id = auth.user_id;
     let report = state.carbon_service.generate_report(owner_id, &req).await?;
     Ok((StatusCode::CREATED, Json(report)))
 }
@@ -172,9 +173,9 @@ pub async fn generate_report(
 /// GET /api/v1/carbon/reports
 pub async fn list_reports(
     State(state): State<AppState>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // TODO: extract real owner_id from auth context
-    let owner_id = Uuid::nil();
+    let owner_id = auth.user_id;
     let reports = state.carbon_service.list_reports(owner_id).await?;
     Ok(Json(serde_json::json!({ "reports": reports, "total": reports.len() })))
 }

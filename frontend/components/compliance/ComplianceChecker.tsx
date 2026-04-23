@@ -13,7 +13,11 @@ interface ComplianceCheckResult {
   warnings: string[];
 }
 
-export function ComplianceChecker() {
+type ComplianceCheckerProps = {
+  data?: Record<string, unknown>
+}
+
+export function ComplianceChecker({ data }: ComplianceCheckerProps) {
   const [selectedType, setSelectedType] = useState<string>('gdpr');
   const [result, setResult] = useState<ComplianceCheckResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +38,7 @@ export function ComplianceChecker() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           compliance_type: selectedType,
-          data: {}, // TODO: Get actual product data
+          data: data ?? {},
         }),
       });
 
