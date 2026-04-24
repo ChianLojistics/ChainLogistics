@@ -2,29 +2,13 @@
 
 ## Description
 
-This PR implements several key features from the issues backlog:
+- Pre-allocated modular system for `routes`, `handlers`, `services`, `models`, and `database`.
 
-1. **Fix Placeholder Owner (#129):**
-   - Updated `/products` page to handle disconnected states.
-   - Removed the hardcoded placeholder address.
-   - Now prompts users to connect their wallet to view products.
-
-2. **Internationalization (i18n) Setup (#120):**
-   - Integrated `i18next` and `react-i18next`.
-   - Added `en.json` and `es.json` locale files with base translations.
-   - Created `LanguageSelector` component for toggling between languages.
-   - Enabled language persistence using `localStorage`.
-
-3. **Frontend Unit Tests (#137):**
-   - Implemented unit tests for utility functions (`format.test.ts`).
-   - Implemented unit tests for Zod validation schemas (`schemas.test.ts`).
-   - Implemented unit tests for the generic UI components (`Button.test.tsx`).
-
-4. **Rust REST API Backend scaffolding (#123 & #21AH):**
-   - Created a heavily optimized Rust/Axum project backend to work together with the Soroban smart contracts.
-   - Setup `Cargo.toml` with `tokio`, `axum`, `sqlx`, `redis`, etc.
-   - Setup `main.rs` as the API Server entry point.
-   - Pre-allocated modular system for `routes`, `handlers`, `services`, `models`, and `database`.
+5. **Backend Security and Performance (#234, #249, #250, #239):**
+   - **Distributed Rate Limiting (#234)**: Replaced in-memory rate limiting with a scalable Redis-backed implementation.
+   - **Query Optimization (#249)**: Refactored expensive analytics and product lookups for better database performance.
+   - **Redis Caching Strategy (#250)**: Implemented a caching layer for global stats and product details to reduce DB load.
+   - **Data Encryption at Rest (#239)**: Secured sensitive user PII (emails, Stellar addresses) using AES-256-GCM.
 
 ## Checks
 - [x] Tested locally.
@@ -39,3 +23,7 @@ This PR implements several key features from the issues backlog:
 - Closes #137
 - Closes #123
 - Closes #21AH
+- Closes #234
+- Closes #249
+- Closes #250
+- Closes #239

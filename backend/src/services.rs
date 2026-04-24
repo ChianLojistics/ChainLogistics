@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::database::{ProductRepository, EventRepository, UserRepository, ApiKeyRepository, ProductFilters, GlobalStats};
 use crate::models::*;
 use bcrypt::{hash, DEFAULT_COST};
+use redis::AsyncCommands;
 
 pub mod financial;
 pub use financial::FinancialService;
@@ -22,11 +23,12 @@ pub use digital_twin_service::DigitalTwinService;
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {
     pool: PgPool,
+    redis_client: redis::Client,
 }
 
 impl ProductService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
+        Self { pool, redis_client }
     }
 }
 
@@ -52,7 +54,7 @@ impl ProductRepository for ProductService {
 /// let product = service.create_product(new_product).await?;
 /// ```
     async fn create_product(&self, product: NewProduct) -> Result<Product, sqlx::Error> {
-        sqlx::query_as!(
+        let created = sqlx::query_as!(
             Product,
             r#"
             INSERT INTO products (
@@ -75,7 +77,12 @@ impl ProductRepository for ProductService {
             product.created_by
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Invalidate global stats cache
+        let _ = self.invalidate_global_stats().await;
+
+        Ok(created)
     }
 
 /// Retrieves a product by its unique identifier.
@@ -87,17 +94,39 @@ impl ProductRepository for ProductService {
 /// # Returns
 /// * `Result<Option<Product>, sqlx::Error>` - Product if found, None otherwise
     async fn get_product(&self, id: &str) -> Result<Option<Product>, sqlx::Error> {
-        sqlx::query_as!(
+        let cache_key = format!("cache:product:{}", id);
+        
+        // Try to get from cache
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            if let Ok(cached) = conn.get::<_, String>(&cache_key).await {
+                if let Ok(product) = serde_json::from_str::<Product>(&cached) {
+                    return Ok(Some(product));
+                }
+            }
+        }
+
+        let product = sqlx::query_as!(
             Product,
             "SELECT * FROM products WHERE id = $1",
             id
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        // Save to cache if found
+        if let Some(ref p) = product {
+            if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+                if let Ok(serialized) = serde_json::to_string(p) {
+                    let _: Result<(), _> = conn.set_ex(&cache_key, serialized, 3600).await;
+                }
+            }
+        }
+
+        Ok(product)
     }
 
     async fn update_product(&self, id: &str, product: Product) -> Result<Product, sqlx::Error> {
-        sqlx::query_as!(
+        let updated = sqlx::query_as!(
             Product,
             r#"
             UPDATE products SET
@@ -129,13 +158,24 @@ impl ProductRepository for ProductService {
             product.updated_by
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Invalidate cache
+        let _ = self.invalidate_product_cache(id).await;
+        let _ = self.invalidate_global_stats().await;
+
+        Ok(updated)
     }
 
     async fn delete_product(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query!("DELETE FROM products WHERE id = $1", id)
             .execute(&self.pool)
             .await?;
+        
+        // Invalidate cache
+        let _ = self.invalidate_product_cache(id).await;
+        let _ = self.invalidate_global_stats().await;
+        
         Ok(())
     }
 
@@ -297,22 +337,37 @@ impl ProductRepository for ProductService {
         .fetch_all(&self.pool)
         .await
     }
+
+    async fn invalidate_product_cache(&self, id: &str) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del(format!("cache:product:{}", id)).await;
+        }
+        Ok(())
+    }
+
+    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del("cache:global_stats").await;
+        }
+        Ok(())
+    }
 }
 
 pub struct EventService {
     pool: PgPool,
+    redis_client: redis::Client,
 }
 
 impl EventService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
+        Self { pool, redis_client }
     }
 }
 
 #[async_trait]
 impl EventRepository for EventService {
     async fn create_event(&self, event: NewTrackingEvent) -> Result<TrackingEvent, sqlx::Error> {
-        sqlx::query_as!(
+        let created = sqlx::query_as!(
             TrackingEvent,
             r#"
             INSERT INTO tracking_events (
@@ -331,7 +386,12 @@ impl EventRepository for EventService {
             event.metadata
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Invalidate global stats cache
+        let _ = self.invalidate_global_stats().await;
+
+        Ok(created)
     }
 
     async fn get_event(&self, id: i64) -> Result<Option<TrackingEvent>, sqlx::Error> {
@@ -396,21 +456,11 @@ impl EventRepository for EventService {
             r#"
             SELECT 
                 p.id as product_id,
-                COALESCE(e.event_count, 0) as event_count,
+                (SELECT COUNT(*) FROM tracking_events WHERE product_id = p.id) as event_count,
                 p.is_active,
-                e.last_event_at,
-                e.last_event_type
+                (SELECT MAX(timestamp) FROM tracking_events WHERE product_id = p.id) as last_event_at,
+                (SELECT event_type FROM tracking_events WHERE product_id = p.id ORDER BY timestamp DESC LIMIT 1) as last_event_type
             FROM products p
-            LEFT JOIN (
-                SELECT 
-                    product_id,
-                    COUNT(*) as event_count,
-                    MAX(timestamp) as last_event_at,
-                    (event_type) as last_event_type
-                FROM tracking_events 
-                WHERE product_id = $1
-                GROUP BY product_id
-            ) e ON p.id = e.product_id
             WHERE p.id = $1
             "#,
             product_id
@@ -420,6 +470,19 @@ impl EventRepository for EventService {
     }
 
     async fn get_global_stats(&self) -> Result<GlobalStats, sqlx::Error> {
+        let cache_key = "cache:global_stats";
+
+        // Try to get from cache
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            if let Ok(cached) = conn.get::<_, String>(cache_key).await {
+                if let Ok(stats) = serde_json::from_str::<GlobalStats>(&cached) {
+                    return Ok(stats);
+                }
+            }
+        }
+
+        // Optimized query with single table scans where possible
+        // Note: For large tables, these counts should be handled differently (e.g. periodically updated counters)
         let stats = sqlx::query!(
             r#"
             SELECT 
@@ -433,23 +496,40 @@ impl EventRepository for EventService {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(GlobalStats {
+        let global_stats = GlobalStats {
             total_products: stats.total_products.unwrap_or(0),
             active_products: stats.active_products.unwrap_or(0),
             total_events: stats.total_events.unwrap_or(0),
             total_users: stats.total_users.unwrap_or(0),
             active_api_keys: stats.active_api_keys.unwrap_or(0),
-        })
+        };
+
+        // Save to cache
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            if let Ok(serialized) = serde_json::to_string(&global_stats) {
+                let _: Result<(), _> = conn.set_ex(cache_key, serialized, 300).await;
+            }
+        }
+
+        Ok(global_stats)
+    }
+
+    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del("cache:global_stats").await;
+        }
+        Ok(())
     }
 }
 
 pub struct UserService {
     pool: PgPool,
+    encryption_key: String,
 }
 
 impl UserService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, encryption_key: String) -> Self {
+        Self { pool, encryption_key }
     }
 
     pub async fn hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
@@ -464,53 +544,98 @@ impl UserService {
 #[async_trait]
 impl UserRepository for UserService {
     async fn create_user(&self, user: NewUser) -> Result<User, sqlx::Error> {
-        sqlx::query_as!(
+        let encrypted_email = crate::utils::crypto::encrypt(&user.email, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+        
+        let encrypted_address = if let Some(addr) = &user.stellar_address {
+            Some(crate::utils::crypto::encrypt(addr, &self.encryption_key)
+                .map_err(|e| sqlx::Error::Protocol(e.to_string()))?)
+        } else {
+            None
+        };
+
+        let mut created = sqlx::query_as!(
             User,
             r#"
             INSERT INTO users (email, password_hash, stellar_address)
             VALUES ($1, $2, $3)
             RETURNING *
             "#,
-            user.email,
+            encrypted_email,
             user.password_hash,
-            user.stellar_address
+            encrypted_address
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Decrypt for returning
+        let _ = self.decrypt_user(&mut created);
+        Ok(created)
     }
 
     async fn get_user(&self, id: Uuid) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
+        let mut user = sqlx::query_as!(
             User,
             "SELECT * FROM users WHERE id = $1",
             id
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        if let Some(ref mut u) = user {
+            let _ = self.decrypt_user(u);
+        }
+        Ok(user)
     }
 
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
+        let encrypted_email = crate::utils::crypto::encrypt(email, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+        let mut user = sqlx::query_as!(
             User,
             "SELECT * FROM users WHERE email = $1",
-            email
+            encrypted_email
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        if let Some(ref mut u) = user {
+            let _ = self.decrypt_user(u);
+        }
+        Ok(user)
     }
 
     async fn get_user_by_stellar_address(&self, address: &str) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
+        let encrypted_address = crate::utils::crypto::encrypt(address, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+        let mut user = sqlx::query_as!(
             User,
             "SELECT * FROM users WHERE stellar_address = $1",
-            address
+            encrypted_address
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        if let Some(ref mut u) = user {
+            let _ = self.decrypt_user(u);
+        }
+        Ok(user)
     }
 
-    async fn update_user(&self, id: Uuid, user: User) -> Result<User, sqlx::Error> {
-        sqlx::query_as!(
+    async fn update_user(&self, id: Uuid, mut user: User) -> Result<User, sqlx::Error> {
+        let encrypted_email = crate::utils::crypto::encrypt(&user.email, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+        
+        let encrypted_address = if let Some(addr) = &user.stellar_address {
+            Some(crate::utils::crypto::encrypt(addr, &self.encryption_key)
+                .map_err(|e| sqlx::Error::Protocol(e.to_string()))?)
+        } else {
+            None
+        };
+
+        let mut updated = sqlx::query_as!(
             User,
             r#"
             UPDATE users SET
@@ -525,16 +650,20 @@ impl UserRepository for UserService {
             RETURNING *
             "#,
             id,
-            user.email,
+            encrypted_email,
             user.password_hash,
-            user.stellar_address,
+            encrypted_address,
             user.api_key,
             user.api_key_hash,
             user.is_active,
             user.is_admin
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Decrypt for returning
+        let _ = self.decrypt_user(&mut updated);
+        Ok(updated)
     }
 
     async fn update_last_login(&self, id: Uuid) -> Result<(), sqlx::Error> {
@@ -544,6 +673,22 @@ impl UserRepository for UserService {
         )
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+}
+
+impl UserService {
+    fn decrypt_user(&self, user: &mut User) -> Result<(), AppError> {
+        if let Ok(decrypted) = crate::utils::crypto::decrypt(&user.email, &self.encryption_key) {
+            user.email = decrypted;
+        }
+        
+        if let Some(addr) = &user.stellar_address {
+            if let Ok(decrypted) = crate::utils::crypto::decrypt(addr, &self.encryption_key) {
+                user.stellar_address = Some(decrypted);
+            }
+        }
+        
         Ok(())
     }
 }
@@ -663,16 +808,18 @@ impl ApiKeyRepository for ApiKeyService {
 /// the relational database, ensuring both systems stay in sync.
 pub struct SyncService {
     pool: PgPool,
+    redis_client: redis::Client,
     product_service: ProductService,
     event_service: EventService,
 }
 
 impl SyncService {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
         Self {
             pool: pool.clone(),
-            product_service: ProductService::new(pool.clone()),
-            event_service: EventService::new(pool),
+            redis_client: redis_client.clone(),
+            product_service: ProductService::new(pool.clone(), redis_client.clone()),
+            event_service: EventService::new(pool, redis_client),
         }
     }
 

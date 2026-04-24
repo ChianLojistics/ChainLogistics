@@ -6,6 +6,7 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub server: ServerConfig,
     pub redis: RedisConfig,
+    pub encryption_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +51,8 @@ impl Default for Config {
                 url: env::var("REDIS_URL")
                     .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
             },
+            encryption_key: env::var("ENCRYPTION_KEY")
+                .unwrap_or_else(|_| "0123456789abcdef0123456789abcdef".to_string()), // 32 chars for AES-256
         }
     }
 }
