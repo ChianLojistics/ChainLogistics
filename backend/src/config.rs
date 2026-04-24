@@ -6,6 +6,7 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub server: ServerConfig,
     pub redis: RedisConfig,
+    pub security: SecurityConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,11 +22,21 @@ pub struct DatabaseConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    pub tls_enabled: bool,
+    pub tls_cert_path: Option<String>,
+    pub tls_key_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RedisConfig {
     pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityConfig {
+    pub enforce_https: bool,
+    pub hsts_max_age: u64,
+    pub allowed_origins: Vec<String>,
 }
 
 impl Default for Config {
@@ -45,10 +56,31 @@ impl Default for Config {
                     .unwrap_or_else(|_| "3001".to_string())
                     .parse()
                     .unwrap_or(3001),
+                tls_enabled: env::var("TLS_ENABLED")
+                    .unwrap_or_else(|_| "false".to_string())
+                    .parse()
+                    .unwrap_or(false),
+                tls_cert_path: env::var("TLS_CERT_PATH").ok(),
+                tls_key_path: env::var("TLS_KEY_PATH").ok(),
             },
             redis: RedisConfig {
                 url: env::var("REDIS_URL")
                     .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+            },
+            security: SecurityConfig {
+                enforce_https: env::var("ENFORCE_HTTPS")
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
+                hsts_max_age: env::var("HSTS_MAX_AGE")
+                    .unwrap_or_else(|_| "31536000".to_string())
+                    .parse()
+                    .unwrap_or(31536000), // 1 year
+                allowed_origins: env::var("ALLOWED_ORIGINS")
+                    .unwrap_or_else(|_| "https://localhost:3000".to_string())
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect(),
             },
         }
     }

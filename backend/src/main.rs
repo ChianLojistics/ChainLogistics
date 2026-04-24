@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 mod config;
-mod middleware;
+mod middleware as app_middleware;
 mod routes;
 mod handlers;
 mod services;
@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cron_service = CronService::new(app_state.db.pool().clone());
     cron_service.start_scheduler().await;
     
-    // Build router
+    // Build router with security middleware
     let app = Router::new()
         .merge(crate::routes::health_routes())
         .merge(crate::routes::api_routes())
@@ -99,9 +99,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CorsLayer::permissive())
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    app_middleware::security::enforce_https,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    app_middleware::security::security_headers,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    app_middleware::security::cors_policy,
+                ))
         )
-        .with_state(app_state);
+        .with_state(app_state.clone());
     
     // Run server
     let config = Config::from_env()?;
@@ -111,6 +122,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     
     tracing::info!("Server listening on {}", addr);
+    tracing::info!("HTTPS enforcement: {}", config.security.enforce_https);
+    tracing::info!("TLS enabled: {}", config.server.tls_enabled);
+    
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     
