@@ -1,6 +1,5 @@
  
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import { connectWallet, disconnectWallet, getCurrentAddress, getFreighterNetwork } from "../stellar/wallet";
 
 const E2E_MOCKS_ENABLED = process.env.NEXT_PUBLIC_E2E_MOCKS === "true";
@@ -55,8 +54,7 @@ function stopAccountWatcher() {
 }
 
 export const useWalletStore = create<WalletState>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
       status: "disconnected",
       publicKey: null,
       network: null,
@@ -148,8 +146,4 @@ export const useWalletStore = create<WalletState>()(
         startAccountWatcher(get, set);
       },
     }),
-    {
-      name: "chain-logistics-wallet",
-    }
-  )
-);
+};
