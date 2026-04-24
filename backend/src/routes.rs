@@ -9,6 +9,7 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/admin", admin_api_routes())
         .nest("/api/v1/analytics", analytics_routes())
         .nest("/api/v1/carbon", carbon_routes())
+        .nest("/api/v1/keys", key_management_routes())
 }
 
 fn public_api_routes() -> Router<AppState> {
@@ -58,6 +59,15 @@ fn analytics_routes() -> Router<AppState> {
         .route("/events", get(crate::routes::analytics::event_analytics))
         .route("/users", get(crate::routes::analytics::user_analytics))
         .route("/export", get(crate::routes::analytics::export))
+        .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn key_management_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", get(crate::handlers::api_keys::list_keys).post(crate::handlers::api_keys::create_key))
+        .route("/:id/revoke", post(crate::handlers::api_keys::revoke_key))
+        .route("/:id/rotate", post(crate::handlers::api_keys::rotate_key))
         .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }

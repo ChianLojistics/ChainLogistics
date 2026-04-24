@@ -84,7 +84,6 @@ export const useWalletStore = create<WalletState>()(
             ),
           ]);
           const detectedNetwork = await getFreighterNetwork();
-          console.info("[wallet] detected freighter network:", detectedNetwork);
           set({
             status: "connected",
             publicKey: result.account.publicKey,
@@ -93,8 +92,6 @@ export const useWalletStore = create<WalletState>()(
           });
           startAccountWatcher(get, set);
         } catch (err: unknown) {
-          console.error("[wallet] connect failed", err);
-
           let message = err instanceof Error ? err.message : "Failed to connect wallet";
           if (message.toLowerCase().includes("timed out")) {
             message =
@@ -142,7 +139,6 @@ export const useWalletStore = create<WalletState>()(
         }
 
         const detectedNetwork = await getFreighterNetwork();
-        console.info("[wallet] detected freighter network (init):", detectedNetwork);
         set({ network: detectedNetwork });
 
         startAccountWatcher(get, set);

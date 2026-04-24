@@ -280,7 +280,6 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
         return [];
       } catch (error) {
         const normalized = normalizeContractClientError(error);
-        console.error("Failed to get product event IDs:", normalized);
         trackContractInteraction({
           method: "get_product_event_ids",
           durationMs: now() - startedAt,
@@ -360,7 +359,6 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
         return parsedEvent;
       } catch (error) {
         const normalized = normalizeContractClientError(error);
-        console.error(`Failed to get event ${eventId}:`, normalized);
         trackContractInteraction({
           method: "get_event",
           durationMs: now() - startedAt,
