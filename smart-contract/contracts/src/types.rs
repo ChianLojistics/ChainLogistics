@@ -107,6 +107,17 @@ pub enum DataKey {
     MainContract,          // Main contract address
     TransferContract,      // Transfer contract address
     MultiSigContract,      // Multisig contract address
+    TimelockContract,      // Timelock contract address
+    OracleFeedConfig(Symbol),
+    OracleFeedSources(Symbol),
+    OracleSource(Symbol, Address),
+    OracleReport(Symbol, Address),
+    OracleSnapshot(Symbol),
+    OracleFallback(Symbol),
+    OracleCircuitBreaker(Symbol),
+    TimelockConfig,
+    TimelockOperation(u64),
+    NextTimelockOperationId,
 }
 
 #[contracttype]
@@ -178,5 +189,146 @@ pub struct Proposal {
     pub proposer: Address,
     pub created_at: u64,
     pub executed: bool,
+    pub approvals: Vec<Address>,
+}
+
+// ─── Oracle Security Types ───────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum OracleFeedType {
+    CommodityPrice,
+    FuelPrice,
+    ExchangeRate,
+    Temperature,
+    Humidity,
+    GpsLocation,
+    ShipmentCondition,
+    SecureTimestamp,
+    ComplianceStatus,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleFeedConfig {
+    pub feed_id: Symbol,
+    pub feed_type: OracleFeedType,
+    pub min_value: i128,
+    pub max_value: i128,
+    pub max_age_seconds: u64,
+    pub min_sources: u32,
+    pub max_deviation_bps: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleSource {
+    pub reporter: Address,
+    pub stake: i128,
+    pub active: bool,
+    pub reward_points: u32,
+    pub slash_count: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleReport {
+    pub reporter: Address,
+    pub value: i128,
+    pub observed_at: u64,
+    pub submitted_at: u64,
+    pub proof_hash: BytesN<32>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleSnapshot {
+    pub feed_id: Symbol,
+    pub value: i128,
+    pub observed_at: u64,
+    pub source_count: u32,
+    pub using_fallback: bool,
+    pub circuit_broken: bool,
+}
+
+// ─── Gas Handling Types ──────────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GasPolicy {
+    pub max_batch_size: u32,
+    pub recommended_chunk_size: u32,
+    pub base_cost_units: u64,
+    pub per_item_cost_units: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GasEstimate {
+    pub item_count: u32,
+    pub estimated_cost_units: u64,
+    pub recommended_chunk_size: u32,
+    pub recommended_chunk_count: u32,
+    pub fits_single_transaction: bool,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchProgress {
+    pub requested: u32,
+    pub processed: u32,
+    pub succeeded: u32,
+    pub next_cursor: u32,
+    pub complete: bool,
+}
+
+// ─── Timelock Types ──────────────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TimelockAction {
+    PauseMain,
+    UnpauseMain,
+    SetMainMultisig(Address),
+    InitiateUpgrade(ContractVersion, Address, bool),
+    CompleteUpgrade,
+    FailUpgrade(Symbol),
+    EmergencyPause(Symbol),
+    EmergencyUnpause,
+    ConfigureOracleFeed(Address, OracleFeedConfig),
+    SetOracleFallback(Address, Symbol, i128, u64),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TimelockConfig {
+    pub signers: Vec<Address>,
+    pub threshold: u32,
+    pub min_delay_seconds: u64,
+    pub max_delay_seconds: u64,
+    pub grace_period_seconds: u64,
+    pub main_contract: Address,
+    pub upgrade_contract: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TimelockStatus {
+    PendingApprovals,
+    Queued,
+    Executed,
+    Cancelled,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TimelockOperation {
+    pub id: u64,
+    pub proposer: Address,
+    pub action: TimelockAction,
+    pub created_at: u64,
+    pub ready_at: u64,
+    pub execute_by: u64,
+    pub status: TimelockStatus,
     pub approvals: Vec<Address>,
 }

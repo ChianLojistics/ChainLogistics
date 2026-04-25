@@ -4,6 +4,25 @@
 
 Comprehensive security implementation for ChainLogistics including HTTPS enforcement, SSL/TLS configuration, and CORS policies.
 
+## Smart Contract Controls
+
+Recent Soroban hardening adds contract-level controls for the supply-chain workflows that depend on external data and privileged governance actions:
+
+- Oracle security:
+  feed configs define allowed value ranges, freshness windows, minimum source counts, and consensus deviation thresholds.
+- Oracle redundancy:
+  every feed supports multiple registered reporters, median-based aggregation, fallback snapshots, and a circuit-breaker flag when consensus collapses.
+- Oracle incentives:
+  accepted reporters accrue reward points while outlier reports increment slash counters and reduce staked participation weight.
+- Timelock governance:
+  critical actions now flow through a signer-threshold timelock with proposal, approval, cancel, queue, and execute states.
+- Trusted execution:
+  the timelock can execute delayed pause/unpause, upgrade, multisig, and oracle-config actions through contract-authenticated subcalls.
+- Gas handling:
+  batch transfers expose gas policy and estimation APIs plus resumable chunk processing so callers can split heavy operations before they fail on ledger limits.
+- Test hardening:
+  smart-contract tests now cover oracle fallback paths, timelock execution windows, upgrade gating, and gas-planning invariants.
+
 ## HTTPS Enforcement
 
 ### Configuration

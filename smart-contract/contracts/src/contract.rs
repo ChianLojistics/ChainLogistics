@@ -22,7 +22,19 @@ fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
     }
 
     if let Some(multisig) = storage::get_multisig_contract(env) {
-        if &multisig == caller && env.current_contract_address() == multisig {
+        if &multisig == caller {
+            if env.current_contract_address() != multisig {
+                caller.require_auth();
+            }
+            return Ok(());
+        }
+    }
+
+    if let Some(timelock) = storage::get_timelock_contract(env) {
+        if &timelock == caller {
+            if env.current_contract_address() != timelock {
+                caller.require_auth();
+            }
             return Ok(());
         }
     }
@@ -129,6 +141,16 @@ impl ChainLogisticsContract {
     ) -> Result<(), Error> {
         require_admin(&env, &caller)?;
         storage::set_multisig_contract(&env, &multisig_contract);
+        Ok(())
+    }
+
+    pub fn set_timelock_contract(
+        env: Env,
+        caller: Address,
+        timelock_contract: Address,
+    ) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        storage::set_timelock_contract(&env, &timelock_contract);
         Ok(())
     }
 
