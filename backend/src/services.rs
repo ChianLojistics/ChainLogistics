@@ -559,13 +559,14 @@ impl UserRepository for UserService {
         let mut created = sqlx::query_as!(
             User,
             r#"
-            INSERT INTO users (email, password_hash, stellar_address)
-            VALUES ($1, $2, $3)
+            INSERT INTO users (email, password_hash, stellar_address, role)
+            VALUES ($1, $2, $3, $4)
             RETURNING *
             "#,
             encrypted_email,
             user.password_hash,
-            encrypted_address
+            encrypted_address,
+            user.role as UserRole
         )
         .fetch_one(&self.pool)
         .await?;
@@ -644,10 +645,10 @@ impl UserRepository for UserService {
                 email = $2,
                 password_hash = $3,
                 stellar_address = $4,
-                api_key = $5,
-                api_key_hash = $6,
-                is_active = $7,
-                is_admin = $8
+                role = $5,
+                api_key = $6,
+                api_key_hash = $7,
+                is_active = $8
             WHERE id = $1
             RETURNING *
             "#,
@@ -655,10 +656,10 @@ impl UserRepository for UserService {
             encrypted_email,
             user.password_hash,
             encrypted_address,
+            user.role as UserRole,
             user.api_key,
             user.api_key_hash,
-            user.is_active,
-            user.is_admin
+            user.is_active
         )
         .fetch_one(&self.pool)
         .await?;

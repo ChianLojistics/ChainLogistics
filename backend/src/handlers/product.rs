@@ -120,17 +120,28 @@ pub async fn list_products(
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(20).min(100); // Cap at 100
 
+    // Validate query parameters
+    if let Some(ref search) = query.search {
+        validate_string("search", search, 100)?;
+    }
+    if let Some(ref category) = query.category {
+        validate_string("category", category, 64)?;
+    }
+    if let Some(ref owner) = query.owner_address {
+        validate_stellar_address(owner)?;
+    }
+
     let products = if let Some(search_query) = query.search {
         state.product_service
-            .search_products(&search_query, limit)
+            .search_products(&sanitize_input(&search_query), limit)
             .await?
             .into_iter()
             .map(ProductResponse::from)
             .collect()
     } else {
         let filters = ProductFilters {
-            owner_address: query.owner_address,
-            category: query.category,
+            owner_address: query.owner_address.clone().map(|s| sanitize_input(&s)),
+            category: query.category.clone().map(|s| sanitize_input(&s)),
             is_active: query.is_active,
             created_after: None,
             created_before: None,
@@ -145,12 +156,11 @@ pub async fn list_products(
     };
 
     let total = if query.search.is_some() {
-        // For search, we don't have an efficient count, so we use the length
         products.len() as i64
     } else {
         let filters = ProductFilters {
-            owner_address: query.owner_address,
-            category: query.category,
+            owner_address: query.owner_address.map(|s| sanitize_input(&s)),
+            category: query.category.map(|s| sanitize_input(&s)),
             is_active: query.is_active,
             created_after: None,
             created_before: None,
@@ -207,8 +217,8 @@ pub async fn create_product(
         origin_location: sanitize_input(&request.origin_location),
         category: sanitize_input(&request.category),
         tags: request.tags.iter().map(|t| sanitize_input(t)).collect(),
-        certifications: request.certifications,
-        media_hashes: request.media_hashes,
+        certifications: request.certifications.iter().map(|c| sanitize_input(c)).collect(),
+        media_hashes: request.media_hashes.iter().map(|m| sanitize_input(m)).collect(),
         custom_fields: request.custom_fields,
         owner_address: auth_context.stellar_address.clone().unwrap_or_default(),
         created_by: auth_context.user_id.to_string(),
@@ -275,33 +285,41 @@ pub async fn update_product(
 ) -> Result<Json<ProductResponse>, AppError> {
     let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
     
+    validate_string("id", &id, 64)?;
+
     let mut product = state
         .product_service
         .get_product(&id)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Product {} not found", id)))?;
 
-    // Update fields if provided
+    // Update fields if provided with validation
     if let Some(name) = request.name {
-        product.name = name;
+        validate_string("name", &name, 128)?;
+        product.name = sanitize_input(&name);
     }
     if let Some(description) = request.description {
-        product.description = description;
+        if description.len() > 2048 {
+            return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
+        }
+        product.description = sanitize_input(&description);
     }
     if let Some(origin_location) = request.origin_location {
-        product.origin_location = origin_location;
+        validate_string("origin_location", &origin_location, 256)?;
+        product.origin_location = sanitize_input(&origin_location);
     }
     if let Some(category) = request.category {
-        product.category = category;
+        validate_string("category", &category, 64)?;
+        product.category = sanitize_input(&category);
     }
     if let Some(tags) = request.tags {
-        product.tags = tags;
+        product.tags = tags.iter().map(|t| sanitize_input(t)).collect();
     }
     if let Some(certifications) = request.certifications {
-        product.certifications = certifications;
+        product.certifications = certifications.iter().map(|c| sanitize_input(c)).collect();
     }
     if let Some(media_hashes) = request.media_hashes {
-        product.media_hashes = media_hashes;
+        product.media_hashes = media_hashes.iter().map(|m| sanitize_input(m)).collect();
     }
     if let Some(custom_fields) = request.custom_fields {
         product.custom_fields = custom_fields;
