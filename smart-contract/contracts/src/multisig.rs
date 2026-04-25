@@ -1,3 +1,9 @@
+/// Multi-signature contract for administrative actions.
+/// This contract handles:
+/// - Multi-sig configuration
+/// - Proposal submission
+/// - Proposal approval
+/// - Proposal execution
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
 
 use crate::error::Error;
@@ -5,16 +11,19 @@ use crate::types::{DataKey, MultiSigConfig, Proposal};
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
+/// Get the multi-signature configuration.
 fn get_multisig_config(env: &Env) -> Option<MultiSigConfig> {
     env.storage().persistent().get(&DataKey::MultiSigConfig)
 }
 
+/// Set the multi-signature configuration.
 fn set_multisig_config(env: &Env, config: &MultiSigConfig) {
     env.storage()
         .persistent()
         .set(&DataKey::MultiSigConfig, config);
 }
 
+/// Get the next proposal ID.
 fn get_next_proposal_id(env: &Env) -> u64 {
     env.storage()
         .persistent()
@@ -22,18 +31,21 @@ fn get_next_proposal_id(env: &Env) -> u64 {
         .unwrap_or(1)
 }
 
+/// Set the next proposal ID.
 fn set_next_proposal_id(env: &Env, id: u64) {
     env.storage()
         .persistent()
         .set(&DataKey::NextProposalId, &id);
 }
 
+/// Get a proposal by ID.
 fn get_proposal(env: &Env, proposal_id: u64) -> Option<Proposal> {
     env.storage()
         .persistent()
         .get(&DataKey::Proposal(proposal_id))
 }
 
+/// Store a proposal.
 fn put_proposal(env: &Env, proposal: &Proposal) {
     env.storage()
         .persistent()
@@ -42,6 +54,9 @@ fn put_proposal(env: &Env, proposal: &Proposal) {
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
+/// Ensure the caller is a signer.
+/// Returns MultiSigNotConfigured if multi-sig is not configured.
+/// Returns NotSigner if caller is not a signer.
 fn require_signer(env: &Env, caller: &Address) -> Result<(), Error> {
     let config = get_multisig_config(env).ok_or(Error::MultiSigNotConfigured)?;
     if !config.signers.contains(caller) {
@@ -50,6 +65,7 @@ fn require_signer(env: &Env, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
+/// Check if an address is a signer.
 fn is_signer(env: &Env, address: &Address) -> bool {
     if let Some(config) = get_multisig_config(env) {
         config.signers.contains(address)
@@ -58,6 +74,7 @@ fn is_signer(env: &Env, address: &Address) -> bool {
     }
 }
 
+/// Check if the threshold has been reached.
 fn threshold_reached(env: &Env, approvals: &Vec<Address>) -> bool {
     if let Some(config) = get_multisig_config(env) {
         approvals.len() >= config.threshold
@@ -68,6 +85,7 @@ fn threshold_reached(env: &Env, approvals: &Vec<Address>) -> bool {
 
 // ─── Contract ──────────────────────────────────────────────────────────────────
 
+/// The Multi-Signature contract manages administrative actions requiring multiple approvals.
 #[contract]
 pub struct MultiSigContract;
 
@@ -75,6 +93,20 @@ pub struct MultiSigContract;
 impl MultiSigContract {
     /// Initialize multi-signature configuration.
     /// Can only be called once and requires authentication from all initial signers.
+    /// 
+    /// # Arguments
+    /// * `signers` - A list of signer addresses
+    /// * `threshold` - The number of approvals required to execute proposals
+    /// 
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if initialization fails
+    /// 
+    /// # Errors
+    /// * `AlreadyInitialized` - If multi-sig is already configured
+    /// * `InvalidInput` - If signers list is empty
+    /// * `InvalidThreshold` - If threshold is invalid (0 or > signers count)
+    /// * `TooManySigners` - If more than 10 signers
+    /// * `DuplicateSigner` - If duplicate signers are provided
     pub fn init_multisig(env: Env, signers: Vec<Address>, threshold: u32) -> Result<(), Error> {
         if get_multisig_config(&env).is_some() {
             return Err(Error::AlreadyInitialized);
@@ -123,12 +155,30 @@ impl MultiSigContract {
     }
 
     /// Get current multi-signature configuration.
+    /// 
+    /// # Returns
+    /// * `Result<MultiSigConfig, Error>` - The multi-signature configuration
+    /// 
+    /// # Errors
+    /// * `MultiSigNotConfigured` - If multi-sig is not configured
     pub fn get_multisig_config(env: Env) -> Result<MultiSigConfig, Error> {
         get_multisig_config(&env).ok_or(Error::MultiSigNotConfigured)
     }
 
     /// Submit a new proposal.
     /// Only signers can submit proposals.
+    /// 
+    /// # Arguments
+    /// * `proposer` - The address submitting the proposal (must be a signer)
+    /// * `kind` - The type of proposal (e.g., "transfer_admin", "pause")
+    /// * `args` - Arguments for the proposal
+    /// 
+    /// # Returns
+    /// * `Result<u64, Error>` - The ID of the newly created proposal
+    /// 
+    /// # Errors
+    /// * `MultiSigNotConfigured` - If multi-sig is not configured
+    /// * `NotSigner` - If proposer is not a signer
     pub fn submit_proposal(
         env: Env,
         proposer: Address,
@@ -172,6 +222,20 @@ impl MultiSigContract {
 
     /// Approve a proposal.
     /// Only signers can approve.
+    /// 
+    /// # Arguments
+    /// * `approver` - The address approving the proposal (must be a signer)
+    /// * `proposal_id` - The ID of the proposal to approve
+    /// 
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if approval fails
+    /// 
+    /// # Errors
+    /// * `MultiSigNotConfigured` - If multi-sig is not configured
+    /// * `NotSigner` - If approver is not a signer
+    /// * `ProposalNotFound` - If the proposal does not exist
+    /// * `ProposalAlreadyExecuted` - If the proposal has already been executed
+    /// * `AlreadyApproved` - If the approver has already approved this proposal
     pub fn approve_proposal(env: Env, approver: Address, proposal_id: u64) -> Result<(), Error> {
         require_signer(&env, &approver)?;
         approver.require_auth();
@@ -204,6 +268,21 @@ impl MultiSigContract {
 
     /// Execute a proposal if threshold is reached.
     /// Only signers can execute.
+    /// 
+    /// # Arguments
+    /// * `executor` - The address executing the proposal (must be a signer)
+    /// * `proposal_id` - The ID of the proposal to execute
+    /// 
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if execution fails
+    /// 
+    /// # Errors
+    /// * `MultiSigNotConfigured` - If multi-sig is not configured
+    /// * `NotSigner` - If executor is not a signer
+    /// * `ProposalNotFound` - If the proposal does not exist
+    /// * `ProposalAlreadyExecuted` - If the proposal has already been executed
+    /// * `ThresholdNotReached` - If the threshold has not been reached
+    /// * `InvalidInput` - If the proposal kind is invalid
     pub fn execute_proposal(env: Env, executor: Address, proposal_id: u64) -> Result<(), Error> {
         require_signer(&env, &executor)?;
         executor.require_auth();
@@ -273,11 +352,27 @@ impl MultiSigContract {
     }
 
     /// Get a proposal by ID.
+    /// 
+    /// # Arguments
+    /// * `proposal_id` - The ID of the proposal to retrieve
+    /// 
+    /// # Returns
+    /// * `Result<Proposal, Error>` - The proposal
+    /// 
+    /// # Errors
+    /// * `ProposalNotFound` - If the proposal does not exist
     pub fn get_proposal(env: Env, proposal_id: u64) -> Result<Proposal, Error> {
         get_proposal(&env, proposal_id).ok_or(Error::ProposalNotFound)
     }
 
     /// Get all proposal IDs (for enumeration).
+    /// 
+    /// # Arguments
+    /// * `from_id` - The starting proposal ID
+    /// * `limit` - The maximum number of IDs to return
+    /// 
+    /// # Returns
+    /// * `Vec<u64>` - A vector of proposal IDs
     pub fn get_proposal_ids(env: Env, from_id: u64, limit: u32) -> Vec<u64> {
         let mut ids = Vec::new(&env);
         let next_id = get_next_proposal_id(&env);

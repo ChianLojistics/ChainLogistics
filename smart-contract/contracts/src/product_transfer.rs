@@ -1,3 +1,8 @@
+/// Product Transfer contract for managing product ownership transfers.
+/// This contract handles:
+/// - Single product ownership transfers
+/// - Batch product ownership transfers
+/// - Owner verification
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
 
 use crate::error::Error;
@@ -6,20 +11,24 @@ use crate::{AuthorizationContractClient, ProductRegistryContractClient};
 
 // ─── Storage helpers for ProductTransferContract ─────────────────────────────
 
+/// Get the authorization contract address.
 fn get_auth_contract(env: &Env) -> Option<Address> {
     env.storage().persistent().get(&DataKey::AuthContract)
 }
 
+/// Set the authorization contract address.
 fn set_auth_contract(env: &Env, address: &Address) {
     env.storage()
         .persistent()
         .set(&DataKey::AuthContract, address);
 }
 
+/// Get the main contract address.
 fn get_main_contract(env: &Env) -> Option<Address> {
     env.storage().persistent().get(&DataKey::MainContract)
 }
 
+/// Set the main contract address.
 fn set_main_contract(env: &Env, address: &Address) {
     env.storage()
         .persistent()
@@ -28,12 +37,23 @@ fn set_main_contract(env: &Env, address: &Address) {
 
 // ─── Contract ────────────────────────────────────────────────────────────────
 
+/// The Product Transfer contract manages product ownership transfers.
 #[contract]
 pub struct ProductTransferContract;
 
 #[contractimpl]
 impl ProductTransferContract {
     /// Initialize the ProductTransferContract with required contract addresses.
+    /// 
+    /// # Arguments
+    /// * `main_contract` - The address of the main ChainLogistics contract
+    /// * `auth_contract` - The address of the authorization contract
+    /// 
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if already initialized
+    /// 
+    /// # Errors
+    /// * `AlreadyInitialized` - If the contract has already been initialized
     pub fn pt_init(env: Env, main_contract: Address, auth_contract: Address) -> Result<(), Error> {
         if get_auth_contract(&env).is_some() || get_main_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
@@ -50,7 +70,20 @@ impl ProductTransferContract {
 
     /// Transfer ownership of a product from the current owner to a new owner.
     /// Requires authentication from both the current owner and the new owner.
-    /// Updates authorization mappings and emits a transfer event.
+    /// 
+    /// # Arguments
+    /// * `owner` - The current owner of the product
+    /// * `product_id` - The ID of the product to transfer
+    /// * `new_owner` - The new owner of the product
+    /// 
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if transfer fails
+    /// 
+    /// # Errors
+    /// * `NotInitialized` - If the contract is not initialized
+    /// * `ProductNotFound` - If the product does not exist
+    /// * `Unauthorized` - If owner is not the current owner
+    /// * `ProductDeactivated` - If the product is deactivated
     pub fn transfer_product(
         env: Env,
         owner: Address,
@@ -102,6 +135,16 @@ impl ProductTransferContract {
     }
 
     /// Get the current owner of a product.
+    /// 
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// 
+    /// # Returns
+    /// * `Result<Address, Error>` - The address of the current owner
+    /// 
+    /// # Errors
+    /// * `NotInitialized` - If the contract is not initialized
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_owner(env: Env, product_id: String) -> Result<Address, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
@@ -114,6 +157,17 @@ impl ProductTransferContract {
     }
 
     /// Verify if an address is the owner of a specific product.
+    /// 
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `address` - The address to check
+    /// 
+    /// # Returns
+    /// * `Result<bool, Error>` - True if the address is the owner, false otherwise
+    /// 
+    /// # Errors
+    /// * `NotInitialized` - If the contract is not initialized
+    /// * `ProductNotFound` - If the product does not exist
     pub fn is_product_owner(env: Env, product_id: String, address: Address) -> Result<bool, Error> {
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
@@ -127,6 +181,18 @@ impl ProductTransferContract {
 
     /// Batch transfer multiple products from one owner to another.
     /// All products must be owned by the same owner.
+    /// 
+    /// # Arguments
+    /// * `owner` - The current owner of the products
+    /// * `product_ids` - A vector of product IDs to transfer
+    /// * `new_owner` - The new owner of the products
+    /// 
+    /// # Returns
+    /// * `Result<u32, Error>` - The number of products successfully transferred
+    /// 
+    /// # Errors
+    /// * `NotInitialized` - If the contract is not initialized
+    /// * `EmptyBatch` - If the product_ids vector is empty or exceeds limit (100)
     pub fn batch_transfer_products(
         env: Env,
         owner: Address,
