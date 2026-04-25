@@ -1,80 +1,257 @@
 version: 2
 
+# Reusable defaults are not natively supported by Dependabot; values are
+# duplicated per ecosystem. Schedule, reviewers, and assignees are intentionally
+# kept aligned across ecosystems so the security backlog has a single owner.
+
 updates:
-  # Rust dependencies (Soroban contracts)
+  # ---------------------------------------------------------------------------
+  # Rust — Soroban smart contracts
+  # ---------------------------------------------------------------------------
   - package-ecosystem: "cargo"
     directory: "/smart-contract"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
       time: "09:00"
-
     open-pull-requests-limit: 10
-
     reviewers:
       - "Lynndabel"
-
     assignees:
       - "Lynndabel"
-
     commit-message:
-      prefix: "deps"
+      prefix: "deps(smart-contract)"
       include: "scope"
-
     versioning-strategy: increase
-
     labels:
       - "dependencies"
       - "rust"
-
+      - "smart-contract"
     groups:
-      rust-dependencies:
-        patterns:
-          - "*"
+      smart-contract-patch:
+        update-types:
+          - "patch"
+      smart-contract-minor:
+        update-types:
+          - "minor"
+    ignore:
+      # soroban-sdk pins the on-chain ABI; majors require coordinated contract
+      # redeploys and must be reviewed manually.
+      - dependency-name: "soroban-sdk"
+        update-types:
+          - "version-update:semver-major"
 
-  # Frontend dependencies (Next.js / TypeScript)
-  - package-ecosystem: "npm"
-    directory: "/frontend"
+  # ---------------------------------------------------------------------------
+  # Rust — Backend service (Axum API)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "cargo"
+    directory: "/backend"
+    schedule:
+      interval: "daily"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "Lynndabel"
+    assignees:
+      - "Lynndabel"
+    commit-message:
+      prefix: "deps(backend)"
+      include: "scope"
+    versioning-strategy: increase
+    labels:
+      - "dependencies"
+      - "rust"
+      - "backend"
+    groups:
+      backend-patch:
+        update-types:
+          - "patch"
+      backend-minor:
+        update-types:
+          - "minor"
+    ignore:
+      # Pin web-framework majors; require coordinated migration.
+      - dependency-name: "axum"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "tower"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "tower-http"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "sqlx"
+        update-types:
+          - "version-update:semver-major"
+
+  # ---------------------------------------------------------------------------
+  # Rust SDK
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "cargo"
+    directory: "/sdk/rust"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-
-    open-pull-requests-limit: 10
-
+    open-pull-requests-limit: 5
     reviewers:
       - "Lynndabel"
-
     assignees:
       - "Lynndabel"
-
     commit-message:
-      prefix: "deps"
+      prefix: "deps(sdk-rust)"
       include: "scope"
-
     versioning-strategy: increase
+    labels:
+      - "dependencies"
+      - "rust"
+      - "sdk"
+    groups:
+      sdk-rust-patch:
+        update-types:
+          - "patch"
+      sdk-rust-minor:
+        update-types:
+          - "minor"
 
+  # ---------------------------------------------------------------------------
+  # Python SDK
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "pip"
+    directory: "/sdk/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Lynndabel"
+    assignees:
+      - "Lynndabel"
+    commit-message:
+      prefix: "deps(sdk-python)"
+      include: "scope"
+    versioning-strategy: increase
+    labels:
+      - "dependencies"
+      - "python"
+      - "sdk"
+    groups:
+      sdk-python-patch:
+        update-types:
+          - "patch"
+      sdk-python-minor:
+        update-types:
+          - "minor"
+
+  # ---------------------------------------------------------------------------
+  # Frontend (Next.js / TypeScript)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "daily"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "Lynndabel"
+    assignees:
+      - "Lynndabel"
+    commit-message:
+      prefix: "deps(frontend)"
+      include: "scope"
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "javascript"
-
+      - "frontend"
     groups:
-      frontend-dependencies:
-        patterns:
-          - "*"
-
+      frontend-patch:
+        update-types:
+          - "patch"
+      frontend-minor:
+        update-types:
+          - "minor"
     ignore:
-      # Ignore risky React major updates
       - dependency-name: "react"
         update-types:
           - "version-update:semver-major"
-
       - dependency-name: "react-dom"
         update-types:
           - "version-update:semver-major"
-
-      # Ignore Soroban SDK updates requiring manual testing
+      - dependency-name: "next"
+        update-types:
+          - "version-update:semver-major"
       - dependency-name: "@stellar/*"
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
+
+  # ---------------------------------------------------------------------------
+  # Root npm (build helper)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Lynndabel"
+    assignees:
+      - "Lynndabel"
+    commit-message:
+      prefix: "deps(root)"
+      include: "scope"
+    versioning-strategy: increase
+    labels:
+      - "dependencies"
+      - "javascript"
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions — keep CI/CD action versions current and patched
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "Lynndabel"
+    assignees:
+      - "Lynndabel"
+    commit-message:
+      prefix: "deps(actions)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # ---------------------------------------------------------------------------
+  # Docker — backend runtime base image
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Lynndabel"
+    assignees:
+      - "Lynndabel"
+    commit-message:
+      prefix: "deps(docker)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "backend"

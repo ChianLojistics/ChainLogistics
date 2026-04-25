@@ -1,34 +1,34 @@
 name: Security Scan
 
+# Higher-cost / static-analysis checks that run on a slower cadence than
+# dependency-scan.yml. Vulnerability scanning of dependencies has moved to
+# .github/workflows/dependency-scan.yml — this file now focuses on:
+#   - CodeQL static analysis (JS/TS)
+#   - License compliance review (frontend + Rust)
+#   - Secret scanning (gitleaks)
+
 on:
   schedule:
-    # Run weekly on Mondays at 9 AM UTC
-    - cron: '0 9 * * 1'
+    # Weekly on Mondays at 09:00 UTC
+    - cron: "0 9 * * 1"
   workflow_dispatch:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "smart-contract/**"
+      - "sdk/**"
+      - ".github/workflows/security.yml"
+      - "deny.toml"
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  # Replaces the separate rust-security and npm-security jobs.
-  #
-  # WHY: cargo audit is effectively unmaintained (primary maintainer stepped back March 2025).
-  # Its --format json --output flags don't exist (correct flag is --json to stdout), and its
-  # JSON schema doesn't have a flat "severity": "critical" field, so the grep checks were
-  # silently never matching anything. OSV-Scanner covers Cargo, npm, and 11+ other ecosystems,
-  # outputs SARIF to GitHub's Security tab natively, and is actively maintained by Google.
-  osv-scan:
-    name: OSV Dependency Scan
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.3
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    with:
-      # Recursively scans the repo, picking up both Cargo.lock and frontend/package-lock.json
-      scan-args: |-
-        --recursive
-        ./
-
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
@@ -39,11 +39,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Fixed: 'rust' is not a supported CodeQL language.
-        # CodeQL does not support Rust — remove it to prevent the job from failing silently
-        # or erroring. If you want static analysis for Rust, use cargo clippy (in CI) or
-        # a dedicated tool like semgrep with Rust rules.
-        language: [ 'javascript-typescript' ]
+        # CodeQL does not support Rust. For Rust SAST, see clippy in CI and
+        # cargo-deny in dependency-scan.yml.
+        language: [ "javascript-typescript" ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,8 +60,8 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
-  license-check:
-    name: License Compliance
+  license-check-frontend:
+    name: License Compliance (frontend)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -72,8 +70,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
@@ -87,18 +85,66 @@ jobs:
         working-directory: ./frontend
         run: |
           license-checker --json --out licenses.json
-          # Warn on any GPL variant (GPL-2.0, GPL-3.0, LGPL, AGPL, etc.)
+          # GPL-family licenses are incompatible with this project's MIT
+          # baseline; flag for review rather than auto-fail to avoid blocking
+          # legitimate transitive deps until policy is set per-license.
           if grep -qE '"licenses":\s*"(A|L)?GPL' licenses.json; then
-            echo "⚠ GPL-family licensed dependencies found — review for compatibility:"
+            echo "::warning::GPL-family licensed dependencies found — review for compatibility"
             grep -E '"licenses":\s*"(A|L)?GPL' licenses.json
-            # This is a warning, not a hard failure — adjust to 'exit 1' if you want to enforce
           else
-            echo "✓ No GPL-family licenses found."
+            echo "No GPL-family licenses found."
           fi
 
       - name: Upload license report
         uses: actions/upload-artifact@v4
         with:
-          name: license-report
+          name: license-report-frontend
           path: frontend/licenses.json
           retention-days: 30
+
+  license-check-rust:
+    name: License Compliance (rust)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace:
+          - backend
+          - smart-contract
+          - sdk/rust
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo bin
+        id: cache-cargo-bin
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: cargo-deny-v1
+
+      - name: Install cargo-deny
+        if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
+        run: cargo install --locked cargo-deny
+
+      - name: Check Rust licenses
+        working-directory: ./${{ matrix.workspace }}
+        run: cargo deny --manifest-path Cargo.toml --config ${{ github.workspace }}/deny.toml check licenses
+
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
