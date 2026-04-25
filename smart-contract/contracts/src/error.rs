@@ -59,4 +59,8 @@ pub enum Error {
     InvalidThreshold = 66,
     TooManySigners = 67,
     DuplicateSigner = 68,
+    ProposalRejected = 69,
+    TimeLockNotExpired = 70,
+    AlreadyRejected = 71,
+    ProposalExpired = 72,
 }

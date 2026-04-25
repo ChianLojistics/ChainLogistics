@@ -225,6 +225,22 @@ pub enum UpgradeStatus {
     Failed,
 }
 
+/// Status of a multi-signature proposal.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProposalStatus {
+    /// Proposal is active and awaiting approvals
+    Active,
+    /// Threshold reached, awaiting time-lock or execution
+    Approved,
+    /// Proposal has been executed
+    Executed,
+    /// Proposal was rejected by signers
+    Rejected,
+    /// Proposal has expired
+    Expired,
+}
+
 // ─── Multi-Signature Types ─────────────────────────────────────────────────────
 
 /// Multi-signature configuration for administrative actions.
@@ -233,8 +249,12 @@ pub enum UpgradeStatus {
 pub struct MultiSigConfig {
     /// List of authorized signer addresses
     pub signers: Vec<Address>,
-    /// Number of signatures required to execute a proposal
+    /// Default number of signatures required
     pub threshold: u32,
+    /// Specific thresholds for different operation types (kind -> threshold)
+    pub thresholds: Map<Symbol, u32>,
+    /// Time locks for different operation types (kind -> delay in seconds)
+    pub time_locks: Map<Symbol, u64>,
 }
 
 /// A multi-signature proposal for administrative actions.
@@ -245,14 +265,20 @@ pub struct Proposal {
     pub id: u64,
     /// Type of proposal (e.g., "transfer_admin", "pause", "unpause")
     pub kind: Symbol,
+    /// Target contract for the proposal
+    pub target: Address,
     /// Arguments for the proposal
     pub args: Vec<Val>,
     /// Address that created the proposal
     pub proposer: Address,
     /// When the proposal was created
     pub created_at: u64,
-    /// Whether the proposal has been executed
-    pub executed: bool,
+    /// Timestamp when threshold was reached (0 if not reached)
+    pub approved_at: u64,
+    /// Current status of the proposal
+    pub status: ProposalStatus,
     /// Addresses that have approved the proposal
     pub approvals: Vec<Address>,
+    /// Addresses that have rejected the proposal
+    pub rejections: Vec<Address>,
 }
