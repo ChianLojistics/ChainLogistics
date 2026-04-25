@@ -25,6 +25,8 @@ async-trait = "0.1"
 sha2 = "0.10"
 hex = "0.4"
 rand = { version = "0.8", features = ["std"] }
+regex = "1.10"
+lazy_static = "1.4"
 # Stellar/Soroban dependencies
 soroban-sdk = "21.0"
 # OpenAPI documentation

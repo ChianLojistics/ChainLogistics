@@ -10,6 +10,9 @@ pub enum AppError {
     #[error("Database error: {0}")]
     Database(String),
     
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+    
     #[error("Authentication failed")]
     Unauthorized,
     
@@ -35,7 +38,7 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message): (StatusCode, String) = match self {
-            AppError::Database(msg) => {
+            AppError::Database(msg) | AppError::DatabaseError(msg) => {
                 tracing::error!("Database error: {}", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
             }

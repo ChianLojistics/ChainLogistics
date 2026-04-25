@@ -79,22 +79,25 @@ pub async fn list_events(
     let limit = query.limit.unwrap_or(20).min(100);
 
     let (events, total) = if let Some(product_id) = query.product_id {
+        validate_string("product_id", &product_id, 64)?;
+        let sanitized_product_id = sanitize_input(&product_id);
+
         let events = if let Some(event_type) = query.event_type {
+            validate_string("event_type", &event_type, 64)?;
             state.event_service
-                .list_events_by_type(&product_id, &event_type, offset, limit)
+                .list_events_by_type(&sanitized_product_id, &sanitize_input(&event_type), offset, limit)
                 .await?
         } else {
             state.event_service
-                .list_events_by_product(&product_id, offset, limit)
+                .list_events_by_product(&sanitized_product_id, offset, limit)
                 .await?
         };
 
         let total = if query.event_type.is_some() {
-            // For type-filtered events, we don't have an efficient count
             events.len() as i64
         } else {
             state.event_service
-                .count_events_by_product(&product_id)
+                .count_events_by_product(&sanitized_product_id)
                 .await?
         };
 
