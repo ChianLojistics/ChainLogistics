@@ -54,13 +54,13 @@ pub struct TrackingContract;
 #[contractimpl]
 impl TrackingContract {
     /// Initialize the TrackingContract with the main contract address.
-    /// 
+    ///
     /// # Arguments
     /// * `main_contract` - The address of the main ChainLogistics contract
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if already initialized
-    /// 
+    ///
     /// # Errors
     /// * `AlreadyInitialized` - If the contract has already been initialized
     pub fn init(env: Env, main_contract: Address) -> Result<(), Error> {
@@ -74,7 +74,7 @@ impl TrackingContract {
     /// Add a new tracking event to a product.
     /// Requires authentication from the actor.
     /// Validates inputs and emits a tracking event.
-    /// 
+    ///
     /// # Arguments
     /// * `actor` - The address adding the event (must be authorized)
     /// * `product_id` - The ID of the product
@@ -83,10 +83,10 @@ impl TrackingContract {
     /// * `data_hash` - Hash of the event data
     /// * `note` - Optional note about the event
     /// * `metadata` - Additional metadata as key-value pairs
-    /// 
+    ///
     /// # Returns
     /// * `Result<u64, Error>` - The ID of the newly created event
-    /// 
+    ///
     /// # Errors
     /// * `NotInitialized` - If the tracking contract is not initialized
     /// * `ContractPaused` - If the main contract is paused
@@ -151,13 +151,13 @@ impl TrackingContract {
     }
 
     /// Get a single event by its ID.
-    /// 
+    ///
     /// # Arguments
     /// * `event_id` - The ID of the event to retrieve
-    /// 
+    ///
     /// # Returns
     /// * `Result<TrackingEvent, Error>` - The tracking event
-    /// 
+    ///
     /// # Errors
     /// * `EventNotFound` - If the event does not exist
     pub fn tracking_get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
@@ -165,10 +165,10 @@ impl TrackingContract {
     }
 
     /// Get all event IDs for a product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
-    /// 
+    ///
     /// # Returns
     /// * `Vec<u64>` - A vector of event IDs
     pub fn tracking_get_product_event_ids(env: Env, product_id: String) -> Vec<u64> {
@@ -176,10 +176,10 @@ impl TrackingContract {
     }
 
     /// Get the total event count for a product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
-    /// 
+    ///
     /// # Returns
     /// * `u64` - The number of events
     pub fn tracking_get_event_count(env: Env, product_id: String) -> u64 {
@@ -187,11 +187,11 @@ impl TrackingContract {
     }
 
     /// Get the count of events by type for a product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `event_type` - The type of events to count
-    /// 
+    ///
     /// # Returns
     /// * `u64` - The number of events of the specified type
     pub fn tracking_get_event_count_by_type(

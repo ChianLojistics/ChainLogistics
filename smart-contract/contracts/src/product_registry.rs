@@ -197,13 +197,13 @@ impl ProductRegistryContract {
 
     /// Configure the authorization contract address.
     /// This can only be called once.
-    /// 
+    ///
     /// # Arguments
     /// * `auth_contract` - The address of the authorization contract
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if already initialized with different address
-    /// 
+    ///
     /// # Errors
     /// * `AlreadyInitialized` - If already initialized with a different address
     pub fn configure_auth_contract(env: Env, auth_contract: Address) -> Result<(), Error> {
@@ -341,13 +341,13 @@ impl ProductRegistryContract {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Get a product by its string ID.
-    /// 
+    ///
     /// # Arguments
     /// * `id` - The ID of the product to retrieve
-    /// 
+    ///
     /// # Returns
     /// * `Result<Product, Error>` - The product information
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_product(env: Env, id: String) -> Result<Product, Error> {
@@ -355,7 +355,7 @@ impl ProductRegistryContract {
     }
 
     /// Get global product statistics.
-    /// 
+    ///
     /// # Returns
     /// * `ProductStats` - Global statistics including total and active product counts
     pub fn get_stats(env: Env) -> ProductStats {
@@ -372,11 +372,11 @@ impl ProductRegistryContract {
     /// Search products by name, origin, or category.
     /// Returns matching product IDs with exact matching.
     /// Results are limited for gas efficiency.
-    /// 
+    ///
     /// # Arguments
     /// * `query` - The search query string
     /// * `limit` - Maximum number of results to return
-    /// 
+    ///
     /// # Returns
     /// * `Vec<String>` - A vector of matching product IDs
     pub fn search_products(env: Env, query: String, limit: u32) -> Vec<String> {

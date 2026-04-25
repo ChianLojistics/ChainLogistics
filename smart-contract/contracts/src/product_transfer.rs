@@ -44,14 +44,14 @@ pub struct ProductTransferContract;
 #[contractimpl]
 impl ProductTransferContract {
     /// Initialize the ProductTransferContract with required contract addresses.
-    /// 
+    ///
     /// # Arguments
     /// * `main_contract` - The address of the main ChainLogistics contract
     /// * `auth_contract` - The address of the authorization contract
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if already initialized
-    /// 
+    ///
     /// # Errors
     /// * `AlreadyInitialized` - If the contract has already been initialized
     pub fn pt_init(env: Env, main_contract: Address, auth_contract: Address) -> Result<(), Error> {
@@ -70,15 +70,15 @@ impl ProductTransferContract {
 
     /// Transfer ownership of a product from the current owner to a new owner.
     /// Requires authentication from both the current owner and the new owner.
-    /// 
+    ///
     /// # Arguments
     /// * `owner` - The current owner of the product
     /// * `product_id` - The ID of the product to transfer
     /// * `new_owner` - The new owner of the product
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if transfer fails
-    /// 
+    ///
     /// # Errors
     /// * `NotInitialized` - If the contract is not initialized
     /// * `ProductNotFound` - If the product does not exist
@@ -135,13 +135,13 @@ impl ProductTransferContract {
     }
 
     /// Get the current owner of a product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
-    /// 
+    ///
     /// # Returns
     /// * `Result<Address, Error>` - The address of the current owner
-    /// 
+    ///
     /// # Errors
     /// * `NotInitialized` - If the contract is not initialized
     /// * `ProductNotFound` - If the product does not exist
@@ -157,14 +157,14 @@ impl ProductTransferContract {
     }
 
     /// Verify if an address is the owner of a specific product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `address` - The address to check
-    /// 
+    ///
     /// # Returns
     /// * `Result<bool, Error>` - True if the address is the owner, false otherwise
-    /// 
+    ///
     /// # Errors
     /// * `NotInitialized` - If the contract is not initialized
     /// * `ProductNotFound` - If the product does not exist
@@ -181,15 +181,15 @@ impl ProductTransferContract {
 
     /// Batch transfer multiple products from one owner to another.
     /// All products must be owned by the same owner.
-    /// 
+    ///
     /// # Arguments
     /// * `owner` - The current owner of the products
     /// * `product_ids` - A vector of product IDs to transfer
     /// * `new_owner` - The new owner of the products
-    /// 
+    ///
     /// # Returns
     /// * `Result<u32, Error>` - The number of products successfully transferred
-    /// 
+    ///
     /// # Errors
     /// * `NotInitialized` - If the contract is not initialized
     /// * `EmptyBatch` - If the product_ids vector is empty or exceeds limit (100)

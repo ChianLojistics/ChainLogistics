@@ -96,14 +96,14 @@ impl ChainLogisticsContract {
     const MAX_EVENT_ID_PAGE_LIMIT: u32 = 100;
 
     /// Initialize the contract with an admin address and authorization contract.
-    /// 
+    ///
     /// # Arguments
     /// * `admin` - The admin address who will have control over the contract
     /// * `auth_contract` - The address of the authorization contract
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if already initialized
-    /// 
+    ///
     /// # Errors
     /// * `AlreadyInitialized` - If the contract has already been initialized
     pub fn init(env: Env, admin: Address, auth_contract: Address) -> Result<(), Error> {
@@ -118,7 +118,7 @@ impl ChainLogisticsContract {
     }
 
     /// Check if the contract is currently paused.
-    /// 
+    ///
     /// # Returns
     /// * `bool` - True if paused, false otherwise
     pub fn is_paused(env: Env) -> bool {
@@ -127,13 +127,13 @@ impl ChainLogisticsContract {
 
     /// Pause the contract, preventing most operations.
     /// Only the admin can call this function.
-    /// 
+    ///
     /// # Arguments
     /// * `caller` - The address calling the function (must be admin)
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if already paused or not authorized
-    /// 
+    ///
     /// # Errors
     /// * `Unauthorized` - If caller is not the admin
     /// * `ContractPaused` - If the contract is already paused
@@ -148,13 +148,13 @@ impl ChainLogisticsContract {
 
     /// Unpause the contract, resuming normal operations.
     /// Only the admin can call this function.
-    /// 
+    ///
     /// # Arguments
     /// * `caller` - The address calling the function (must be admin)
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if not paused or not authorized
-    /// 
+    ///
     /// # Errors
     /// * `Unauthorized` - If caller is not the admin
     /// * `ContractNotPaused` - If the contract is not paused
@@ -169,14 +169,14 @@ impl ChainLogisticsContract {
 
     /// Transfer admin rights to a new address.
     /// Both the current admin and new admin must authenticate.
-    /// 
+    ///
     /// # Arguments
     /// * `current_admin` - The current admin address
     /// * `new_admin` - The new admin address to transfer to
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if not authorized
-    /// 
+    ///
     /// # Errors
     /// * `Unauthorized` - If current_admin is not the actual admin
     pub fn transfer_admin(
@@ -192,14 +192,14 @@ impl ChainLogisticsContract {
 
     /// Set the multi-signature contract address.
     /// Only the admin can call this function.
-    /// 
+    ///
     /// # Arguments
     /// * `caller` - The address calling the function (must be admin)
     /// * `multisig_contract` - The address of the multi-signature contract
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if not authorized
-    /// 
+    ///
     /// # Errors
     /// * `Unauthorized` - If caller is not the admin
     pub fn set_multisig_contract(
@@ -220,7 +220,7 @@ impl ChainLogisticsContract {
     // get_product_event_ids, get_event_count are now in ProductQueryContract
 
     /// Add a tracking event to a product.
-    /// 
+    ///
     /// # Arguments
     /// * `actor` - The address adding the event (must be authorized)
     /// * `product_id` - The ID of the product
@@ -229,10 +229,10 @@ impl ChainLogisticsContract {
     /// * `data_hash` - Hash of the event data
     /// * `note` - Optional note about the event
     /// * `metadata` - Additional metadata as key-value pairs
-    /// 
+    ///
     /// # Returns
     /// * `Result<u64, Error>` - The ID of the newly created event
-    /// 
+    ///
     /// # Errors
     /// * `ContractPaused` - If the contract is paused
     /// * `ProductNotFound` - If the product does not exist
@@ -291,13 +291,13 @@ impl ChainLogisticsContract {
     }
 
     /// Get a tracking event by its ID.
-    /// 
+    ///
     /// # Arguments
     /// * `event_id` - The ID of the event to retrieve
-    /// 
+    ///
     /// # Returns
     /// * `Result<TrackingEvent, Error>` - The tracking event
-    /// 
+    ///
     /// # Errors
     /// * `EventNotFound` - If the event does not exist
     pub fn get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
@@ -305,15 +305,15 @@ impl ChainLogisticsContract {
     }
 
     /// Get paginated tracking events for a product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `offset` - The offset to start from (for pagination)
     /// * `limit` - The maximum number of events to return
-    /// 
+    ///
     /// # Returns
     /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_events(
@@ -347,16 +347,16 @@ impl ChainLogisticsContract {
     }
 
     /// Get tracking events for a product filtered by event type.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `event_type` - The type of events to filter by
     /// * `offset` - The offset to start from (for pagination)
     /// * `limit` - The maximum number of events to return
-    /// 
+    ///
     /// # Returns
     /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_events_by_type(
@@ -390,17 +390,17 @@ impl ChainLogisticsContract {
     }
 
     /// Get tracking events for a product filtered by time range.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `start_time` - The start timestamp (inclusive)
     /// * `end_time` - The end timestamp (inclusive)
     /// * `offset` - The offset to start from (for pagination)
     /// * `limit` - The maximum number of events to return
-    /// 
+    ///
     /// # Returns
     /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_events_by_time_range(
@@ -448,16 +448,16 @@ impl ChainLogisticsContract {
     }
 
     /// Get tracking events for a product with advanced filtering.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `filter` - The filter criteria (event type, time range, location)
     /// * `offset` - The offset to start from (for pagination)
     /// * `limit` - The maximum number of events to return
-    /// 
+    ///
     /// # Returns
     /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_filtered_events(
@@ -522,13 +522,13 @@ impl ChainLogisticsContract {
     }
 
     /// Get all event IDs for a product.
-    /// 
+    ///
     /// # Arguments
     /// * `id` - The ID of the product
-    /// 
+    ///
     /// # Returns
     /// * `Result<Vec<u64>, Error>` - A vector of event IDs
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_event_ids(env: Env, id: String) -> Result<Vec<u64>, Error> {
@@ -537,15 +537,15 @@ impl ChainLogisticsContract {
     }
 
     /// Get paginated event IDs for a product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `offset` - The offset to start from (for pagination)
     /// * `limit` - The maximum number of event IDs to return (max 100)
-    /// 
+    ///
     /// # Returns
     /// * `Result<Vec<u64>, Error>` - A vector of event IDs
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_event_ids_paginated(
@@ -569,13 +569,13 @@ impl ChainLogisticsContract {
     }
 
     /// Get the total number of events for a product.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
-    /// 
+    ///
     /// # Returns
     /// * `Result<u32, Error>` - The number of events
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_event_count(env: Env, product_id: String) -> Result<u32, Error> {
@@ -584,13 +584,13 @@ impl ChainLogisticsContract {
     }
 
     /// Get the total number of events for a product (as u64).
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
-    /// 
+    ///
     /// # Returns
     /// * `Result<u64, Error>` - The number of events
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
@@ -600,14 +600,14 @@ impl ChainLogisticsContract {
     }
 
     /// Get the number of events for a product filtered by type.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `event_type` - The type of events to count
-    /// 
+    ///
     /// # Returns
     /// * `Result<u64, Error>` - The number of events of the specified type
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_event_count_by_type(
@@ -625,10 +625,10 @@ impl ChainLogisticsContract {
 
     /// Helper function to simulate multi-sig contract invoking pause.
     /// Used for testing purposes only.
-    /// 
+    ///
     /// # Arguments
     /// * `caller` - The address calling the function
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if pause fails
     pub fn __simulate_multisig_pause(env: Env, caller: Address) -> Result<(), Error> {

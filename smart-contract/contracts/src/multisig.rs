@@ -93,14 +93,14 @@ pub struct MultiSigContract;
 impl MultiSigContract {
     /// Initialize multi-signature configuration.
     /// Can only be called once and requires authentication from all initial signers.
-    /// 
+    ///
     /// # Arguments
     /// * `signers` - A list of signer addresses
     /// * `threshold` - The number of approvals required to execute proposals
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if initialization fails
-    /// 
+    ///
     /// # Errors
     /// * `AlreadyInitialized` - If multi-sig is already configured
     /// * `InvalidInput` - If signers list is empty
@@ -155,10 +155,10 @@ impl MultiSigContract {
     }
 
     /// Get current multi-signature configuration.
-    /// 
+    ///
     /// # Returns
     /// * `Result<MultiSigConfig, Error>` - The multi-signature configuration
-    /// 
+    ///
     /// # Errors
     /// * `MultiSigNotConfigured` - If multi-sig is not configured
     pub fn get_multisig_config(env: Env) -> Result<MultiSigConfig, Error> {
@@ -167,15 +167,15 @@ impl MultiSigContract {
 
     /// Submit a new proposal.
     /// Only signers can submit proposals.
-    /// 
+    ///
     /// # Arguments
     /// * `proposer` - The address submitting the proposal (must be a signer)
     /// * `kind` - The type of proposal (e.g., "transfer_admin", "pause")
     /// * `args` - Arguments for the proposal
-    /// 
+    ///
     /// # Returns
     /// * `Result<u64, Error>` - The ID of the newly created proposal
-    /// 
+    ///
     /// # Errors
     /// * `MultiSigNotConfigured` - If multi-sig is not configured
     /// * `NotSigner` - If proposer is not a signer
@@ -222,14 +222,14 @@ impl MultiSigContract {
 
     /// Approve a proposal.
     /// Only signers can approve.
-    /// 
+    ///
     /// # Arguments
     /// * `approver` - The address approving the proposal (must be a signer)
     /// * `proposal_id` - The ID of the proposal to approve
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if approval fails
-    /// 
+    ///
     /// # Errors
     /// * `MultiSigNotConfigured` - If multi-sig is not configured
     /// * `NotSigner` - If approver is not a signer
@@ -268,14 +268,14 @@ impl MultiSigContract {
 
     /// Execute a proposal if threshold is reached.
     /// Only signers can execute.
-    /// 
+    ///
     /// # Arguments
     /// * `executor` - The address executing the proposal (must be a signer)
     /// * `proposal_id` - The ID of the proposal to execute
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if execution fails
-    /// 
+    ///
     /// # Errors
     /// * `MultiSigNotConfigured` - If multi-sig is not configured
     /// * `NotSigner` - If executor is not a signer
@@ -352,13 +352,13 @@ impl MultiSigContract {
     }
 
     /// Get a proposal by ID.
-    /// 
+    ///
     /// # Arguments
     /// * `proposal_id` - The ID of the proposal to retrieve
-    /// 
+    ///
     /// # Returns
     /// * `Result<Proposal, Error>` - The proposal
-    /// 
+    ///
     /// # Errors
     /// * `ProposalNotFound` - If the proposal does not exist
     pub fn get_proposal(env: Env, proposal_id: u64) -> Result<Proposal, Error> {
@@ -366,11 +366,11 @@ impl MultiSigContract {
     }
 
     /// Get all proposal IDs (for enumeration).
-    /// 
+    ///
     /// # Arguments
     /// * `from_id` - The starting proposal ID
     /// * `limit` - The maximum number of IDs to return
-    /// 
+    ///
     /// # Returns
     /// * `Vec<u64>` - A vector of proposal IDs
     pub fn get_proposal_ids(env: Env, from_id: u64, limit: u32) -> Vec<u64> {

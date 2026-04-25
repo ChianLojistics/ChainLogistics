@@ -27,13 +27,13 @@ pub struct AuthorizationContract;
 impl AuthorizationContract {
     /// Configure the trusted initializer contract.
     /// This can only be called once and must be the ProductRegistryContract.
-    /// 
+    ///
     /// # Arguments
     /// * `initializer` - The address of the trusted initializer contract
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if already initialized with different address
-    /// 
+    ///
     /// # Errors
     /// * `AlreadyInitialized` - If already initialized with a different address
     pub fn configure_initializer(env: Env, initializer: Address) -> Result<(), Error> {
@@ -55,15 +55,15 @@ impl AuthorizationContract {
 
     /// Initialize product ownership in the authorization system.
     /// This should be called by the ProductRegistryContract during product registration.
-    /// 
+    ///
     /// # Arguments
     /// * `caller` - The address calling the function (must be the trusted initializer)
     /// * `product_id` - The ID of the product
     /// * `owner` - The initial owner of the product
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if not authorized or product already exists
-    /// 
+    ///
     /// # Errors
     /// * `NotInitialized` - If the initializer is not configured
     /// * `Unauthorized` - If caller is not the trusted initializer
@@ -99,15 +99,15 @@ impl AuthorizationContract {
 
     /// Update product ownership (transfer).
     /// Only the current owner can call this function.
-    /// 
+    ///
     /// # Arguments
     /// * `old_owner` - The current owner of the product
     /// * `product_id` - The ID of the product
     /// * `new_owner` - The new owner of the product
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if not authorized
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     /// * `Unauthorized` - If old_owner is not the actual owner
@@ -136,15 +136,15 @@ impl AuthorizationContract {
 
     /// Grant an actor the right to add tracking events to a product.
     /// Only the product owner can call this function.
-    /// 
+    ///
     /// # Arguments
     /// * `owner` - The product owner
     /// * `product_id` - The ID of the product
     /// * `actor` - The address to authorize
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if not authorized
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     /// * `Unauthorized` - If caller is not the product owner
@@ -173,15 +173,15 @@ impl AuthorizationContract {
 
     /// Revoke an actor's authorization.
     /// Only the product owner can call this function.
-    /// 
+    ///
     /// # Arguments
     /// * `owner` - The product owner
     /// * `product_id` - The ID of the product
     /// * `actor` - The address to deauthorize
-    /// 
+    ///
     /// # Returns
     /// * `Result<(), Error>` - Returns error if not authorized
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     /// * `Unauthorized` - If caller is not the product owner
@@ -210,14 +210,14 @@ impl AuthorizationContract {
 
     /// Check whether an actor is authorized to add tracking events to a product.
     /// Returns true if the actor is the owner or has been explicitly authorized.
-    /// 
+    ///
     /// # Arguments
     /// * `product_id` - The ID of the product
     /// * `actor` - The address to check authorization for
-    /// 
+    ///
     /// # Returns
     /// * `Result<bool, Error>` - True if authorized, false otherwise
-    /// 
+    ///
     /// # Errors
     /// * `ProductNotFound` - If the product does not exist
     pub fn is_authorized(env: Env, product_id: String, actor: Address) -> Result<bool, Error> {
