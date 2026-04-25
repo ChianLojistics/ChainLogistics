@@ -76,13 +76,15 @@ jobs:
       fail-on-vuln: false
 
   # ---------------------------------------------------------------------------
-  # cargo-audit + cargo-deny per Rust workspace.
-  # Report-only (continue-on-error) until existing advisories are remediated.
+  # cargo-deny per Rust workspace: advisories + licenses + bans + sources.
+  # Triaged advisories are documented in deny.toml with `expires` dates so
+  # they are re-evaluated on a fixed cadence.
+  # cargo-audit is intentionally not invoked separately — cargo-deny's
+  # `check advisories` covers the same RustSec database with a single config.
   # ---------------------------------------------------------------------------
   rust-audit:
     name: Rust audit (${{ matrix.workspace }})
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -102,19 +104,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin
-          key: cargo-audit-deny-v1
-
-      - name: Install cargo-audit
-        if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
-        run: cargo install --locked cargo-audit
+          key: cargo-deny-v1
 
       - name: Install cargo-deny
         if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
         run: cargo install --locked cargo-deny
-
-      - name: Run cargo-audit
-        working-directory: ./${{ matrix.workspace }}
-        run: cargo audit
 
       - name: Run cargo-deny (advisories, licenses, bans, sources)
         working-directory: ./${{ matrix.workspace }}

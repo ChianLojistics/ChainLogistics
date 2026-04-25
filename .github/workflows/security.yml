@@ -140,9 +140,8 @@ jobs:
     # The gitleaks/gitleaks-action requires GITLEAKS_LICENSE for organizations.
     # Use the upstream gitleaks CLI directly so this works on user repos and
     # forks without any license setup.
-    # continue-on-error: any historical-secret finding is reported but does not
-    # block merging; remediate via `git filter-repo` and a config baseline.
-    continue-on-error: true
+    # Known false positives (test fixtures, doc placeholders, CI cache keys)
+    # are allowlisted in .gitleaks.toml; any new finding fails the job.
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -159,4 +158,4 @@ jobs:
           gitleaks version
 
       - name: Run gitleaks
-        run: gitleaks detect --source . --redact --no-banner --verbose
+        run: gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --verbose

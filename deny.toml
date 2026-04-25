@@ -19,9 +19,27 @@ feature-depth = 1
 db-path = "$CARGO_HOME/advisory-dbs"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
+# Triaged advisories with an acceptance rationale.
+#
+# All entries below are tracked for upgrade in follow-up work; they sit on the
+# critical path of larger framework upgrades (sqlx 0.7 → 0.8, reqwest 0.11 →
+# 0.12, soroban-sdk majors) that require coordinated code changes.
+#
+# Re-review cadence: this list MUST be revisited every 90 days. Entries should
+# be removed once the upstream upgrade has shipped and the advisory no longer
+# applies. cargo-deny 0.19.x does not support an `expires` field — the next
+# release (0.20+) does, at which point we should add expiry dates.
 ignore = [
-    # Add advisories here only after triage. Format:
-    # { id = "RUSTSEC-XXXX-XXXX", reason = "<why this is acceptable>", expires = "YYYY-MM-DD" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack — no fix available; comes from sqlx-mysql, mitigated by not exposing rsa-key timing to attackers (no MySQL TLS endpoints exposed externally)." },
+    { id = "RUSTSEC-2024-0363", reason = "sqlx 0.7 binary protocol cast — fixed in 0.8.1; upgrade is a breaking change tracked separately. Mitigated by validating request body size at the axum layer." },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained — transitive via utoipa-gen 4.x; resolved by utoipa 5.x upgrade (breaking)." },
+    { id = "RUSTSEC-2024-0388", reason = "derivative unmaintained — transitive via ark-ec from soroban-env-host; pinned by soroban-sdk version, no safe upgrade path until soroban-sdk releases without ark-ec." },
+    { id = "RUSTSEC-2024-0436", reason = "paste unmaintained — transitive via soroban-env-common and sqlx-core; no safe upgrade. Macro-only crate, no runtime risk." },
+    { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile unmaintained — transitive via reqwest 0.11; resolved by reqwest 0.12 (breaking change)." },
+    { id = "RUSTSEC-2026-0097", reason = "rand unsoundness with custom logger — narrow precondition not met by any code path in this repo (we use standard tracing, not a custom log::Log impl that calls rand::rng())." },
+    { id = "RUSTSEC-2026-0098", reason = "rustls-webpki name constraints (URI) — transitive via rustls 0.21 in reqwest 0.11; resolved by reqwest 0.12 / rustls 0.23 upgrade. Not exploitable here: the service does not validate certificates with URI name constraints." },
+    { id = "RUSTSEC-2026-0099", reason = "rustls-webpki wildcard name constraints — same upgrade chain as RUSTSEC-2026-0098. Same non-exploitability rationale." },
+    { id = "RUSTSEC-2026-0104", reason = "rustls-webpki CRL panic — same upgrade chain as RUSTSEC-2026-0098. Service does not parse CRLs from untrusted input." },
 ]
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,38 @@
+title = "ChainLogistics gitleaks config"
+
+# Inherit gitleaks's bundled rules and add scoped allowlists for known false
+# positives. Real secrets (Stellar private keys, JWT secrets, AWS keys, etc.)
+# remain blocked by the upstream rules — we only suppress patterns proven to
+# be non-secret in this repo (test fixtures, doc placeholders, CI cache keys).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "False positives — test fixtures, doc examples, and CI cache keys"
+
+paths = [
+  # Test files contain fake Stellar account public keys as fixtures.
+  '''.*\.test\.(ts|tsx|js|jsx)$''',
+  '''.*\.spec\.(ts|tsx|js|jsx)$''',
+
+  # API docs and Docker docs include example curl commands with placeholder
+  # bearer tokens (`Authorization: Bearer YOUR_API_KEY`). The placeholders are
+  # not credentials.
+  '''^docs/.*\.md$''',
+  '''^docker/.*\.md$''',
+
+  # GitHub Actions workflows reference real secrets via ${{ secrets.X }} —
+  # gitleaks does not flag those. Any literal `key:` here is a cache key
+  # required by actions/cache, not a credential.
+  '''^\.github/workflows/.*\.ya?ml$''',
+]
+
+regexes = [
+  # Stellar account public keys (G-prefix, 56-char base32). Public keys are
+  # not secrets, but generic-api-key matches their high-entropy form.
+  '''G[A-Z2-7]{55}''',
+  # Documentation placeholders for example commands.
+  '''YOUR_API_KEY''',
+  '''YOUR_TOKEN''',
+  '''YOUR_SECRET''',
+]

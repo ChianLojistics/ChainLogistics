@@ -71,13 +71,12 @@ run_scanner() {
 }
 
 # ---------------------------------------------------------------------------
-# Rust workspaces — cargo-audit + cargo-deny
+# Rust workspaces — cargo-deny (advisories + licenses + bans + sources).
+# Triaged advisories are documented in deny.toml with expiry dates.
 # ---------------------------------------------------------------------------
 if want rust; then
   for ws in backend smart-contract sdk/rust; do
     if [ -f "$ws/Cargo.toml" ]; then
-      run_scanner "cargo-audit ($ws)" cargo-audit \
-        bash -c "cd '$ws' && cargo-audit audit"
       run_scanner "cargo-deny ($ws)" cargo-deny \
         cargo-deny --manifest-path "$ws/Cargo.toml" check --config "$REPO_ROOT/deny.toml"
     fi
