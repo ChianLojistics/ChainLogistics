@@ -2,6 +2,7 @@
 name = "chainlojistic-backend"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }

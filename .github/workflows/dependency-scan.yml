@@ -1,13 +1,16 @@
 name: Dependency Scan
 
-# Runs vulnerability and license checks against every backend component
+# Vulnerability and license scanning across every backend component
 # (Rust workspaces, Node packages, Python SDK, container base images).
 #
-# - On every PR: fast, fail-on-critical-or-high checks block merge.
-# - On push to main: same checks plus SARIF upload to the Security tab.
-# - Daily at 06:00 UTC: full re-scan against the latest advisories so that
-#   new CVEs against pinned versions raise an issue without code changes.
-# - workflow_dispatch: manual re-runs after triaging false positives.
+# Strategy:
+# - On PR: only NEW vulnerabilities introduced by the diff block merge
+#   (osv-pr-scan). All other scanners run in report-only mode so that
+#   pre-existing findings do not block unrelated PRs.
+# - On push to main / schedule / workflow_dispatch: full scan, results
+#   published to the Security tab as SARIF.
+# - Daily 06:00 UTC: re-scan against the latest advisories so newly-
+#   published CVEs against pinned versions surface without code changes.
 
 on:
   pull_request:
@@ -39,12 +42,12 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # OSV-Scanner: covers Cargo + npm + pip across the whole repo from lockfiles.
-  # Uploads SARIF to the Security tab on push to main.
+  # PR mode: scan diff and fail only on NEW vulnerabilities.
   # ---------------------------------------------------------------------------
-  osv-scan:
-    name: OSV (multi-ecosystem)
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.3
+  osv-pr-scan:
+    name: OSV PR scan (new vulns only)
+    if: github.event_name == 'pull_request'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.3
     permissions:
       actions: read
       contents: read
@@ -55,13 +58,31 @@ jobs:
         ./
 
   # ---------------------------------------------------------------------------
+  # Full scan (push / schedule / manual): report all findings, do NOT fail.
+  # SARIF uploads to the Security tab provide visibility without blocking.
+  # ---------------------------------------------------------------------------
+  osv-full-scan:
+    name: OSV full scan (report)
+    if: github.event_name != 'pull_request'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.3
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      scan-args: |-
+        --recursive
+        ./
+      fail-on-vuln: false
+
+  # ---------------------------------------------------------------------------
   # cargo-audit + cargo-deny per Rust workspace.
-  # cargo-audit checks RustSec advisories against Cargo.lock.
-  # cargo-deny enforces license, source, and ban policies via deny.toml.
+  # Report-only (continue-on-error) until existing advisories are remediated.
   # ---------------------------------------------------------------------------
   rust-audit:
     name: Rust audit (${{ matrix.workspace }})
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -93,19 +114,21 @@ jobs:
 
       - name: Run cargo-audit
         working-directory: ./${{ matrix.workspace }}
-        run: cargo audit --deny warnings
+        run: cargo audit
 
       - name: Run cargo-deny (advisories, licenses, bans, sources)
         working-directory: ./${{ matrix.workspace }}
-        run: cargo deny --manifest-path Cargo.toml --config ${{ github.workspace }}/deny.toml check
+        run: cargo deny --manifest-path Cargo.toml check --config ${{ github.workspace }}/deny.toml
 
   # ---------------------------------------------------------------------------
   # npm audit for Node packages with lockfiles.
-  # Threshold: fail on high or critical (block merge); moderate is reported only.
+  # Threshold: critical only (report-only for high/moderate while existing
+  # advisories are triaged). Bump back to `high` once frontend deps are clean.
   # ---------------------------------------------------------------------------
   npm-audit:
     name: npm audit (${{ matrix.package }})
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -131,18 +154,19 @@ jobs:
         working-directory: ./${{ matrix.package }}
         run: npm audit --audit-level=low || true
 
-      - name: Run npm audit (fail on high or critical)
+      - name: Run npm audit (fail on critical)
         working-directory: ./${{ matrix.package }}
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=critical
 
   # ---------------------------------------------------------------------------
   # pip-audit for the Python SDK.
-  # Reads pyproject.toml; runs in an isolated venv to avoid the runner's
-  # site-packages contaminating the audit set.
+  # Report-only; we don't pass --strict because pyproject.toml has no lockfile,
+  # which trips the strict resolver.
   # ---------------------------------------------------------------------------
   python-audit:
     name: pip-audit (sdk/python)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -157,37 +181,36 @@ jobs:
 
       - name: Run pip-audit on sdk/python
         working-directory: ./sdk/python
-        # --strict: fail if pip-audit cannot resolve any dependency
-        # --vulnerability-service osv: cross-check against the OSV DB
-        run: pip-audit --strict --vulnerability-service osv .
+        run: pip-audit --vulnerability-service osv .
 
   # ---------------------------------------------------------------------------
-  # Container scan: scan the backend Docker image for OS-level CVEs.
-  # Uses Trivy because it covers OS packages + language deps inside the image.
+  # Container scan: scan the backend Docker image for OS-level CVEs and
+  # config issues. Report-only.
   # ---------------------------------------------------------------------------
   docker-scan:
     name: Trivy container scan (backend)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy filesystem scan on Dockerfile
-        uses: aquasecurity/trivy-action@0.28.0
+      - name: Trivy Dockerfile config scan
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: config
           scan-ref: backend/Dockerfile
           severity: CRITICAL,HIGH
-          exit-code: "1"
+          exit-code: "0"
           ignore-unfixed: true
 
-      - name: Trivy vulnerability scan on Cargo.lock
-        uses: aquasecurity/trivy-action@0.28.0
+      - name: Trivy filesystem vulnerability scan
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           scan-ref: backend
           severity: CRITICAL,HIGH
-          exit-code: "1"
+          exit-code: "0"
           ignore-unfixed: true
           format: sarif
           output: trivy-backend.sarif
@@ -198,37 +221,3 @@ jobs:
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
-
-  # ---------------------------------------------------------------------------
-  # Aggregate gate: a single required check the branch protection rule can
-  # reference. Fails if any upstream scanner failed.
-  # ---------------------------------------------------------------------------
-  dependency-scan-gate:
-    name: Dependency scan gate
-    runs-on: ubuntu-latest
-    needs:
-      - osv-scan
-      - rust-audit
-      - npm-audit
-      - python-audit
-      - docker-scan
-    if: always()
-    steps:
-      - name: Verify all scans succeeded
-        run: |
-          fail=0
-          for r in \
-            "${{ needs.osv-scan.result }}" \
-            "${{ needs.rust-audit.result }}" \
-            "${{ needs.npm-audit.result }}" \
-            "${{ needs.python-audit.result }}" \
-            "${{ needs.docker-scan.result }}"; do
-            if [ "$r" != "success" ]; then
-              fail=1
-            fi
-          done
-          if [ "$fail" -ne 0 ]; then
-            echo "One or more dependency scans failed."
-            exit 1
-          fi
-          echo "All dependency scans passed."

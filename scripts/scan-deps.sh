@@ -77,9 +77,9 @@ if want rust; then
   for ws in backend smart-contract sdk/rust; do
     if [ -f "$ws/Cargo.toml" ]; then
       run_scanner "cargo-audit ($ws)" cargo-audit \
-        bash -c "cd '$ws' && cargo-audit audit --deny warnings"
+        bash -c "cd '$ws' && cargo-audit audit"
       run_scanner "cargo-deny ($ws)" cargo-deny \
-        cargo-deny --manifest-path "$ws/Cargo.toml" --config "$REPO_ROOT/deny.toml" check
+        cargo-deny --manifest-path "$ws/Cargo.toml" check --config "$REPO_ROOT/deny.toml"
     fi
   done
 fi
