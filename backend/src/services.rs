@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
+use sha2::{Sha256, Digest};
+use rand::Rng;
 use crate::database::{ProductRepository, EventRepository, UserRepository, ApiKeyRepository, ProductFilters, GlobalStats};
 use crate::models::*;
 use bcrypt::{hash, DEFAULT_COST};
@@ -702,8 +704,34 @@ impl ApiKeyService {
         Self { pool }
     }
 
-    pub async fn hash_api_key(api_key: &str) -> Result<String, bcrypt::BcryptError> {
-        hash(api_key, DEFAULT_COST)
+    /// SHA-256 hash of an API key. API keys are long random strings with sufficient
+    /// entropy that bcrypt's computational cost is unnecessary and harmful to throughput.
+    pub fn hash_api_key(api_key: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(api_key.as_bytes());
+        hex::encode(hasher.finalize())
+    }
+
+    /// Generates a cryptographically secure API key: `cl_` prefix + 64 hex chars (256 bits entropy).
+    pub fn generate_api_key() -> String {
+        let bytes: [u8; 32] = rand::thread_rng().gen();
+        format!("cl_{}", hex::encode(bytes))
+    }
+
+    pub async fn disable_inactive_keys(&self, inactive_days: i64) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE api_keys
+            SET is_active = false
+            WHERE is_active = true
+              AND last_used_at IS NOT NULL
+              AND last_used_at < NOW() - INTERVAL '1 day' * $1
+            "#,
+            inactive_days
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 }
 

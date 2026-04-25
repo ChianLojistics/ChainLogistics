@@ -1,7 +1,7 @@
 use std::time::Duration;
 use sqlx::PgPool;
 use chrono::{DateTime, Utc};
-use crate::services::{SyncService, ProductService, EventService};
+use crate::services::{SyncService, ProductService, EventService, ApiKeyService};
 
 pub mod aggregation;
 pub mod crypto;
@@ -145,6 +145,20 @@ impl CronService {
                 
                 // Placeholder for sync logic
                 // sync_service.sync_from_contract().await;
+            }
+        });
+
+        // Disable API keys inactive for 90+ days — runs once per day
+        let api_key_service = ApiKeyService::new(pool.clone());
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(86400));
+            loop {
+                interval.tick().await;
+                match api_key_service.disable_inactive_keys(90).await {
+                    Ok(n) if n > 0 => tracing::info!("Disabled {} inactive API keys", n),
+                    Ok(_) => {}
+                    Err(e) => tracing::error!("Failed to disable inactive API keys: {}", e),
+                }
             }
         });
 

@@ -31,8 +31,7 @@ pub async fn api_key_auth(
         .ok_or_else(|| AppError::Unauthorized)?;
 
     // Hash the provided API key to compare with stored hash
-    let key_hash = crate::services::ApiKeyService::hash_api_key(auth_header)
-        .map_err(|e| AppError::Internal(format!("Failed to hash API key: {}", e)))?;
+    let key_hash = crate::services::ApiKeyService::hash_api_key(auth_header);
 
     // Look up API key in database
     let api_key = state
