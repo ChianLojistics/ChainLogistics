@@ -7,6 +7,7 @@ pub struct Config {
     pub server: ServerConfig,
     pub redis: RedisConfig,
     pub encryption_key: String,
+    pub jwt_secret: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +54,8 @@ impl Default for Config {
             },
             encryption_key: env::var("ENCRYPTION_KEY")
                 .unwrap_or_else(|_| "0123456789abcdef0123456789abcdef".to_string()), // 32 chars for AES-256
+            jwt_secret: env::var("JWT_SECRET")
+                .unwrap_or_else(|_| "default_jwt_secret_change_me_in_production".to_string()),
         }
     }
 }

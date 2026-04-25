@@ -42,8 +42,14 @@ impl IntoResponse for AppError {
                 tracing::error!("Database error: {}", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
             }
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
-            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
+            AppError::Unauthorized => {
+                tracing::warn!("Unauthorized access attempt");
+                (StatusCode::UNAUTHORIZED, "Unauthorized".to_string())
+            }
+            AppError::Forbidden(msg) => {
+                tracing::warn!("Forbidden access attempt: {}", msg);
+                (StatusCode::FORBIDDEN, msg)
+            }
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::Validation(msg) => (StatusCode::BAD_REQUEST, msg),
             AppError::RateLimit => (StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded".to_string()),
