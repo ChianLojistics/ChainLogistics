@@ -7,6 +7,7 @@ pub struct Config {
     pub server: ServerConfig,
     pub redis: RedisConfig,
     pub security: SecurityConfig,
+    pub encryption_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +83,8 @@ impl Default for Config {
                     .map(|s| s.trim().to_string())
                     .collect(),
             },
+            encryption_key: env::var("ENCRYPTION_KEY")
+                .unwrap_or_else(|_| "0123456789abcdef0123456789abcdef".to_string()), // 32 chars for AES-256
         }
     }
 }
