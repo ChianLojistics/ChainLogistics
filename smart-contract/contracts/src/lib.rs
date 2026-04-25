@@ -58,6 +58,10 @@ mod test_integration;
 #[path = "test/integration_tests.rs"]
 mod integration_tests;
 
+#[cfg(test)]
+#[path = "test/supply_chain_scenarios.rs"]
+mod supply_chain_scenarios;
+
 pub use authorization::*;
 pub use contract::*;
 pub use error::*;

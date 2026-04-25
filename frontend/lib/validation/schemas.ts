@@ -79,3 +79,33 @@ export const eventTrackingSchema = z.object({
 });
 
 export type EventTrackingValues = z.infer<typeof eventTrackingSchema>;
+
+// ─── Transfer Product Schema ──────────────────────────────────────────────────
+
+export const transferProductSchema = z.object({
+  productId: productIdSchema,
+  recipientAddress: stellarPublicKeySchema,
+});
+
+export type TransferProductValues = z.infer<typeof transferProductSchema>;
+
+// ─── Product Search Schema ────────────────────────────────────────────────────
+
+export const PRODUCT_SEARCH_MIN_LEN = 1;
+export const PRODUCT_SEARCH_MAX_LEN = 128;
+
+export const productSearchSchema = z.object({
+  query: z
+    .string()
+    .min(PRODUCT_SEARCH_MIN_LEN, VALIDATION_MESSAGES.required("Search query"))
+    .max(
+      PRODUCT_SEARCH_MAX_LEN,
+      VALIDATION_MESSAGES.maxLength("Search query", PRODUCT_SEARCH_MAX_LEN)
+    )
+    .regex(
+      /^[a-zA-Z0-9 \-_.,]+$/,
+      "Search query contains invalid characters"
+    ),
+});
+
+export type ProductSearchValues = z.infer<typeof productSearchSchema>;
