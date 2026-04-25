@@ -76,7 +76,10 @@ fn is_signer(env: &Env, address: &Address) -> bool {
 /// Check if the threshold has been reached for a specific proposal kind.
 fn threshold_reached(env: &Env, kind: &Symbol, approvals: &Vec<Address>) -> bool {
     if let Some(config) = get_multisig_config(env) {
-        let threshold = config.thresholds.get(kind.clone()).unwrap_or(config.threshold);
+        let threshold = config
+            .thresholds
+            .get(kind.clone())
+            .unwrap_or(config.threshold);
         approvals.len() >= threshold as u32
     } else {
         false
@@ -86,11 +89,14 @@ fn threshold_reached(env: &Env, kind: &Symbol, approvals: &Vec<Address>) -> bool
 /// Check if the rejection threshold has been reached.
 /// For simplicity, we'll say if more than (Total - Threshold) have rejected, it's rejected.
 /// Or just any signer can reject for now? The requirements say "Audit trail of approvals and rejections".
-/// Let's say if 1/3 of signers reject, or just if any signer rejects? 
+/// Let's say if 1/3 of signers reject, or just if any signer rejects?
 /// Typically, "rejected" means it can no longer be approved.
 fn rejection_threshold_reached(env: &Env, kind: &Symbol, rejections: &Vec<Address>) -> bool {
     if let Some(config) = get_multisig_config(env) {
-        let threshold = config.thresholds.get(kind.clone()).unwrap_or(config.threshold);
+        let threshold = config
+            .thresholds
+            .get(kind.clone())
+            .unwrap_or(config.threshold);
         let max_rejections = config.signers.len() - threshold as u32 + 1;
         rejections.len() >= max_rejections
     } else {
@@ -408,7 +414,8 @@ impl MultiSigContract {
         // We pass the current contract address as the first argument if the target expects a 'caller' argument
         // Many functions in our contracts take 'caller' as the first or second argument.
         // However, for generic support, we just pass the args as provided.
-        let _result: Val = env.invoke_contract(&proposal.target, &proposal.kind, proposal.args.clone());
+        let _result: Val =
+            env.invoke_contract(&proposal.target, &proposal.kind, proposal.args.clone());
 
         // Emit execution event
         env.events().publish(
