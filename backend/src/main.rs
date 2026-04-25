@@ -36,6 +36,7 @@ pub struct AppState {
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
+    pub redis_client: redis::Client,
     pub config: Config,
 }
 
@@ -49,19 +50,22 @@ impl AppState {
         // Run migrations
         db.migrate().await?;
         
+        // Initialize Redis client
+        let redis_client = redis::Client::open(config.redis.url.as_str())?;
+        
         // Create services
-        let product_service = Arc::new(ProductService::new(db.pool().clone()));
-        let event_service = Arc::new(EventService::new(db.pool().clone()));
-        let user_service = Arc::new(UserService::new(db.pool().clone()));
+        let product_service = Arc::new(ProductService::new(db.pool().clone(), redis_client.clone()));
+        let event_service = Arc::new(EventService::new(db.pool().clone(), redis_client.clone()));
+        let user_service = Arc::new(UserService::new(db.pool().clone(), config.encryption_key.clone()));
         let api_key_service = Arc::new(ApiKeyService::new(db.pool().clone()));
-        let sync_service = Arc::new(SyncService::new(db.pool().clone()));
+        let sync_service = Arc::new(SyncService::new(db.pool().clone(), redis_client.clone()));
         let financial_service = Arc::new(FinancialService::new(db.pool().clone()));
         let analytics_service = Arc::new(AnalyticsService::new(
             db.pool().clone(),
             config.redis.url.clone(),
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
-
+        
         Ok(Self {
             db,
             product_service,
@@ -72,6 +76,7 @@ impl AppState {
             financial_service,
             analytics_service,
             carbon_service,
+            redis_client,
             config,
         })
     }
@@ -87,8 +92,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create application state
     let app_state = AppState::new().await?;
     
-    // Start cron scheduler
-    let cron_service = CronService::new(app_state.db.pool().clone());
+    // Start background services
+    let cron_service = CronService::new(app_state.db.pool().clone(), app_state.redis_client.clone());
     cron_service.start_scheduler().await;
     
     // Build router

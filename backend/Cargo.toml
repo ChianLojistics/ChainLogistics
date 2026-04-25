@@ -32,3 +32,9 @@ utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
 tower-test = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 testcontainers = "0.15"
+
+[dependencies.aes-gcm]
+version = "0.10"
+
+[dependencies.base64]
+version = "0.21"
