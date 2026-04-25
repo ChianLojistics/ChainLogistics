@@ -59,21 +59,25 @@ pub enum Error {
     InvalidThreshold = 66,
     TooManySigners = 67,
     DuplicateSigner = 68,
+    ProposalRejected = 69,
+    TimeLockNotExpired = 70,
+    AlreadyRejected = 71,
+    ProposalExpired = 72,
 
-    // --- Oracle Security (70-80) ---
-    OracleFeedNotConfigured = 70,
-    OracleSourceNotFound = 71,
-    OracleReportStale = 72,
-    OracleValueOutOfRange = 73,
-    OracleConsensusBroken = 74,
-    OracleFallbackUnavailable = 75,
-    DuplicateOracleSource = 76,
-    OracleInvalidStake = 77,
+    // --- Oracle Security (73-80) ---
+    OracleFeedNotConfigured = 73,
+    OracleSourceNotFound = 74,
+    OracleReportStale = 75,
+    OracleValueOutOfRange = 76,
+    OracleConsensusBroken = 77,
+    OracleFallbackUnavailable = 78,
+    DuplicateOracleSource = 79,
+    OracleInvalidStake = 80,
 
-    // --- Timelock (80-90) ---
-    TimelockNotReady = 80,
-    TimelockExpired = 81,
-    TimelockDelayTooShort = 82,
-    TimelockDelayTooLong = 83,
-    TimelockCancelled = 84,
+    // --- Timelock (81-90) ---
+    TimelockNotReady = 81,
+    TimelockExpired = 82,
+    TimelockDelayTooShort = 83,
+    TimelockDelayTooLong = 84,
+    TimelockCancelled = 85,
 }
