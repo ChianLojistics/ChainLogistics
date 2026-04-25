@@ -14,6 +14,8 @@ ChainLogistics is a decentralized supply chain tracking platform that enables tr
 6. [Developer Guide](#developer-guide)
 7. [Troubleshooting](#troubleshooting)
 8. [Best Practices](#best-practices)
+9. [FAQ](#faq)
+10. [Video Tutorials](#video-tutorials)
 
 ---
 
@@ -1416,6 +1418,158 @@ When reporting issues, include:
 - Use batch operations
 - Optimize API calls
 - Monitor performance metrics
+
+---
+
+## FAQ
+
+### General Questions
+
+**Q: What is ChainLogistics?**  
+A: ChainLogistics is a decentralized supply chain tracking platform built on Stellar blockchain that enables transparent, tamper-proof tracking of products from origin to consumer.
+
+**Q: How does ChainLogistics ensure data integrity?**  
+A: All tracking events are recorded on the Stellar blockchain, which provides immutable, cryptographically verified records. Once an event is recorded, it cannot be altered or deleted.
+
+**Q: Do I need cryptocurrency to use ChainLogistics?**  
+A: Yes, you need a Stellar wallet with XLM to pay for transaction fees. However, the fees are minimal (typically less than 0.01 XLM per transaction).
+
+**Q: Is my data private?**  
+A: ChainLogistics uses a hybrid approach. Product tracking data is public on the blockchain for transparency, but user account information and business details are stored securely off-chain and only accessible to authorized parties.
+
+### Producer Questions
+
+**Q: How do I register my first product?**  
+A: After connecting your wallet and completing producer onboarding, navigate to the "Products" section and click "Register New Product". Fill in the required product details and submit. The transaction will be recorded on the blockchain.
+
+**Q: Can I update product information after registration?**  
+A: Basic product information like name and description cannot be changed after registration for security reasons. However, you can add new tracking events and certifications at any time.
+
+**Q: What happens if I lose my wallet credentials?**  
+A: If you lose your wallet credentials, you will lose access to your account. This is why it's critical to backup your recovery phrase securely. ChainLogistics cannot recover lost credentials.
+
+**Q: How do I authorize partners to add tracking events?**  
+A: In the product details view, navigate to the "Authorized Partners" section and add the wallet addresses of partners you want to authorize. They will then be able to add tracking events to your products.
+
+### Supply Chain Partner Questions
+
+**Q: How do I add tracking events?**  
+A: When you receive a product, scan its QR code or enter its ID. Navigate to the "Add Event" section, select the event type (e.g., "received", "shipped", "processed"), fill in the required information, and submit.
+
+**Q: What event types are available?**  
+A: Common event types include: created, received, shipped, in_transit, processed, quality_checked, delivered, and custom events for specific workflows.
+
+**Q: Can I add events to products I don't own?**  
+A: Only if the product owner has authorized your wallet address. Contact the product owner to request authorization.
+
+**Q: What information should I include in tracking events?**  
+A: Include location, timestamp, relevant conditions (temperature, humidity if applicable), any quality checks performed, and supporting documentation.
+
+### Consumer Questions
+
+**Q: How do I verify a product's authenticity?**  
+A: Scan the product's QR code using the ChainLogistics mobile app or web portal. You'll see the complete product journey from origin to current location, along with all tracking events and certifications.
+
+**Q: What should I do if I suspect a product is counterfeit?**  
+A: Use the "Report Issue" feature in the product details view to report suspicious products. Include photos and any evidence you have. The report will be sent to the product owner and administrators.
+
+**Q: Can I see the environmental impact of products?**  
+A: Yes, if the producer and partners have included environmental data (carbon footprint, temperature logs, etc.), this information will be visible in the product journey.
+
+**Q: How do I report quality issues?**  
+A: Navigate to the product details, click "Report Issue", select the issue type, and provide details. This creates a permanent record on the blockchain.
+
+### Administrator Questions
+
+**Q: How do I manage user permissions?**  
+A: In the Admin Dashboard, navigate to "User Management". You can view, approve, suspend, or remove users. You can also assign roles and permissions.
+
+**Q: What happens when the contract is paused?**  
+A: When paused, no new tracking events can be added, and product registrations are disabled. Existing data remains readable. This is used during emergencies or upgrades.
+
+**Q: How do I initiate a contract upgrade?**  
+A: Contract upgrades require multi-signature approval. Submit a proposal through the Admin Dashboard, wait for the required number of approvals, then execute the upgrade.
+
+**Q: Can I export data for analysis?**  
+A: Yes, use the "Export" feature in the Admin Dashboard to export tracking data, user data, or statistics in CSV or JSON format.
+
+### Developer Questions
+
+**Q: How do I get API access?**  
+A: Register for a developer account in the portal, then navigate to "API Keys" to generate your API key. Review the API documentation for integration guidelines.
+
+**Q: What are the rate limits?**  
+A: The API has rate limits of 100 requests per minute per API key. For higher limits, contact support to discuss enterprise plans.
+
+**Q: How do I handle errors?**  
+A: All API errors return structured JSON with error codes and messages. Refer to the Error Handling Standards documentation for detailed error handling patterns.
+
+**Q: Is there a testnet for development?**  
+A: Yes, ChainLogistics operates on Stellar testnet for development. Use testnet XLM for testing. Production requires mainnet XLM.
+
+### Security Questions
+
+**Q: How secure is my data?**  
+A: Data is secured through blockchain cryptography, HTTPS encryption, and secure off-chain storage. We follow industry best practices for data security.
+
+**Q: What happens during a network outage?**  
+A: During Stellar network outages, you cannot submit new transactions. However, you can still view existing data. Transactions will be queued and submitted when the network recovers.
+
+**Q: How do I report a security vulnerability?**  
+A: Email security@chainlogistics.io with details. We follow responsible disclosure practices and may offer bounties for critical vulnerabilities.
+
+---
+
+## Video Tutorials
+
+### Getting Started
+
+- **[Wallet Setup Guide](https://youtube.com/watch?v=example1)** - How to set up and secure your Freighter wallet (5 min)
+- **[Account Registration](https://youtube.com/watch?v=example2)** - Step-by-step account registration walkthrough (3 min)
+- **[Platform Overview](https://youtube.com/watch?v=example3)** - Quick tour of the ChainLogistics platform (8 min)
+
+### Producer Tutorials
+
+- **[Registering Your First Product](https://youtube.com/watch?v=example4)** - Complete product registration walkthrough (7 min)
+- **[Managing Product Information](https://youtube.com/watch?v=example5)** - How to update and maintain product data (6 min)
+- **[Authorizing Partners](https://youtube.com/watch?v=example6)** - Setting up partner authorizations (5 min)
+- **[Understanding Certifications](https://youtube.com/watch?v=example7)** - Adding and managing product certifications (4 min)
+
+### Supply Chain Partner Tutorials
+
+- **[Adding Tracking Events](https://youtube.com/watch?v=example8)** - How to add various types of tracking events (6 min)
+- **[Scanning QR Codes](https://youtube.com/watch?v=example9)** - Using the mobile app for quick event entry (3 min)
+- **[Batch Event Processing](https://youtube.com/watch?v=example10)** - Handling multiple products efficiently (5 min)
+- **[Quality Check Workflows](https://youtube.com/watch?v=example11)** - Documenting quality inspections (4 min)
+
+### Consumer Tutorials
+
+- **[Verifying Product Authenticity](https://youtube.com/watch?v=example12)** - How to scan and verify products (3 min)
+- **[Understanding Product Journeys](https://youtube.com/watch?v=example13)** - Reading and interpreting tracking history (5 min)
+- **[Reporting Issues](https://youtube.com/watch?v=example14)** - How to report quality or authenticity concerns (4 min)
+
+### Administrator Tutorials
+
+- **[Admin Dashboard Overview](https://youtube.com/watch?v=example15)** - Complete admin dashboard walkthrough (10 min)
+- **[User Management](https://youtube.com/watch?v=example16)** - Managing users and permissions (7 min)
+- **[Contract Management](https://youtube.com/watch?v=example17)** - Pausing, unpausing, and upgrading contracts (8 min)
+- **[Multi-Signature Operations](https://youtube.com/watch?v=example18)** - Using multi-sig for administrative actions (6 min)
+
+### Developer Tutorials
+
+- **[API Integration Basics](https://youtube.com/watch?v=example19)** - Getting started with the ChainLogistics API (12 min)
+- **[SDK Usage](https://youtube.com/watch?v=example20)** - Using the official SDKs in your applications (10 min)
+- **[Webhook Setup](https://youtube.com/watch?v=example21)** - Setting up real-time event notifications (8 min)
+- **[Error Handling](https://youtube.com/watch?v=example22)** - Best practices for handling API errors (6 min)
+
+### Advanced Topics
+
+- **[Smart Contract Interaction](https://youtube.com/watch?v=example23)** - Direct smart contract integration (15 min)
+- **[Custom Workflows](https://youtube.com/watch?v=example24)** - Building custom tracking workflows (12 min)
+- **[Analytics and Reporting](https://youtube.com/watch?v=example25)** - Creating custom reports and dashboards (10 min)
+- **[Security Best Practices](https://youtube.com/watch?v=example26)** - Securing your integration (8 min)
+
+*Note: Video tutorials are hosted on our YouTube channel. New tutorials are added regularly. Subscribe to stay updated.*
 
 ---
 
