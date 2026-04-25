@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 mod config;
-mod middleware as app_middleware;
+mod middleware;
 mod routes;
 mod handlers;
 mod services;
@@ -106,15 +106,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .layer(TraceLayer::new_for_http())
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
-                    app_middleware::security::enforce_https,
+                    middleware::security::enforce_https,
                 ))
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
-                    app_middleware::security::security_headers,
+                    middleware::security::security_headers,
                 ))
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
-                    app_middleware::security::cors_policy,
+                    middleware::security::cors_policy,
                 ))
         )
         .with_state(app_state.clone());

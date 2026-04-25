@@ -65,7 +65,7 @@ fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
 fn index_product(env: &Env, product: &Product) {
     // Index only meaningful fields to reduce gas costs
     // Use full text as single keyword for efficient lookups
-    
+
     // Index name (most common search field)
     if product.name.len() > 2 {
         storage::add_to_search_index(env, product.name.clone(), &product.id);
