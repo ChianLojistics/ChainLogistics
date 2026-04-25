@@ -29,7 +29,7 @@ fn public_api_routes() -> Router<AppState> {
             .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator]))))
         .route("/audit/report", get(crate::handlers::compliance::generate_audit_report)
             .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator]))))
-        .layer(middleware::from_fn_with_state(crate::AppState::clone, api_key_auth))
+        .layer(middleware::from_fn(api_key_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -50,7 +50,7 @@ fn admin_api_routes() -> Router<AppState> {
         .route("/auth/login", post(crate::handlers::auth::login))
         .route("/auth/register", post(crate::handlers::auth::register))
         .layer(middleware::from_fn(require_admin))
-        .layer(middleware::from_fn_with_state(crate::AppState::clone, jwt_auth))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -69,7 +69,7 @@ fn analytics_routes() -> Router<AppState> {
         .route("/users", get(crate::routes::analytics::user_analytics))
         .route("/export", get(crate::routes::analytics::export))
         .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator])))
-        .layer(middleware::from_fn_with_state(crate::AppState::clone, jwt_auth))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -78,7 +78,7 @@ fn key_management_routes() -> Router<AppState> {
         .route("/", get(crate::handlers::api_keys::list_keys).post(crate::handlers::api_keys::create_key))
         .route("/:id/revoke", post(crate::handlers::api_keys::revoke_key))
         .route("/:id/rotate", post(crate::handlers::api_keys::rotate_key))
-        .layer(middleware::from_fn_with_state(crate::AppState::clone, jwt_auth))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -103,6 +103,6 @@ fn carbon_routes() -> Router<AppState> {
         .route("/verify/:credit_id", get(crate::handlers::carbon::list_verifications))
         // Reports
         .route("/reports", get(crate::handlers::carbon::list_reports).post(crate::handlers::carbon::generate_report))
-        .layer(middleware::from_fn_with_state(crate::AppState::clone, jwt_auth))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
