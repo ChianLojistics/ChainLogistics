@@ -80,7 +80,7 @@ fn threshold_reached(env: &Env, kind: &Symbol, approvals: &Vec<Address>) -> bool
             .thresholds
             .get(kind.clone())
             .unwrap_or(config.threshold);
-        approvals.len() >= threshold as u32
+        approvals.len() >= threshold
     } else {
         false
     }
@@ -97,7 +97,7 @@ fn rejection_threshold_reached(env: &Env, kind: &Symbol, rejections: &Vec<Addres
             .thresholds
             .get(kind.clone())
             .unwrap_or(config.threshold);
-        let max_rejections = config.signers.len() - threshold as u32 + 1;
+        let max_rejections = config.signers.len() - threshold + 1;
         rejections.len() >= max_rejections
     } else {
         false
