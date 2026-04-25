@@ -7,22 +7,30 @@ use axum::{
 use std::sync::Arc;
 use tower::ServiceExt;
 
-use crate::{AppState, error::AppError};
+use crate::{AppState, error::AppError, models::UserRole};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     pub user_id: uuid::Uuid,
-    pub api_key_id: uuid::Uuid,
-    pub tier: crate::models::ApiKeyTier,
+    pub api_key_id: Option<uuid::Uuid>,
+    pub tier: Option<crate::models::ApiKeyTier>,
     pub stellar_address: Option<String>,
+    pub role: UserRole,
 }
 
-pub async fn api_key_auth(
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String, // User ID
+    pub exp: usize,
+    pub role: UserRole,
+}
+
+pub async fn jwt_auth(
     State(state): State<AppState>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
-    // Extract API key from Authorization header
     let auth_header = request
         .headers()
         .get(header::AUTHORIZATION)
@@ -30,17 +38,55 @@ pub async fn api_key_auth(
         .and_then(|h| h.strip_prefix("Bearer "))
         .ok_or_else(|| AppError::Unauthorized)?;
 
-    // Hash the provided API key to compare with stored hash
+    let token_data = jsonwebtoken::decode::<Claims>(
+        auth_header,
+        &jsonwebtoken::DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+        &jsonwebtoken::Validation::default(),
+    )
+    .map_err(|_| AppError::Unauthorized)?;
+
+    let user_id = uuid::Uuid::parse_str(&token_data.claims.sub)
+        .map_err(|_| AppError::Unauthorized)?;
+
+    let user = state.user_service.get_user(user_id).await?
+        .ok_or_else(|| AppError::Unauthorized)?;
+
+    if !user.is_active {
+        return Err(AppError::Unauthorized);
+    }
+
+    let auth_context = AuthContext {
+        user_id: user.id,
+        api_key_id: None,
+        tier: None,
+        stellar_address: user.stellar_address,
+        role: user.role,
+    };
+
+    request.extensions_mut().insert(auth_context);
+    Ok(next.run(request).await)
+}
+
+pub async fn api_key_auth(
+    State(state): State<AppState>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, AppError> {
+    let auth_header = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::Unauthorized)?;
+
     let key_hash = crate::services::ApiKeyService::hash_api_key(auth_header);
 
-    // Look up API key in database
     let api_key = state
         .api_key_service
         .get_api_key_by_hash(&key_hash)
         .await?
         .ok_or_else(|| AppError::Unauthorized)?;
 
-    // Check if API key is active and not expired
     if !api_key.is_active {
         return Err(AppError::Unauthorized);
     }
@@ -51,7 +97,6 @@ pub async fn api_key_auth(
         }
     }
 
-    // Get user information
     let user = state
         .user_service
         .get_user(api_key.user_id)
@@ -62,22 +107,36 @@ pub async fn api_key_auth(
         return Err(AppError::Unauthorized);
     }
 
-    // Update last used timestamp
     let _ = state.api_key_service.update_last_used(api_key.id).await;
 
-    // Create auth context
     let auth_context = AuthContext {
         user_id: user.id,
-        api_key_id: api_key.id,
-        tier: api_key.tier,
+        api_key_id: Some(api_key.id),
+        tier: Some(api_key.tier),
         stellar_address: user.stellar_address,
+        role: user.role,
     };
 
-    // Add auth context to request extensions
     request.extensions_mut().insert(auth_context);
-
-    // Continue with the request
     Ok(next.run(request).await)
+}
+
+pub fn require_role(roles: Vec<UserRole>) -> impl Fn(Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, AppError>> + Send>> + Clone {
+    move |request: Request, next: Next| {
+        let roles = roles.clone();
+        Box::pin(async move {
+            let auth_context = request
+                .extensions()
+                .get::<AuthContext>()
+                .ok_or_else(|| AppError::Unauthorized)?;
+
+            if !roles.iter().any(|r| std::mem::discriminant(r) == std::mem::discriminant(&auth_context.role)) {
+                return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+            }
+
+            Ok(next.run(request).await)
+        })
+    }
 }
 
 pub async fn require_admin(
@@ -89,16 +148,12 @@ pub async fn require_admin(
         .get::<AuthContext>()
         .ok_or_else(|| AppError::Unauthorized)?;
 
-    // Check if user is admin (you might want to add this to the User model)
-    let user_id = auth_context.user_id;
-    
-    // For now, we'll skip the admin check since it's not in the User model
-    // In a real implementation, you'd check user.is_admin
-    
-    Ok(next.run(request).await)
+    match auth_context.role {
+        UserRole::Administrator => Ok(next.run(request).await),
+        _ => Err(AppError::Forbidden("Admin access required".to_string())),
+    }
 }
 
-// Helper function to extract auth context from request
 pub fn get_auth_context(request: &Request) -> Result<&AuthContext, AppError> {
     request
         .extensions()

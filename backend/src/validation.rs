@@ -1,4 +1,11 @@
 use crate::error::AppError;
+use regex::Regex;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref SQL_INJECTION_REGEX: Regex = Regex::new(r"(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|EXECUTE|TRUNCATE|--|\*)").unwrap();
+    static ref XSS_REGEX: Regex = Regex::new(r"(?i)<script.*?>.*?</script>|on\w+?\s*=").unwrap();
+}
 
 const STELLAR_ADDRESS_LEN: usize = 56;
 
@@ -27,15 +34,30 @@ pub fn validate_string(field: &str, value: &str, max_len: usize) -> Result<(), A
             field, max_len
         )));
     }
+    
+    // Check for suspicious SQL injection patterns
+    if SQL_INJECTION_REGEX.is_match(value) {
+        tracing::warn!("Suspicious SQL injection pattern detected in field {}: {}", field, value);
+        return Err(AppError::Validation(format!(
+            "Input contains suspicious characters or patterns in field {}",
+            field
+        )));
+    }
+    
     Ok(())
 }
 
-/// Strips HTML tags and trims whitespace from user input.
+/// Robustly sanitizes user input to prevent XSS and other injection attacks.
 pub fn sanitize_input(input: &str) -> String {
-    // Remove anything that looks like an HTML/script tag
-    let mut result = String::with_capacity(input.len());
+    let mut sanitized = input.to_string();
+    
+    // Remove scripts and event handlers
+    sanitized = XSS_REGEX.replace_all(&sanitized, "").to_string();
+    
+    // Remove HTML tags
+    let mut result = String::with_capacity(sanitized.len());
     let mut in_tag = false;
-    for ch in input.chars() {
+    for ch in sanitized.chars() {
         match ch {
             '<' => in_tag = true,
             '>' => in_tag = false,
@@ -43,6 +65,8 @@ pub fn sanitize_input(input: &str) -> String {
             _ => {}
         }
     }
+    
+    // Trim and return
     result.trim().to_string()
 }
 
@@ -55,6 +79,23 @@ pub fn validate_amount(amount: &str) -> Result<(), AppError> {
         return Err(AppError::Validation(
             "Amount must be greater than zero".to_string(),
         ));
+    }
+    Ok(())
+}
+
+/// Validates an email address format.
+pub fn validate_email(email: &str) -> Result<(), AppError> {
+    let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
+    if !email_regex.is_match(email) {
+        return Err(AppError::Validation("Invalid email format".to_string()));
+    }
+    Ok(())
+}
+
+/// Validates a generic UUID string.
+pub fn validate_uuid(uuid: &str) -> Result<(), AppError> {
+    if uuid::Uuid::parse_str(uuid).is_err() {
+        return Err(AppError::Validation("Invalid UUID format".to_string()));
     }
     Ok(())
 }

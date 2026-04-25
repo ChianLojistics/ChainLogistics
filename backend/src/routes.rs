@@ -1,5 +1,7 @@
 use axum::{Router, routing::{get, post, put, delete}, middleware};
 use super::AppState;
+use crate::models::UserRole;
+use crate::middleware::auth::{jwt_auth, api_key_auth, require_role, require_admin};
 
 pub mod analytics;
 
@@ -21,10 +23,13 @@ fn public_api_routes() -> Router<AppState> {
         .route("/stats", get(crate::handlers::stats::get_stats))
         .route("/transactions", get(crate::handlers::financial::list_transactions))
         .route("/transactions/:id", get(crate::handlers::financial::get_transaction))
-        .route("/compliance/check", post(crate::handlers::compliance::check_compliance))
-        .route("/compliance/report/:product_id", get(crate::handlers::compliance::get_compliance_report))
-        .route("/audit/report", get(crate::handlers::compliance::generate_audit_report))
-        .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
+        .route("/compliance/check", post(crate::handlers::compliance::check_compliance)
+            .layer(middleware::from_fn(require_role(vec![UserRole::Inspector, UserRole::Administrator]))))
+        .route("/compliance/report/:product_id", get(crate::handlers::compliance::get_compliance_report)
+            .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator]))))
+        .route("/audit/report", get(crate::handlers::compliance::generate_audit_report)
+            .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator]))))
+        .layer(middleware::from_fn(api_key_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -32,16 +37,20 @@ fn admin_api_routes() -> Router<AppState> {
     Router::new()
         .route("/products", post(crate::handlers::product::create_product))
         .route("/products/:id", put(crate::handlers::product::update_product).delete(crate::handlers::product::delete_product))
-        .route("/events", post(crate::handlers::event::create_event))
-        .route("/transactions", post(crate::handlers::financial::create_transaction))
-        .route("/invoices", post(crate::handlers::financial::create_invoice))
-        .route("/financing/request", post(crate::handlers::financial::request_financing))
+        .route("/events", post(crate::handlers::event::create_event)
+            .layer(middleware::from_fn(require_role(vec![UserRole::Supplier, UserRole::Carrier, UserRole::Administrator]))))
+        .route("/transactions", post(crate::handlers::financial::create_transaction)
+            .layer(middleware::from_fn(require_role(vec![UserRole::Supplier, UserRole::Administrator]))))
+        .route("/invoices", post(crate::handlers::financial::create_invoice)
+            .layer(middleware::from_fn(require_role(vec![UserRole::Supplier, UserRole::Administrator]))))
+        .route("/financing/request", post(crate::handlers::financial::request_financing)
+            .layer(middleware::from_fn(require_role(vec![UserRole::Supplier, UserRole::Administrator]))))
         .route("/users", post(crate::handlers::user::create_user))
         .route("/users/me", get(crate::handlers::user::get_current_user))
         .route("/auth/login", post(crate::handlers::auth::login))
         .route("/auth/register", post(crate::handlers::auth::register))
-        .layer(middleware::from_fn(crate::middleware::auth::require_admin))
-        .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
+        .layer(middleware::from_fn(require_admin))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -59,7 +68,8 @@ fn analytics_routes() -> Router<AppState> {
         .route("/events", get(crate::routes::analytics::event_analytics))
         .route("/users", get(crate::routes::analytics::user_analytics))
         .route("/export", get(crate::routes::analytics::export))
-        .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
+        .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator])))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -68,7 +78,7 @@ fn key_management_routes() -> Router<AppState> {
         .route("/", get(crate::handlers::api_keys::list_keys).post(crate::handlers::api_keys::create_key))
         .route("/:id/revoke", post(crate::handlers::api_keys::revoke_key))
         .route("/:id/rotate", post(crate::handlers::api_keys::rotate_key))
-        .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -93,6 +103,6 @@ fn carbon_routes() -> Router<AppState> {
         .route("/verify/:credit_id", get(crate::handlers::carbon::list_verifications))
         // Reports
         .route("/reports", get(crate::handlers::carbon::list_reports).post(crate::handlers::carbon::generate_report))
-        .layer(middleware::from_fn(crate::middleware::auth::api_key_auth))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }

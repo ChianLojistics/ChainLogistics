@@ -11,13 +11,20 @@ use crate::{
     error::AppError,
     models::digital_twin::*,
     AppState,
+    validation::{validate_string, sanitize_input},
 };
 
 /// Create a new digital twin
 pub async fn create_digital_twin(
     State(state): State<AppState>,
-    Json(request): Json<CreateDigitalTwinRequest>,
+    Json(mut request): Json<CreateDigitalTwinRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    validate_string("name", &request.name, 128)?;
+    validate_string("description", &request.description, 1024)?;
+    
+    request.name = sanitize_input(&request.name);
+    request.description = sanitize_input(&request.description);
+
     let twin = state
         .digital_twin_service
         .create_twin(request)

@@ -40,16 +40,28 @@ pub struct TrackingEvent {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "text", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum UserRole {
+    Supplier,
+    Carrier,
+    Inspector,
+    Customer,
+    Administrator,
+    Auditor,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
     pub email: String,
     pub password_hash: String,
     pub stellar_address: Option<String>,
+    pub role: UserRole,
     pub api_key: Option<String>,
     pub api_key_hash: Option<String>,
     pub is_active: bool,
-    pub is_admin: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
@@ -131,6 +143,7 @@ pub struct NewUser {
     pub email: String,
     pub password_hash: String,
     pub stellar_address: Option<String>,
+    pub role: UserRole,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
