@@ -29,6 +29,8 @@ mod admin;
 #[cfg(not(target_arch = "wasm32"))]
 mod event_query;
 #[cfg(not(target_arch = "wasm32"))]
+mod oracle;
+#[cfg(not(target_arch = "wasm32"))]
 mod product_query;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_registry;
@@ -36,6 +38,8 @@ mod product_registry;
 mod product_transfer;
 #[cfg(not(target_arch = "wasm32"))]
 mod stats;
+#[cfg(not(target_arch = "wasm32"))]
+mod timelock;
 #[cfg(not(target_arch = "wasm32"))]
 mod tracking;
 #[cfg(not(target_arch = "wasm32"))]
@@ -69,6 +73,8 @@ pub use admin::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use event_query::*;
 #[cfg(not(target_arch = "wasm32"))]
+pub use oracle::*;
+#[cfg(not(target_arch = "wasm32"))]
 pub use product_query::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use product_registry::*;
@@ -76,6 +82,8 @@ pub use product_registry::*;
 pub use product_transfer::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use stats::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use timelock::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use tracking::*;
 #[cfg(not(target_arch = "wasm32"))]
