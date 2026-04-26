@@ -1,22 +1,23 @@
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use crate::{AppState, error::AppError, models::{UserRole, NewUser, User}, middleware::auth::Claims, validation::{validate_email, validate_string}};
 use bcrypt::verify;
 use jsonwebtoken::{encode, Header, EncodingKey};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AuthResponse {
     pub token: String,
     pub user: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub email: String,
     pub password: String,
@@ -24,6 +25,17 @@ pub struct RegisterRequest {
     pub stellar_address: Option<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/auth/login",
+    tag = "authentication",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "Invalid credentials"),
+        (status = 429, description = "Rate limit exceeded")
+    )
+)]
 pub async fn login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
@@ -69,6 +81,18 @@ pub async fn login(
     Ok(Json(AuthResponse { token, user }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/auth/register",
+    tag = "authentication",
+    request_body = RegisterRequest,
+    responses(
+        (status = 201, description = "User registered successfully", body = User),
+        (status = 400, description = "Bad request - invalid input"),
+        (status = 409, description = "Email already registered"),
+        (status = 429, description = "Rate limit exceeded")
+    )
+)]
 pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,

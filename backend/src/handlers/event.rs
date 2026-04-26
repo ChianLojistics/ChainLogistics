@@ -4,6 +4,7 @@ use axum::{
     response::Json,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     AppState,
@@ -12,7 +13,7 @@ use crate::{
     validation::{validate_string, validate_stellar_address, sanitize_input, validate_product_id, validate_location, sanitize_json_metadata},
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListEventsQuery {
     pub offset: Option<i64>,
     pub limit: Option<i64>,
@@ -20,7 +21,7 @@ pub struct ListEventsQuery {
     pub event_type: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
     pub product_id: String,
     pub actor_address: String,
@@ -32,7 +33,7 @@ pub struct CreateEventRequest {
     pub metadata: serde_json::Value,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct EventResponse {
     pub id: i64,
     pub product_id: String,
@@ -46,7 +47,7 @@ pub struct EventResponse {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PaginatedEventsResponse {
     pub events: Vec<EventResponse>,
     pub total: i64,
@@ -71,6 +72,21 @@ impl From<TrackingEvent> for EventResponse {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/events",
+    tag = "events",
+    params(ListEventsQuery),
+    responses(
+        (status = 200, description = "Events listed successfully", body = PaginatedEventsResponse),
+        (status = 400, description = "Bad request - product_id is required"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 pub async fn list_events(
     State(state): State<AppState>,
     Query(query): Query<ListEventsQuery>,
@@ -119,6 +135,22 @@ const ALLOWED_EVENT_TYPES: &[&str] = &[
     "QUALITY_CHECK", "TRANSFER", "REGISTER", "CHECKPOINT",
 ];
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/events",
+    tag = "events",
+    request_body = CreateEventRequest,
+    responses(
+        (status = 201, description = "Event created successfully", body = EventResponse),
+        (status = 400, description = "Bad request - invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 pub async fn create_event(
     State(state): State<AppState>,
     Json(request): Json<CreateEventRequest>,
@@ -161,6 +193,23 @@ pub async fn create_event(
     Ok(Json(EventResponse::from(event)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/events/{id}",
+    tag = "events",
+    params(
+        ("id" = i64, Path, description = "Event ID")
+    ),
+    responses(
+        (status = 200, description = "Event retrieved successfully", body = EventResponse),
+        (status = 404, description = "Event not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 pub async fn get_event(
     State(state): State<AppState>,
     Path(id): Path<i64>,
