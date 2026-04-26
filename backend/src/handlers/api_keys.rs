@@ -6,6 +6,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use utoipa::ToSchema;
 
 use crate::{
     AppState,
@@ -13,14 +14,14 @@ use crate::{
     models::{ApiKey, ApiKeyTier, NewApiKey},
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateApiKeyRequest {
     pub name: String,
     pub tier: Option<ApiKeyTier>,
     pub expires_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ApiKeyCreatedResponse {
     pub id: Uuid,
     pub name: String,
@@ -30,7 +31,7 @@ pub struct ApiKeyCreatedResponse {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ApiKeyResponse {
     pub id: Uuid,
     pub name: String,
@@ -55,6 +56,21 @@ impl From<ApiKey> for ApiKeyResponse {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/keys",
+    tag = "api_keys",
+    request_body = CreateApiKeyRequest,
+    responses(
+        (status = 201, description = "API key created successfully", body = ApiKeyCreatedResponse),
+        (status = 400, description = "Bad request - invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 pub async fn create_key(
     State(state): State<AppState>,
     axum::Extension(auth): axum::Extension<crate::middleware::auth::AuthContext>,
@@ -99,6 +115,19 @@ pub async fn create_key(
     ))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/keys",
+    tag = "api_keys",
+    responses(
+        (status = 200, description = "API keys listed successfully", body = Vec<ApiKeyResponse>),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 pub async fn list_keys(
     State(state): State<AppState>,
     axum::Extension(auth): axum::Extension<crate::middleware::auth::AuthContext>,
@@ -114,6 +143,24 @@ pub async fn list_keys(
     Ok(Json(keys))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/keys/{id}/revoke",
+    tag = "api_keys",
+    params(
+        ("id" = Uuid, Path, description = "API Key ID")
+    ),
+    responses(
+        (status = 204, description = "API key revoked successfully"),
+        (status = 404, description = "API key not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - cannot revoke another user's key"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 pub async fn revoke_key(
     State(state): State<AppState>,
     axum::Extension(auth): axum::Extension<crate::middleware::auth::AuthContext>,
@@ -133,6 +180,24 @@ pub async fn revoke_key(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/keys/{id}/rotate",
+    tag = "api_keys",
+    params(
+        ("id" = Uuid, Path, description = "API Key ID")
+    ),
+    responses(
+        (status = 201, description = "API key rotated successfully", body = ApiKeyCreatedResponse),
+        (status = 404, description = "API key not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - cannot rotate another user's key"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 pub async fn rotate_key(
     State(state): State<AppState>,
     axum::Extension(auth): axum::Extension<crate::middleware::auth::AuthContext>,
