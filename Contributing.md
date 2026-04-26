@@ -1207,18 +1207,30 @@ Create a beginner-friendly guide for new users.
 1. **Run Tests**
    ```bash
    # Contracts
-   cargo test && cargo clippy
-   
+   cd contracts
+   cargo test
+   cargo clippy -- -D warnings
+   cargo build --target wasm32-unknown-unknown --release
+
    # Frontend
-   npm run build && npm run lint
-   
-   # Backend
+   cd frontend
+   npm run build
+   npm run lint
+   npm run type-check
    npm test
+
+   # Backend
+   cd backend
+   cargo test
+   cargo clippy -- -D warnings
+   cargo fmt --check
    ```
 
 2. **Update Docs**
    - Add/update README if needed
    - Document new features
+   - Update API documentation if endpoints changed
+   - Add utoipa annotations for new endpoints
 
 3. **Commit Convention**
    ```
@@ -1229,92 +1241,880 @@ Create a beginner-friendly guide for new users.
    refactor: code restructure
    test: add tests
    chore: maintenance
+   ci: CI/CD changes
    ```
 
-### PR Template
+### Branch Naming
+
+Use descriptive branch names following this pattern:
+- `feature/issue-23-wallet-connection`
+- `bugfix/issue-45-auth-token-expiry`
+- `hotfix/issue-67-security-patch`
+- `docs/update-api-documentation`
+- `refactor/optimize-database-queries`
+
+### PR Description Template
 
 ```markdown
 ## Description
-[What does this PR do?]
+[Provide a clear and concise description of what this PR does]
+
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] Performance improvement
+- [ ] Code refactoring
 
 ## Related Issue
 Closes #[issue number]
+Related to #[issue number]
 
-## Type
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation
+## Changes Made
+- [ ] Added tests for new functionality
+- [ ] Updated documentation
+- [ ] Updated API documentation (if applicable)
+- [ ] Added/updated utoipa annotations (if applicable)
 
 ## Testing
-- [ ] Tests pass
-- [ ] Manual testing done
+### Manual Testing Steps
+1.
+2.
+3.
 
-## Screenshots
-[If applicable]
+### Automated Tests
+- [ ] All existing tests pass
+- [ ] New tests added and passing
+- [ ] Test coverage maintained or improved
+
+## Screenshots (if applicable)
+[Add screenshots for UI changes]
 
 ## Checklist
-- [ ] Code follows style guide
-- [ ] Self-reviewed
-- [ ] Commented complex code
-- [ ] Docs updated
-- [ ] Tests added
+- [ ] My code follows the style guidelines of this project
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have made corresponding changes to the documentation
+- [ ] My changes generate no new warnings
+- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] New and existing unit tests pass locally with my changes
+- [ ] Any dependent changes have been merged and published
 ```
+
+### PR Review Process
+
+1. **Self-Review**
+   - Review your own changes before submitting
+   - Ensure all tests pass
+   - Check documentation is complete
+   - Verify no sensitive data is committed
+
+2. **Request Review**
+   - Assign at least one reviewer from the team
+   - Tag relevant team members based on the area of change
+   - Provide context on what needs focus
+
+3. **Address Feedback**
+   - Respond to all review comments
+   - Make requested changes or provide justification
+   - Push updates to the same branch
+   - Request re-review when changes are complete
+
+4. **Merge Requirements**
+   - At least one approval from a maintainer
+   - All CI checks must pass
+   - No merge conflicts
+   - PR must be up-to-date with main branch
+
+---
+
+## 🧪 Testing Requirements
+
+### Smart Contracts (Rust/Soroban)
+
+#### Unit Tests
+```rust
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_product_creation() {
+        let env = Env::default();
+        let product_id = String::from_str("PROD001").unwrap();
+        
+        let product = register_product(env.clone(), product_id.clone(), "Coffee", "Ethiopia");
+        
+        assert_eq!(product.id, product_id);
+        assert_eq!(product.name, "Coffee");
+    }
+}
+```
+
+#### Integration Tests
+```rust
+#[test]
+fn test_full_product_lifecycle() {
+    let env = Env::default();
+    
+    // Register product
+    let product = register_product(env.clone(), "PROD001", "Coffee", "Ethiopia");
+    
+    // Add tracking event
+    let event = add_tracking_event(env.clone(), "PROD001", "Harvest", "Farm");
+    
+    // Retrieve product
+    let retrieved = get_product(env, "PROD001");
+    
+    assert_eq!(retrieved.id, product.id);
+}
+```
+
+#### Coverage Requirements
+- Minimum 80% code coverage for critical paths
+- All public functions must have tests
+- Error cases must be tested
+- Edge cases must be covered
+
+#### Test Commands
+```bash
+# Run all tests
+cargo test
+
+# Run specific test
+cargo test test_product_creation
+
+# Run with output
+cargo test -- --nocapture
+
+# Run tests in release mode
+cargo test --release
+```
+
+---
+
+### Frontend (Next.js/TypeScript)
+
+#### Unit Tests
+```typescript
+// components/__tests__/ProductCard.test.tsx
+import { render, screen } from '@testing-library/react';
+import { ProductCard } from '../ProductCard';
+
+describe('ProductCard', () => {
+  it('renders product name', () => {
+    const product = { id: '1', name: 'Coffee' };
+    render(<ProductCard product={product} />);
+    expect(screen.getByText('Coffee')).toBeInTheDocument();
+  });
+});
+```
+
+#### Integration Tests (Playwright)
+```typescript
+// tests/e2e/product-registration.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('user can register a product', async ({ page }) => {
+  await page.goto('/register');
+  await page.fill('[name="productId"]', 'PROD001');
+  await page.fill('[name="name"]', 'Organic Coffee');
+  await page.click('button[type="submit"]');
+  
+  await expect(page).toHaveURL(/\/products\/PROD001/);
+});
+```
+
+#### Coverage Requirements
+- Minimum 70% code coverage for components
+- Critical user flows must have E2E tests
+- All hooks must have unit tests
+- Utility functions must have 100% coverage
+
+#### Test Commands
+```bash
+# Run unit tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run E2E tests
+npx playwright test
+
+# Run specific test file
+npm test ProductCard.test.tsx
+```
+
+---
+
+### Backend (Rust/Axum)
+
+#### Unit Tests
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_product() {
+        let pool = create_test_pool().await;
+        let product = create_test_product(&pool).await;
+        
+        let result = get_product(&pool, &product.id).await;
+        
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().id, product.id);
+    }
+}
+```
+
+#### Integration Tests
+```rust
+#[tokio::test]
+async fn test_product_api_endpoint() {
+    let app = create_test_app().await;
+    
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/api/v1/products/PROD001")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    
+    assert_eq!(response.status(), StatusCode::OK);
+}
+```
+
+#### Coverage Requirements
+- Minimum 80% code coverage for handlers
+- All service functions must have tests
+- Database operations must be tested
+- Error paths must be covered
+
+#### Test Commands
+```bash
+# Run all tests
+cargo test
+
+# Run with output
+cargo test -- --nocapture
+
+# Run specific test
+cargo test test_get_product
+
+# Run tests in release mode
+cargo test --release
+
+# Run with coverage (requires tarpaulin)
+cargo tarpaulin --out Html
+```
+
+---
+
+### General Testing Guidelines
+
+#### Test Organization
+```
+contracts/src/test/
+├── mod.rs              # Test module exports
+├── setup.rs            # Test fixtures and utilities
+├── product_tests.rs    # Product-related tests
+├── event_tests.rs      # Event-related tests
+└── integration_tests.rs # Full workflow tests
+
+frontend/tests/
+├── unit/               # Unit tests
+│   └── components/
+├── integration/        # Integration tests
+└── e2e/               # End-to-end tests
+
+backend/tests/
+├── unit/               # Unit tests
+└── integration/        # Integration tests
+```
+
+#### Test Naming
+```rust
+// Good: Descriptive and specific
+#[test]
+fn test_product_registration_with_valid_data() {}
+
+// Bad: Vague
+#[test]
+fn test_product() {}
+```
+
+#### Test Data Management
+- Use fixtures for common test data
+- Clean up test data after each test
+- Use transactions for database tests
+- Mock external dependencies
+
+#### CI/CD Testing
+All tests must pass in CI before merging:
+- GitHub Actions runs tests on every PR
+- Tests run on multiple OS versions
+- Database tests use test containers
+- E2E tests run on staging environment
+
+---
+
+## ✅ Code Review Checklist
+
+### Before Submitting for Review
+
+**Code Quality**
+- [ ] Code follows project style guidelines
+- [ ] No compiler warnings
+- [ ] No clippy warnings (Rust)
+- [ ] No ESLint warnings (TypeScript)
+- [ ] Code is properly formatted
+- [ ] Complex logic has comments
+- [ ] Magic numbers are replaced with constants
+
+**Functionality**
+- [ ] Feature works as specified
+- [ ] Edge cases are handled
+- [ ] Error handling is comprehensive
+- [ ] Input validation is present
+- [ ] Security best practices followed
+- [ ] Performance considerations addressed
+
+**Testing**
+- [ ] Unit tests added
+- [ ] Integration tests added (if applicable)
+- [ ] E2E tests added (for UI changes)
+- [ ] Tests cover happy path
+- [ ] Tests cover error cases
+- [ ] Test coverage is sufficient
+- [ ] All tests pass locally
+
+**Documentation**
+- [ ] Public APIs documented
+- [ ] Complex algorithms explained
+- [ ] README updated (if needed)
+- [ ] API documentation updated (if endpoints changed)
+- [ ] Changelog updated (if breaking change)
+- [ ] Comments are accurate and up-to-date
+
+**Security**
+- [ ] No secrets or keys committed
+- [ ] User inputs are validated
+- [ ] SQL injection prevention in place
+- [ ] XSS prevention in place (frontend)
+- [ ] Authentication/authorization correct
+- [ ] Rate limiting applied (if public API)
+
+**Performance**
+- [ ] No obvious performance issues
+- [ ] Database queries optimized
+- [ ] Caching used where appropriate
+- [ ] Large data sets handled efficiently
+- [ ] Memory leaks checked
+
+### During Review
+
+**Review Focus Areas**
+- [ ] Code is readable and maintainable
+- [ ] Logic is correct and efficient
+- [ ] Error handling is appropriate
+- [ ] Security vulnerabilities identified
+- [ ] Performance bottlenecks identified
+- [ ] Test coverage is adequate
+- [ ] Documentation is clear
+
+**Review Comments Guidelines**
+- Be constructive and specific
+- Explain the "why" behind suggestions
+- Provide code examples for improvements
+- Ask questions if something is unclear
+- Acknowledge good work
+
+### Before Merging
+
+**Final Checks**
+- [ ] All review comments addressed
+- [ ] CI checks passing
+- [ ] No merge conflicts
+- [ ] Up-to-date with main branch
+- [ ] At least one approval from maintainer
+- [ ] Breaking changes documented
+- [ ] Migration guide provided (if needed)
+
+### Post-Merge
+
+**Follow-up Tasks**
+- [ ] Monitor production for issues
+- [ ] Update issue tracker
+- [ ] Close related issues
+- [ ] Notify team of deployment
+- [ ] Update documentation website (if applicable)
+- [ ] Create release notes (if needed)
 
 ---
 
 ## 🎨 Code Style Guidelines
 
-### Smart Contracts (Rust)
+### Smart Contracts (Rust/Soroban)
+
+#### Naming Conventions
 ```rust
-// Good naming
+// Functions: snake_case
 pub fn register_product() {} ✅
 pub fn reg_prod() {}          ❌
 
-// Document public APIs
-/// Registers a new product.
-pub fn register_product() {}
+// Structs: PascalCase
+pub struct Product {}         ✅
+pub struct product {}         ❌
 
-// Format & lint
-cargo fmt
-cargo clippy
+// Constants: SCREAMING_SNAKE_CASE
+pub const MAX_PRODUCTS: u32 = 1000;  ✅
+pub const max_products: u32 = 1000;  ❌
+
+// Storage keys: SymbolShort
+let key = symbol_short!("PRODUCT");  ✅
+let key = symbol_short!("product");  ❌
 ```
 
-### Frontend (TypeScript)
-```typescript
-// Strict TypeScript
-interface Product {
-  id: string;
-  name: string;
+#### Documentation
+```rust
+/// Registers a new product on the blockchain.
+///
+/// # Arguments
+///
+/// * `product_id` - Unique identifier for the product
+/// * `name` - Human-readable product name
+/// * `origin` - Geographic origin location
+///
+/// # Returns
+///
+/// Returns the newly created Product struct.
+///
+/// # Errors
+///
+/// Returns `Error::AlreadyExists` if product_id is already registered.
+///
+/// # Example
+///
+/// ```
+/// let product = register_product(env, "PROD001", "Coffee", "Ethiopia");
+/// ```
+pub fn register_product(
+    env: Env,
+    product_id: String,
+    name: String,
+    origin: String,
+) -> Product {
+    // implementation
+}
+```
+
+#### Error Handling
+```rust
+// Use custom error types
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Product already exists")]
+    AlreadyExists,
+    #[error("Unauthorized access")]
+    Unauthorized,
 }
 
-// Functional components
-export function ProductCard({ product }: { product: Product }) {
+// Panic with errors for contract failures
+if product_exists {
+    panic_with_error!(&env, Error::AlreadyExists);
+}
+```
+
+#### Code Organization
+```rust
+// File structure
+src/
+├── lib.rs           # Contract entry point
+├── contract.rs      # Main contract logic
+├── types.rs         # Data structures
+├── storage.rs       # Storage helpers
+├── error.rs         # Error types
+├── events.rs        # Event emission
+└── validation.rs    # Input validation
+
+// Use modules for organization
+pub mod types;
+pub mod storage;
+pub mod error;
+
+use crate::types::{Product, Event};
+use crate::storage::{get_product, set_product};
+```
+
+#### Format & Lint
+```bash
+# Format code
+cargo fmt
+
+# Check for issues
+cargo clippy -- -D warnings
+
+# Run tests
+cargo test
+
+# Build for WASM
+cargo build --target wasm32-unknown-unknown --release
+```
+
+---
+
+### Frontend (Next.js/TypeScript)
+
+#### Naming Conventions
+```typescript
+// Components: PascalCase
+export function ProductCard() {}     ✅
+export function productCard() {}     ❌
+
+// Functions: camelCase
+function getUserData() {}           ✅
+function get_user_data() {}         ❌
+
+// Constants: UPPER_SNAKE_CASE
+const MAX_RETRIES = 3;              ✅
+const maxRetries = 3;               ❌
+
+// Types/Interfaces: PascalCase
+interface UserProfile {}            ✅
+interface userProfile {}            ❌
+```
+
+#### Component Structure
+```typescript
+// Use functional components with hooks
+export function ProductCard({ product }: ProductCardProps) {
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // effect logic
+  }, [product.id]);
+
+  if (loading) return <LoadingSpinner />;
+
   return <div>{product.name}</div>;
 }
 
-// Organize imports
-import { useState } from 'react';          // React
-import { Contract } from '@stellar/sdk';   // Packages
-import { format } from '@/lib/utils';      // Local
+// Define props interface
+interface ProductCardProps {
+  product: Product;
+  onEdit?: () => void;
+}
 ```
 
-### Backend (TypeScript)
+#### TypeScript Best Practices
 ```typescript
-// Async/await
-async function getProduct(id: string) {
-  return await contract.get_product({ id });
+// Always define types
+interface Product {
+  id: string;
+  name: string;
+  origin: string;
 }
 
-// Error handling
-try {
-  const product = await getProduct(id);
-  res.json(product);
-} catch (error) {
-  logger.error('Error fetching product', { id, error });
-  res.status(500).json({ error: 'Internal error' });
+// Avoid `any`
+function processData(data: any) {}      ❌
+function processData(data: Product) {}  ✅
+
+// Use union types for variants
+type EventStatus = 'pending' | 'confirmed' | 'failed';
+
+// Use generics for reusable types
+interface ApiResponse<T> {
+  data: T;
+  error: string | null;
 }
 ```
+
+#### Import Organization
+```typescript
+// 1. React and hooks
+import { useState, useEffect } from 'react';
+
+// 2. Third-party libraries
+import { Contract } from '@stellar/stellar-sdk';
+import { useRouter } from 'next/navigation';
+
+// 3. Internal modules
+import { Product } from '@/types/product';
+import { useWallet } from '@/hooks/useWallet';
+import { formatAddress } from '@/lib/utils';
+```
+
+#### File Organization
+```
+app/
+├── layout.tsx           # Root layout
+├── page.tsx             # Homepage
+└── products/
+    ├── page.tsx         # Products list
+    └── [id]/
+        └── page.tsx     # Product detail
+
+components/
+├── ui/                  # Reusable UI components
+├── forms/               # Form components
+├── wallet/              # Wallet-related
+└── tracking/            # Tracking components
+
+lib/
+├── stellar/             # Stellar SDK utilities
+├── utils/               # Helper functions
+└── hooks/               # Custom hooks
+```
+
+#### Linting & Formatting
+```bash
+# Format code
+npm run format
+
+# Lint code
+npm run lint
+
+# Type check
+npm run type-check
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+```
+
+---
+
+### Backend (Rust/Axum)
+
+#### Naming Conventions
+```rust
+// Structs: PascalCase
+pub struct AppState {}        ✅
+pub struct app_state {}      ❌
+
+// Functions: snake_case
+pub async fn get_product() {}    ✅
+pub async fn getProduct() {}     ❌
+
+// Constants: SCREAMING_SNAKE_CASE
+pub const API_VERSION: &str = "v1";  ✅
+pub const api_version: &str = "v1";  ❌
+```
+
+#### Handler Structure
+```rust
+// Use proper error handling
+pub async fn get_product(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<ProductResponse>, AppError> {
+    let product = state.product_service
+        .get_product(&id)
+        .await
+        .map_err(|_| AppError::NotFound("Product not found".to_string()))?;
+
+    Ok(Json(product.into()))
+}
+```
+
+#### Database Queries
+```rust
+// Use SQLx for type-safe queries
+pub async fn get_product(
+    pool: &PgPool,
+    id: &str,
+) -> Result<Product, sqlx::Error> {
+    sqlx::query_as!(
+        Product,
+        r#"
+        SELECT id, name, description, origin_location, category, tags,
+               certifications, media_hashes, custom_fields, owner_address,
+               is_active, created_at, updated_at, created_by, updated_by
+        FROM products
+        WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_one(pool)
+    .await
+}
+```
+
+#### Error Handling
+```rust
+// Define custom error types
+#[derive(Debug)]
+pub enum AppError {
+    NotFound(String),
+    Unauthorized(String),
+    ValidationError(String),
+    DatabaseError(String),
+    InternalError(String),
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, message) = match self {
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
+            AppError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg),
+            AppError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            AppError::InternalError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+        };
+
+        (status, Json(json!({ "error": message }))).into_response()
+    }
+}
+```
+
+#### Validation
+```rust
+// Validate inputs before processing
+use crate::validation::{validate_string, validate_stellar_address};
+
+pub async fn create_product(
+    State(state): State<AppState>,
+    Json(req): Json<CreateProductRequest>,
+) -> Result<Json<ProductResponse>, AppError> {
+    // Validate inputs
+    validate_string("name", &req.name, 100)?;
+    validate_stellar_address(&req.owner_address)?;
+    validate_string("origin", &req.origin, 200)?;
+
+    // Process request
+    let product = state.product_service.create_product(req).await?;
+
+    Ok(Json(product))
+}
+```
+
+#### OpenAPI Documentation
+```rust
+// Add utoipa annotations for all public endpoints
+#[utoipa::path(
+    get,
+    path = "/api/v1/products/{id}",
+    tag = "products",
+    params(
+        ("id" = String, Path, description = "Product ID")
+    ),
+    responses(
+        (status = 200, description = "Product retrieved successfully", body = ProductResponse),
+        (status = 404, description = "Product not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
+pub async fn get_product(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<ProductResponse>, AppError> {
+    // implementation
+}
+```
+
+#### Format & Lint
+```bash
+# Format code
+cargo fmt
+
+# Check for issues
+cargo clippy -- -D warnings
+
+# Run tests
+cargo test
+
+# Run with database
+cargo run
+
+# Build for release
+cargo build --release
+```
+
+---
+
+### General Guidelines
+
+#### Git Commit Messages
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `perf`: Performance improvements
+- `test`: Test additions/changes
+- `chore`: Maintenance tasks
+- `ci`: CI/CD changes
+
+**Examples:**
+```
+feat(products): add batch product registration
+
+Implements batch registration for multiple products
+in a single transaction to reduce gas costs.
+
+Closes #23
+```
+
+```
+fix(auth): resolve JWT token expiration issue
+
+Fixed token validation logic that was incorrectly
+rejecting valid tokens near expiration time.
+
+Closes #45
+```
+
+#### Code Comments
+```rust
+// GOOD: Explain WHY, not WHAT
+// We use a cache here because the blockchain RPC calls
+// are expensive and can take up to 2 seconds
+let cached_product = cache.get(&product_id).await;
+
+// BAD: Obvious comments
+// Get the product from cache
+let cached_product = cache.get(&product_id).await;
+
+// GOOD: Document complex logic
+// This algorithm calculates the optimal route by considering
+// both distance and carbon footprint, with a 60% weight on
+// environmental impact
+let optimal_route = calculate_route(locations, carbon_weights);
+
+// GOOD: TODO comments with context
+// TODO: Add retry logic for network failures
+// Currently fails silently on network errors
+// Issue: #67
+```
+
+#### Security Best Practices
+- Never commit secrets or API keys
+- Use environment variables for configuration
+- Validate all user inputs
+- Sanitize data before database operations
+- Use parameterized queries to prevent SQL injection
+- Implement rate limiting on public endpoints
+- Use HTTPS in production
+- Keep dependencies updated
 
 ---
 
