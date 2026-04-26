@@ -92,6 +92,7 @@ pub fn set_auth(env: &Env, product_id: &String, actor: &Address, value: bool) {
     StorageContract::set_auth(env, product_id, actor, value)
 }
 
+#[cfg(test)]
 pub fn is_authorized(env: &Env, product_id: &String, actor: &Address) -> bool {
     StorageContract::is_authorized(env, product_id, actor)
 }

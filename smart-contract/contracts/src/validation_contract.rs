@@ -1,5 +1,5 @@
 #![allow(clippy::len_zero)]
-use soroban_sdk::{Address, Map, String, Symbol};
+use soroban_sdk::{Map, String, Symbol};
 
 use crate::error::Error;
 use crate::types::ProductConfig;
@@ -37,11 +37,6 @@ impl ValidationContract {
         if s.len() > max {
             return Err(Error::InvalidInput);
         }
-        Ok(())
-    }
-
-    pub fn require_auth(actor: &Address) -> Result<(), Error> {
-        actor.require_auth();
         Ok(())
     }
 

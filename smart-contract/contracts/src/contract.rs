@@ -1,6 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::error::Error;
+use crate::events::TrackingEventPublished;
 use crate::types::{Product, TrackingEvent, TrackingEventFilter, TrackingEventPage};
 use crate::validation_contract::ValidationContract;
 use crate::{storage, AuthorizationContractClient};
@@ -32,18 +33,6 @@ fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
 
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
-}
-
-fn write_product(env: &Env, product: &Product) {
-    storage::put_product(env, product);
-}
-
-fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
-    caller.require_auth();
-    if &product.owner != caller {
-        return Err(Error::Unauthorized);
-    }
-    Ok(())
 }
 
 fn require_can_add_event(
@@ -139,6 +128,11 @@ impl ChainLogisticsContract {
     // Note: transfer_product is now in ProductTransferContract
     // get_product_event_ids, get_event_count are now in ProductQueryContract
 
+    // This function has 8 parameters which exceeds clippy's default limit of 7.
+// However, this is a public contract entrypoint and changing the signature would be
+// a breaking change for any existing clients. The parameters represent distinct
+// pieces of tracking information that are all required for a single atomic operation.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_tracking_event(
         env: Env,
         actor: Address,
@@ -178,14 +172,12 @@ impl ChainLogisticsContract {
 
         storage::index_event_by_type(&env, &product_id, &event_type, event_id);
 
-        env.events().publish(
-            (
-                Symbol::new(&env, "tracking_event"),
-                product_id.clone(),
-                event_id,
-            ),
-            event.clone(),
-        );
+        TrackingEventPublished {
+            product_id: product_id.clone(),
+            event_id,
+            event: event.clone(),
+        }
+        .publish(&env);
 
         Ok(event_id)
     }

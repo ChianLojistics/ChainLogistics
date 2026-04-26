@@ -1,6 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::error::Error;
+use crate::events::TrackingEventPublished;
 use crate::storage;
 use crate::types::{DataKey, TrackingEvent};
 use crate::validation_contract::ValidationContract;
@@ -39,6 +40,11 @@ fn require_init(env: &Env) -> Result<(), Error> {
 #[contract]
 pub struct TrackingContract;
 
+// The TrackingContract implementation has functions with >7 parameters.
+// These are public contract entrypoints where signature changes would be breaking.
+// The parameters represent distinct pieces of tracking information required for
+// atomic operations. We allow this pattern rather than breaking the public API.
+#[allow(clippy::too_many_arguments)]
 #[contractimpl]
 impl TrackingContract {
     /// Initialize the TrackingContract with the main contract address.
@@ -53,6 +59,11 @@ impl TrackingContract {
     /// Add a new tracking event to a product.
     /// Requires authentication from the actor.
     /// Validates metadata and emits tracking event.
+    // This function has 8 parameters which exceeds clippy's default limit of 7.
+// However, this is a public contract entrypoint and changing the signature would be
+// a breaking change for any existing clients. The parameters represent distinct
+// pieces of tracking information that are all required for a single atomic operation.
+    #[allow(clippy::too_many_arguments)]
     pub fn tracking_add_event(
         env: Env,
         actor: Address,
@@ -98,15 +109,12 @@ impl TrackingContract {
         // Index by type
         storage::index_event_by_type(&env, &product_id, &event_type, event_id);
 
-        // Emit event
-        env.events().publish(
-            (
-                Symbol::new(&env, "tracking_event"),
-                product_id.clone(),
-                event_id,
-            ),
-            event.clone(),
-        );
+        TrackingEventPublished {
+            product_id: product_id.clone(),
+            event_id,
+            event: event.clone(),
+        }
+        .publish(&env);
 
         Ok(event_id)
     }

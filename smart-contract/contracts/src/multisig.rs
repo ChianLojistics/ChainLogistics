@@ -1,6 +1,11 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
 
 use crate::error::Error;
+use crate::events::{
+    AdminTransferExecuted, MultisigInitialized, PauseExecuted, ProposalApproved, ProposalExecuted,
+    ProposalSubmitted, UnpauseExecuted, UpgradeCompleteExecuted, UpgradeFailExecuted,
+    UpgradeInitiateExecuted,
+};
 use crate::types::{DataKey, MultiSigConfig, Proposal};
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
@@ -48,14 +53,6 @@ fn require_signer(env: &Env, caller: &Address) -> Result<(), Error> {
         return Err(Error::NotSigner);
     }
     Ok(())
-}
-
-fn is_signer(env: &Env, address: &Address) -> bool {
-    if let Some(config) = get_multisig_config(env) {
-        config.signers.contains(address)
-    } else {
-        false
-    }
 }
 
 fn threshold_reached(env: &Env, approvals: &Vec<Address>) -> bool {
@@ -113,11 +110,7 @@ impl MultiSigContract {
         set_multisig_config(&env, &config);
         set_next_proposal_id(&env, 1);
 
-        // Emit initialization event
-        env.events().publish(
-            (Symbol::new(&env, "multisig_initialized"),),
-            (signers, threshold),
-        );
+        MultisigInitialized { signers, threshold }.publish(&env);
 
         Ok(())
     }
@@ -157,15 +150,13 @@ impl MultiSigContract {
 
         put_proposal(&env, &proposal);
 
-        // Emit proposal submitted event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_submitted"),
-                &proposal_id,
-                &proposer,
-            ),
-            (&kind, &args),
-        );
+        ProposalSubmitted {
+            proposal_id,
+            proposer: proposer.clone(),
+            kind: kind.clone(),
+            args: args.clone(),
+        }
+        .publish(&env);
 
         Ok(proposal_id)
     }
@@ -189,15 +180,11 @@ impl MultiSigContract {
         proposal.approvals.push_back(approver.clone());
         put_proposal(&env, &proposal);
 
-        // Emit approval event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_approved"),
-                &proposal_id,
-                &approver,
-            ),
-            (),
-        );
+        ProposalApproved {
+            proposal_id,
+            approver: approver.clone(),
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -232,42 +219,39 @@ impl MultiSigContract {
 
         if proposal.kind == transfer_admin {
             // For now, just emit an event; integration will come later
-            env.events().publish(
-                (Symbol::new(&env, "admin_transfer_executed"),),
-                (&proposal.args, &executor),
-            );
+            AdminTransferExecuted {
+                args: proposal.args.clone(),
+                executor: executor.clone(),
+            }
+            .publish(&env);
         } else if proposal.kind == initiate_upgrade {
-            env.events().publish(
-                (Symbol::new(&env, "upgrade_initiate_executed"),),
-                (&proposal.args, &executor),
-            );
+            UpgradeInitiateExecuted {
+                args: proposal.args.clone(),
+                executor: executor.clone(),
+            }
+            .publish(&env);
         } else if proposal.kind == complete_upgrade {
-            env.events()
-                .publish((Symbol::new(&env, "upgrade_complete_executed"),), ());
+            UpgradeCompleteExecuted { _unused: 0 }.publish(&env);
         } else if proposal.kind == fail_upgrade {
-            env.events().publish(
-                (Symbol::new(&env, "upgrade_fail_executed"),),
-                &proposal.args,
-            );
+            UpgradeFailExecuted {
+                args: proposal.args.clone(),
+            }
+            .publish(&env);
         } else if proposal.kind == pause {
-            env.events()
-                .publish((Symbol::new(&env, "pause_executed"),), ());
+            PauseExecuted { _unused: 0 }.publish(&env);
         } else if proposal.kind == unpause {
-            env.events()
-                .publish((Symbol::new(&env, "unpause_executed"),), ());
+            UnpauseExecuted { _unused: 0 }.publish(&env);
         } else {
             return Err(Error::InvalidInput);
         }
 
-        // Emit execution event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_executed"),
-                &proposal_id,
-                &executor,
-            ),
-            (&proposal.kind, &proposal.args),
-        );
+        ProposalExecuted {
+            proposal_id,
+            executor,
+            kind: proposal.kind,
+            args: proposal.args,
+        }
+        .publish(&env);
 
         Ok(())
     }

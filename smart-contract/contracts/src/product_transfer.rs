@@ -1,6 +1,7 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
+use soroban_sdk::{contract, contractimpl, Address, Env, String};
 
 use crate::error::Error;
+use crate::events::ProductTransferred;
 use crate::types::DataKey;
 use crate::{AuthorizationContractClient, ProductRegistryContractClient};
 
@@ -92,11 +93,12 @@ impl ProductTransferContract {
         let self_address = env.current_contract_address();
         pr_client.transfer_owner(&self_address, &product_id, &new_owner);
 
-        // Emit transfer event
-        env.events().publish(
-            (Symbol::new(&env, "product_transferred"), product_id),
-            (owner, new_owner),
-        );
+        ProductTransferred {
+            product_id,
+            from: owner,
+            to: new_owner,
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -177,11 +179,12 @@ impl ProductTransferContract {
                 // Update registry product record ownership
                 pr_client.transfer_owner(&self_address, &product_id, &new_owner);
 
-                // Emit transfer event
-                env.events().publish(
-                    (Symbol::new(&env, "product_transferred"), product_id),
-                    (owner.clone(), new_owner.clone()),
-                );
+                ProductTransferred {
+                    product_id,
+                    from: owner.clone(),
+                    to: new_owner.clone(),
+                }
+                .publish(&env);
 
                 transferred_count += 1;
             }

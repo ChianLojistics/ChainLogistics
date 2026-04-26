@@ -107,10 +107,8 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
-                    if let Ok(event) = event {
-                        events.push_back(event);
-                    }
+                if let Ok(Ok(event)) = tracking_client.try_tracking_get_event(&eid) {
+                    events.push_back(event);
                 }
             }
         }
@@ -151,11 +149,9 @@ impl EventQueryContract {
 
         for i in 0..all_ids.len() {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
-                    if let Ok(event) = event {
-                        if event.event_type == event_type {
-                            matching_ids.push_back(eid);
-                        }
+                if let Ok(Ok(event)) = tracking_client.try_tracking_get_event(&eid) {
+                    if event.event_type == event_type {
+                        matching_ids.push_back(eid);
                     }
                 }
             }
@@ -177,10 +173,8 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = matching_ids.get(i) {
-                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
-                    if let Ok(event) = event {
-                        events.push_back(event);
-                    }
+                if let Ok(Ok(event)) = tracking_client.try_tracking_get_event(&eid) {
+                    events.push_back(event);
                 }
             }
         }
@@ -222,11 +216,9 @@ impl EventQueryContract {
 
         for i in 0..all_ids.len() {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
-                    if let Ok(event) = event {
-                        if event.timestamp >= start_time && event.timestamp <= end_time {
-                            matching_ids.push_back(eid);
-                        }
+                if let Ok(Ok(event)) = tracking_client.try_tracking_get_event(&eid) {
+                    if event.timestamp >= start_time && event.timestamp <= end_time {
+                        matching_ids.push_back(eid);
                     }
                 }
             }
@@ -248,10 +240,8 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = matching_ids.get(i) {
-                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
-                    if let Ok(event) = event {
-                        events.push_back(event);
-                    }
+                if let Ok(Ok(event)) = tracking_client.try_tracking_get_event(&eid) {
+                    events.push_back(event);
                 }
             }
         }
@@ -296,26 +286,24 @@ impl EventQueryContract {
 
         for i in 0..all_ids.len() {
             if let Some(eid) = all_ids.get(i) {
-                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
-                    if let Ok(event) = event {
-                        let mut matches = true;
+                if let Ok(Ok(event)) = tracking_client.try_tracking_get_event(&eid) {
+                    let mut matches = true;
 
-                        if filter.event_type != empty_sym && event.event_type != filter.event_type {
-                            matches = false;
-                        }
-                        if filter.start_time > 0 && event.timestamp < filter.start_time {
-                            matches = false;
-                        }
-                        if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
-                            matches = false;
-                        }
-                        if filter.location != empty_loc && event.location != filter.location {
-                            matches = false;
-                        }
+                    if filter.event_type != empty_sym && event.event_type != filter.event_type {
+                        matches = false;
+                    }
+                    if filter.start_time > 0 && event.timestamp < filter.start_time {
+                        matches = false;
+                    }
+                    if filter.end_time < u64::MAX && event.timestamp > filter.end_time {
+                        matches = false;
+                    }
+                    if filter.location != empty_loc && event.location != filter.location {
+                        matches = false;
+                    }
 
-                        if matches {
-                            matching_ids.push_back(eid);
-                        }
+                    if matches {
+                        matching_ids.push_back(eid);
                     }
                 }
             }
@@ -337,10 +325,8 @@ impl EventQueryContract {
         let mut events = Vec::new(&env);
         for i in start..end {
             if let Some(eid) = matching_ids.get(i) {
-                if let Ok(event) = tracking_client.try_tracking_get_event(&eid) {
-                    if let Ok(event) = event {
-                        events.push_back(event);
-                    }
+                if let Ok(Ok(event)) = tracking_client.try_tracking_get_event(&eid) {
+                    events.push_back(event);
                 }
             }
         }
