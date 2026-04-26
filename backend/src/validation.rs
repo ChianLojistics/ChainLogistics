@@ -5,6 +5,8 @@ use lazy_static::lazy_static;
 lazy_static! {
     static ref SQL_INJECTION_REGEX: Regex = Regex::new(r"(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|EXECUTE|TRUNCATE|--|\*)").unwrap();
     static ref XSS_REGEX: Regex = Regex::new(r"(?i)<script.*?>.*?</script>|on\w+?\s*=").unwrap();
+    static ref PRODUCT_ID_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9-_]+$").unwrap();
+    static ref LOCATION_REGEX: Regex = Regex::new(r"^[\w\s,.\-']+$").unwrap();
 }
 
 const STELLAR_ADDRESS_LEN: usize = 56;
@@ -98,4 +100,46 @@ pub fn validate_uuid(uuid: &str) -> Result<(), AppError> {
         return Err(AppError::Validation("Invalid UUID format".to_string()));
     }
     Ok(())
+}
+
+/// Validates a Product ID.
+pub fn validate_product_id(id: &str) -> Result<(), AppError> {
+    if id.is_empty() || id.len() > 64 {
+        return Err(AppError::Validation("Product ID must be between 1 and 64 characters".to_string()));
+    }
+    if !PRODUCT_ID_REGEX.is_match(id) {
+        return Err(AppError::Validation("Product ID contains invalid characters".to_string()));
+    }
+    Ok(())
+}
+
+/// Validates a location string.
+pub fn validate_location(location: &str) -> Result<(), AppError> {
+    if location.is_empty() || location.len() > 256 {
+        return Err(AppError::Validation("Location must be between 1 and 256 characters".to_string()));
+    }
+    if !LOCATION_REGEX.is_match(location) {
+        return Err(AppError::Validation("Location contains invalid characters".to_string()));
+    }
+    Ok(())
+}
+
+/// Recursively sanitizes JSON metadata by sanitizing all string values.
+pub fn sanitize_json_metadata(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::String(s) => {
+            *s = sanitize_input(s);
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                sanitize_json_metadata(item);
+            }
+        }
+        serde_json::Value::Object(obj) => {
+            for (_, val) in obj.iter_mut() {
+                sanitize_json_metadata(val);
+            }
+        }
+        _ => {}
+    }
 }

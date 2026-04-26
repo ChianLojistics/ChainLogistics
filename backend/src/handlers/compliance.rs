@@ -5,22 +5,39 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use utoipa::ToSchema;
 use crate::AppState;
 use crate::compliance::{ComplianceValidator, ComplianceRule, ComplianceType};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ComplianceCheckRequest {
     pub compliance_type: String,
     pub data: Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ComplianceReportResponse {
     pub product_id: String,
     pub compliance_checks: Vec<Value>,
     pub overall_status: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/compliance/check",
+    tag = "compliance",
+    request_body = ComplianceCheckRequest,
+    responses(
+        (status = 200, description = "Compliance check completed successfully"),
+        (status = 400, description = "Bad request - unknown compliance type"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 pub async fn check_compliance(
     State(_state): State<AppState>,
     Json(req): Json<ComplianceCheckRequest>,
@@ -53,6 +70,23 @@ pub async fn check_compliance(
     }))).into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/compliance/report/{product_id}",
+    tag = "compliance",
+    params(
+        ("product_id" = String, Path, description = "Product ID")
+    ),
+    responses(
+        (status = 200, description = "Compliance report retrieved successfully", body = ComplianceReportResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 pub async fn get_compliance_report(
     State(_state): State<AppState>,
     Path(product_id): Path<String>,
@@ -68,6 +102,20 @@ pub async fn get_compliance_report(
     (StatusCode::NOT_IMPLEMENTED, Json(report)).into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/audit/report",
+    tag = "compliance",
+    responses(
+        (status = 200, description = "Audit report generated successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 pub async fn generate_audit_report(
     State(_state): State<AppState>,
 ) -> impl IntoResponse {

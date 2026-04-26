@@ -1,14 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import dynamic from "next/dynamic";
 import {
   Activity,
   Boxes,
@@ -27,8 +20,58 @@ import { cn } from "@/lib/utils";
 import { DASHBOARD_REFRESH_INTERVAL_MS, DASHBOARD_RECENT_EVENTS_LIMIT } from "@/lib/constants";
 
 import { StatCard } from "@/components/analytics/StatCard";
-import { EventsChart } from "@/components/analytics/EventsChart";
-import { ActivityFeed } from "@/components/analytics/ActivityFeed";
+
+// ─── Lazy-loaded heavy components (recharts, etc.) ───────────────────────────
+// These are large chart/feed components that are only needed after the initial
+// page paint, so they are split into separate JS chunks via next/dynamic.
+const EventsChart = dynamic(
+  () => import("@/components/analytics/EventsChart").then((m) => ({ default: m.EventsChart })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-72 w-full animate-pulse rounded-xl bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
+
+const ActivityFeed = dynamic(
+  () => import("@/components/analytics/ActivityFeed").then((m) => ({ default: m.ActivityFeed })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-40 w-full animate-pulse rounded-xl bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
+
+// recharts components are only imported inside the lazy chunk above — the main
+// bundle no longer carries them. The inline LineChart below is kept here
+// because it is co-located with the dashboard-specific activityOverTime state.
+// We defer the recharts import itself to avoid the initial bundle bloat.
+const DynamicLineChart = dynamic(
+  () =>
+    import("recharts").then(({ LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer }) => {
+      function ActivityLineChart({ data }: { data: { date: string; count: number }[] }) {
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      }
+      return { default: ActivityLineChart };
+    }),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full animate-pulse rounded-lg bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
 
 type EventsByTypeDatum = { type: string; count: number };
 type ActivityDatum = { date: string; count: number };
@@ -344,14 +387,7 @@ export default function DashboardPage() {
                 No activity yet.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={activityOverTime} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <DynamicLineChart data={activityOverTime} />
             )}
           </div>
         </div>

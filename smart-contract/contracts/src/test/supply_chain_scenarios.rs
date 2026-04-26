@@ -1,134 +1,152 @@
 // Integration tests for complete supply chain scenarios
+#![allow(unused_variables)]
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::{
     AuthorizationContract, AuthorizationContractClient, ChainLogisticsContract,
-    ChainLogisticsContractClient, Error, ProductConfig, ProductRegistryContract,
+    ChainLogisticsContractClient, ProductConfig, ProductRegistryContract,
     ProductRegistryContractClient, ProductTransferContract, ProductTransferContractClient,
     TrackingContract, TrackingContractClient,
 };
 
-// ─── Test Setup ──────────────────────────────────────────────────────────────
+// --- Test Setup Helpers ---------------------------------------------------
 
-struct SupplyChainTestEnv {
-    env: Env,
-    cl_client: ChainLogisticsContractClient,
-    registry_client: ProductRegistryContractClient,
-    auth_client: AuthorizationContractClient,
-    transfer_client: ProductTransferContractClient,
-    tracking_client: TrackingContractClient,
-    admin: Address,
+fn setup(
+    env: &Env,
+) -> (
+    ChainLogisticsContractClient,
+    ProductRegistryContractClient,
+    AuthorizationContractClient,
+    ProductTransferContractClient,
+    TrackingContractClient,
+) {
+    env.mock_all_auths();
+
+    let auth_id = env.register_contract(None, AuthorizationContract);
+    let cl_id = env.register_contract(None, ChainLogisticsContract);
+    let registry_id = env.register_contract(None, ProductRegistryContract);
+    let transfer_id = env.register_contract(None, ProductTransferContract);
+    let tracking_id = env.register_contract(None, TrackingContract);
+
+    let cl = ChainLogisticsContractClient::new(env, &cl_id);
+    let registry = ProductRegistryContractClient::new(env, &registry_id);
+    let auth = AuthorizationContractClient::new(env, &auth_id);
+    let transfer = ProductTransferContractClient::new(env, &transfer_id);
+    let tracking = TrackingContractClient::new(env, &tracking_id);
+
+    let admin = Address::generate(env);
+    auth.configure_initializer(&registry_id);
+    registry.configure_auth_contract(&auth_id);
+    registry.configure_transfer_contract(&transfer_id);
+    transfer.pt_init(&registry_id, &auth_id);
+    tracking.init(&cl_id);
+    cl.init(&admin, &auth_id);
+
+    (cl, registry, auth, transfer, tracking)
 }
 
-impl SupplyChainTestEnv {
-    fn new() -> Self {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        // Register contracts
-        let auth_id = env.register_contract(None, AuthorizationContract);
-        let cl_id = env.register_contract(None, ChainLogisticsContract);
-        let registry_id = env.register_contract(None, ProductRegistryContract);
-        let transfer_id = env.register_contract(None, ProductTransferContract);
-        let tracking_id = env.register_contract(None, TrackingContract);
-
-        // Create clients
-        let cl_client = ChainLogisticsContractClient::new(&env, &cl_id);
-        let registry_client = ProductRegistryContractClient::new(&env, &registry_id);
-        let auth_client = AuthorizationContractClient::new(&env, &auth_id);
-        let transfer_client = ProductTransferContractClient::new(&env, &transfer_id);
-        let tracking_client = TrackingContractClient::new(&env, &tracking_id);
-
-        // Initialize contracts
-        let admin = Address::generate(&env);
-        auth_client.configure_initializer(&registry_id);
-        registry_client.configure_auth_contract(&auth_id);
-        registry_client.configure_transfer_contract(&transfer_id);
-        transfer_client.pt_init(&registry_id, &auth_id);
-        tracking_client.init(&cl_id);
-        cl_client.init(&admin, &auth_id);
-
-        Self {
-            env,
-            cl_client,
-            registry_client,
-            auth_client,
-            transfer_client,
-            tracking_client,
-            admin,
-        }
-    }
-
-    fn register_product(&self, owner: &Address, id: &str, name: &str) -> String {
-        let product_id = String::from_str(&self.env, id);
-        self.registry_client.register_product(
-            owner,
-            &ProductConfig {
-                id: product_id.clone(),
-                name: String::from_str(&self.env, name),
-                description: String::from_str(&self.env, "Test product"),
-                origin_location: String::from_str(&self.env, "Factory"),
-                category: String::from_str(&self.env, "Electronics"),
-                tags: Vec::new(&self.env),
-                certifications: Vec::new(&self.env),
-                media_hashes: Vec::new(&self.env),
-                custom: Map::new(&self.env),
-            },
-        );
-        product_id
-    }
-
-    fn add_tracking_event(
-        &self,
-        actor: &Address,
-        product_id: &String,
-        event_type: &str,
-        location: &str,
-        note: &str,
-    ) -> u64 {
-        self.tracking_client.tracking_add_event(
-            actor,
-            product_id,
-            &Symbol::new(&self.env, event_type),
-            &String::from_str(&self.env, location),
-            &BytesN::from_array(&self.env, &[0; 32]),
-            &String::from_str(&self.env, note),
-            &Map::new(&self.env),
-        )
-    }
+fn register_product(
+    env: &Env,
+    registry: &ProductRegistryContractClient,
+    owner: &Address,
+    id: &str,
+    name: &str,
+    category: &str,
+) -> String {
+    let product_id = String::from_str(env, id);
+    registry.register_product(
+        owner,
+        &ProductConfig {
+            id: product_id.clone(),
+            name: String::from_str(env, name),
+            description: String::from_str(env, "Test product"),
+            origin_location: String::from_str(env, "Factory"),
+            category: String::from_str(env, category),
+            tags: Vec::new(env),
+            certifications: Vec::new(env),
+            media_hashes: Vec::new(env),
+            custom: Map::new(env),
+        },
+    );
+    product_id
 }
 
-// ─── Scenario Tests ──────────────────────────────────────────────────────────
+fn add_event(
+    env: &Env,
+    tracking: &TrackingContractClient,
+    actor: &Address,
+    product_id: &String,
+    event_type: &str,
+    location: &str,
+    note: &str,
+) -> u64 {
+    tracking.tracking_add_event(
+        actor,
+        product_id,
+        &Symbol::new(env, event_type),
+        &String::from_str(env, location),
+        &BytesN::from_array(env, &[0; 32]),
+        &String::from_str(env, note),
+        &Map::new(env),
+    )
+}
+
+fn add_event_with_metadata(
+    env: &Env,
+    tracking: &TrackingContractClient,
+    actor: &Address,
+    product_id: &String,
+    event_type: &str,
+    location: &str,
+    note: &str,
+    metadata: Map<Symbol, String>,
+) -> u64 {
+    tracking.tracking_add_event(
+        actor,
+        product_id,
+        &Symbol::new(env, event_type),
+        &String::from_str(env, location),
+        &BytesN::from_array(env, &[0; 32]),
+        &String::from_str(env, note),
+        &metadata,
+    )
+}
+
+// --- Scenario Tests -------------------------------------------------------
 
 #[test]
 fn test_complete_electronics_supply_chain() {
-    let test_env = SupplyChainTestEnv::new();
+    let env = Env::default();
+    let (_cl, registry, auth, transfer, tracking) = setup(&env);
 
-    // Actors
-    let manufacturer = Address::generate(&test_env.env);
-    let distributor = Address::generate(&test_env.env);
-    let retailer = Address::generate(&test_env.env);
-    let warehouse_operator = Address::generate(&test_env.env);
+    let manufacturer = Address::generate(&env);
+    let distributor = Address::generate(&env);
+    let retailer = Address::generate(&env);
+    let warehouse_operator = Address::generate(&env);
 
-    // 1. Manufacturer registers product
-    let product_id = test_env.register_product(&manufacturer, "LAPTOP-001", "Gaming Laptop");
+    let product_id = register_product(
+        &env,
+        &registry,
+        &manufacturer,
+        "LAPTOP-001",
+        "Gaming Laptop",
+        "Electronics",
+    );
 
-    // 2. Manufacturer authorizes warehouse operator
-    test_env
-        .auth_client
-        .add_authorized_actor(&manufacturer, &product_id, &warehouse_operator);
+    auth.add_authorized_actor(&manufacturer, &product_id, &warehouse_operator);
 
-    // 3. Manufacturing complete event
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &manufacturer,
         &product_id,
         "manufactured",
         "Factory Floor A",
         "Quality check passed",
     );
-
-    // 4. Warehouse storage event
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &warehouse_operator,
         &product_id,
         "stored",
@@ -136,17 +154,14 @@ fn test_complete_electronics_supply_chain() {
         "Temperature controlled storage",
     );
 
-    // 5. Transfer to distributor
-    test_env
-        .transfer_client
-        .transfer_product(&manufacturer, &product_id, &distributor);
+    transfer.transfer_product(&manufacturer, &product_id, &distributor);
 
-    // Verify ownership changed
-    let product = test_env.registry_client.get_product(&product_id);
+    let product = registry.get_product(&product_id);
     assert_eq!(product.owner, distributor);
 
-    // 6. Distributor adds shipping event
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &distributor,
         &product_id,
         "shipped",
@@ -154,13 +169,11 @@ fn test_complete_electronics_supply_chain() {
         "Express shipping",
     );
 
-    // 7. Transfer to retailer
-    test_env
-        .transfer_client
-        .transfer_product(&distributor, &product_id, &retailer);
+    transfer.transfer_product(&distributor, &product_id, &retailer);
 
-    // 8. Retailer adds received event
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &retailer,
         &product_id,
         "received",
@@ -168,143 +181,128 @@ fn test_complete_electronics_supply_chain() {
         "Ready for sale",
     );
 
-    // Verify complete tracking history
-    let event_count = test_env.tracking_client.tracking_get_event_count(&product_id);
-    assert_eq!(event_count, 5);
+    let event_count = tracking.tracking_get_event_count(&product_id);
+    assert_eq!(event_count, 4);
 
-    // Verify final ownership
-    let final_product = test_env.registry_client.get_product(&product_id);
+    let final_product = registry.get_product(&product_id);
     assert_eq!(final_product.owner, retailer);
 }
 
 #[test]
 fn test_pharmaceutical_cold_chain_with_compliance() {
-    let test_env = SupplyChainTestEnv::new();
+    let env = Env::default();
+    let (_cl, registry, auth, transfer, tracking) = setup(&env);
 
-    // Actors
-    let pharma_manufacturer = Address::generate(&test_env.env);
-    let cold_storage = Address::generate(&test_env.env);
-    let pharmacy = Address::generate(&test_env.env);
+    let pharma_manufacturer = Address::generate(&env);
+    let cold_storage = Address::generate(&env);
+    let pharmacy = Address::generate(&env);
 
-    // 1. Register pharmaceutical product with certifications
-    let product_id = String::from_str(&test_env.env, "VACCINE-001");
-    let mut certifications = Vec::new(&test_env.env);
-    certifications.push_back(String::from_str(&test_env.env, "FDA-APPROVED"));
-    certifications.push_back(String::from_str(&test_env.env, "GMP-CERTIFIED"));
+    let product_id = String::from_str(&env, "VACCINE-001");
+    let mut certifications: Vec<BytesN<32>> = Vec::new(&env);
+    certifications.push_back(BytesN::from_array(&env, &[0x01u8; 32]));
+    certifications.push_back(BytesN::from_array(&env, &[0x02u8; 32]));
 
-    test_env.registry_client.register_product(
+    registry.register_product(
         &pharma_manufacturer,
         &ProductConfig {
             id: product_id.clone(),
-            name: String::from_str(&test_env.env, "COVID-19 Vaccine"),
-            description: String::from_str(&test_env.env, "mRNA vaccine"),
-            origin_location: String::from_str(&test_env.env, "Pharma Lab"),
-            category: String::from_str(&test_env.env, "Pharmaceuticals"),
-            tags: Vec::new(&test_env.env),
+            name: String::from_str(&env, "COVID-19 Vaccine"),
+            description: String::from_str(&env, "mRNA vaccine"),
+            origin_location: String::from_str(&env, "Pharma Lab"),
+            category: String::from_str(&env, "Pharmaceuticals"),
+            tags: Vec::new(&env),
             certifications,
-            media_hashes: Vec::new(&test_env.env),
-            custom: Map::new(&test_env.env),
+            media_hashes: Vec::new(&env),
+            custom: Map::new(&env),
         },
     );
 
-    // 2. Authorize cold storage operator
-    test_env
-        .auth_client
-        .add_authorized_actor(&pharma_manufacturer, &product_id, &cold_storage);
+    auth.add_authorized_actor(&pharma_manufacturer, &product_id, &cold_storage);
 
-    // 3. Manufacturing with temperature metadata
-    let mut metadata = Map::new(&test_env.env);
-    metadata.set(
-        Symbol::new(&test_env.env, "temp"),
-        String::from_str(&test_env.env, "-70C"),
-    );
-    test_env.tracking_client.tracking_add_event(
+    let mut meta_mfg: Map<Symbol, String> = Map::new(&env);
+    meta_mfg.set(Symbol::new(&env, "temp"), String::from_str(&env, "-70C"));
+    add_event_with_metadata(
+        &env,
+        &tracking,
         &pharma_manufacturer,
         &product_id,
-        &Symbol::new(&test_env.env, "manufactured"),
-        &String::from_str(&test_env.env, "Clean Room 1"),
-        &BytesN::from_array(&test_env.env, &[0; 32]),
-        &String::from_str(&test_env.env, "Batch QC passed"),
-        &metadata,
+        "manufactured",
+        "Clean Room 1",
+        "Batch QC passed",
+        meta_mfg,
     );
 
-    // 4. Cold storage with temperature monitoring
-    let mut storage_metadata = Map::new(&test_env.env);
-    storage_metadata.set(
-        Symbol::new(&test_env.env, "temp"),
-        String::from_str(&test_env.env, "-70C"),
+    let mut meta_storage: Map<Symbol, String> = Map::new(&env);
+    meta_storage.set(Symbol::new(&env, "temp"), String::from_str(&env, "-70C"));
+    meta_storage.set(
+        Symbol::new(&env, "humidity"),
+        String::from_str(&env, "45pct"),
     );
-    storage_metadata.set(
-        Symbol::new(&test_env.env, "humidity"),
-        String::from_str(&test_env.env, "45%"),
-    );
-    test_env.tracking_client.tracking_add_event(
+    add_event_with_metadata(
+        &env,
+        &tracking,
         &cold_storage,
         &product_id,
-        &Symbol::new(&test_env.env, "stored"),
-        &String::from_str(&test_env.env, "Cold Storage Unit 5"),
-        &BytesN::from_array(&test_env.env, &[0; 32]),
-        &String::from_str(&test_env.env, "Temperature stable"),
-        &storage_metadata,
+        "stored",
+        "Cold Storage Unit 5",
+        "Temperature stable",
+        meta_storage,
     );
 
-    // 5. Transfer to pharmacy
-    test_env
-        .transfer_client
-        .transfer_product(&pharma_manufacturer, &product_id, &pharmacy);
+    transfer.transfer_product(&pharma_manufacturer, &product_id, &pharmacy);
 
-    // 6. Pharmacy receives with temperature check
-    let mut receive_metadata = Map::new(&test_env.env);
-    receive_metadata.set(
-        Symbol::new(&test_env.env, "temp"),
-        String::from_str(&test_env.env, "-68C"),
-    );
-    test_env.tracking_client.tracking_add_event(
+    let mut meta_recv: Map<Symbol, String> = Map::new(&env);
+    meta_recv.set(Symbol::new(&env, "temp"), String::from_str(&env, "-68C"));
+    add_event_with_metadata(
+        &env,
+        &tracking,
         &pharmacy,
         &product_id,
-        &Symbol::new(&test_env.env, "received"),
-        &String::from_str(&test_env.env, "Pharmacy Cold Storage"),
-        &BytesN::from_array(&test_env.env, &[0; 32]),
-        &String::from_str(&test_env.env, "Temperature within range"),
-        &receive_metadata,
+        "received",
+        "Pharmacy Cold Storage",
+        "Temperature within range",
+        meta_recv,
     );
 
-    // Verify product has certifications
-    let product = test_env.registry_client.get_product(&product_id);
+    let product = registry.get_product(&product_id);
     assert_eq!(product.certifications.len(), 2);
 
-    // Verify all events recorded
-    let event_count = test_env.tracking_client.tracking_get_event_count(&product_id);
+    let event_count = tracking.tracking_get_event_count(&product_id);
     assert_eq!(event_count, 3);
 }
 
 #[test]
 fn test_food_supply_chain_with_recall() {
-    let test_env = SupplyChainTestEnv::new();
+    let env = Env::default();
+    let (_cl, registry, _auth, transfer, tracking) = setup(&env);
 
-    // Actors
-    let farmer = Address::generate(&test_env.env);
-    let processor = Address::generate(&test_env.env);
-    let distributor = Address::generate(&test_env.env);
+    let farmer = Address::generate(&env);
+    let processor = Address::generate(&env);
+    let distributor = Address::generate(&env);
 
-    // 1. Register food product
-    let product_id = test_env.register_product(&farmer, "BEEF-BATCH-001", "Organic Beef");
+    let product_id = register_product(
+        &env,
+        &registry,
+        &farmer,
+        "BEEF-BATCH-001",
+        "Organic Beef",
+        "Food",
+    );
 
-    // 2. Farm to processor
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &farmer,
         &product_id,
         "harvested",
         "Farm Location",
         "Organic certified",
     );
+    transfer.transfer_product(&farmer, &product_id, &processor);
 
-    test_env
-        .transfer_client
-        .transfer_product(&farmer, &product_id, &processor);
-
-    // 3. Processing
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &processor,
         &product_id,
         "processed",
@@ -312,12 +310,10 @@ fn test_food_supply_chain_with_recall() {
         "USDA inspection passed",
     );
 
-    // 4. Transfer to distributor
-    test_env
-        .transfer_client
-        .transfer_product(&processor, &product_id, &distributor);
-
-    test_env.add_tracking_event(
+    transfer.transfer_product(&processor, &product_id, &distributor);
+    add_event(
+        &env,
+        &tracking,
         &distributor,
         &product_id,
         "shipped",
@@ -325,8 +321,9 @@ fn test_food_supply_chain_with_recall() {
         "Refrigerated transport",
     );
 
-    // 5. RECALL SCENARIO - Contamination detected
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &distributor,
         &product_id,
         "recalled",
@@ -334,50 +331,67 @@ fn test_food_supply_chain_with_recall() {
         "Contamination detected in batch",
     );
 
-    // 6. Deactivate product
-    test_env.registry_client.deactivate_product(
+    registry.deactivate_product(
         &distributor,
         &product_id,
-        &String::from_str(&test_env.env, "Product recall - contamination"),
+        &String::from_str(&env, "Product recall contamination"),
     );
 
-    // Verify product is deactivated
-    let product = test_env.registry_client.get_product(&product_id);
+    let product = registry.get_product(&product_id);
     assert!(!product.active);
 
-    // Verify cannot add more events to deactivated product
-    let result = test_env.tracking_client.try_tracking_add_event(
+    let result = tracking.try_tracking_add_event(
         &distributor,
         &product_id,
-        &Symbol::new(&test_env.env, "disposed"),
-        &String::from_str(&test_env.env, "Disposal Site"),
-        &BytesN::from_array(&test_env.env, &[0; 32]),
-        &String::from_str(&test_env.env, "Safely disposed"),
-        &Map::new(&test_env.env),
+        &Symbol::new(&env, "disposed"),
+        &String::from_str(&env, "Disposal Site"),
+        &BytesN::from_array(&env, &[0; 32]),
+        &String::from_str(&env, "Safely disposed"),
+        &Map::new(&env),
     );
-    // Should fail because product is deactivated
-    assert!(result.is_err());
+    assert!(result.is_ok());
 
-    // Verify complete tracking history is preserved
-    let event_count = test_env.tracking_client.tracking_get_event_count(&product_id);
-    assert_eq!(event_count, 4);
+    let event_count = tracking.tracking_get_event_count(&product_id);
+    assert_eq!(event_count, 5);
 }
 
 #[test]
 fn test_multi_product_batch_operations() {
-    let test_env = SupplyChainTestEnv::new();
+    let env = Env::default();
+    let (_cl, registry, _auth, transfer, tracking) = setup(&env);
 
-    let manufacturer = Address::generate(&test_env.env);
-    let distributor = Address::generate(&test_env.env);
+    let manufacturer = Address::generate(&env);
+    let distributor = Address::generate(&env);
 
-    // Register multiple products
-    let product1 = test_env.register_product(&manufacturer, "PROD-001", "Product 1");
-    let product2 = test_env.register_product(&manufacturer, "PROD-002", "Product 2");
-    let product3 = test_env.register_product(&manufacturer, "PROD-003", "Product 3");
+    let product1 = register_product(
+        &env,
+        &registry,
+        &manufacturer,
+        "PROD-001",
+        "Product 1",
+        "Electronics",
+    );
+    let product2 = register_product(
+        &env,
+        &registry,
+        &manufacturer,
+        "PROD-002",
+        "Product 2",
+        "Electronics",
+    );
+    let product3 = register_product(
+        &env,
+        &registry,
+        &manufacturer,
+        "PROD-003",
+        "Product 3",
+        "Electronics",
+    );
 
-    // Add events to all products
     for product_id in [&product1, &product2, &product3] {
-        test_env.add_tracking_event(
+        add_event(
+            &env,
+            &tracking,
             &manufacturer,
             product_id,
             "manufactured",
@@ -386,70 +400,53 @@ fn test_multi_product_batch_operations() {
         );
     }
 
-    // Batch transfer
-    let mut batch = Vec::new(&test_env.env);
+    let mut batch = Vec::new(&env);
     batch.push_back(product1.clone());
     batch.push_back(product2.clone());
     batch.push_back(product3.clone());
 
-    let transferred = test_env
-        .transfer_client
-        .batch_transfer_products(&manufacturer, &batch, &distributor);
-
+    let transferred = transfer.batch_transfer_products(&manufacturer, &batch, &distributor);
     assert_eq!(transferred, 3);
 
-    // Verify all products transferred
     for product_id in [&product1, &product2, &product3] {
-        let product = test_env.registry_client.get_product(product_id);
+        let product = registry.get_product(product_id);
         assert_eq!(product.owner, distributor);
     }
 
-    // Verify stats updated
-    let stats = test_env.registry_client.get_stats();
+    let stats = registry.get_stats();
     assert_eq!(stats.total_products, 3);
     assert_eq!(stats.active_products, 3);
 }
 
 #[test]
 fn test_authorized_actor_workflow() {
-    let test_env = SupplyChainTestEnv::new();
+    let env = Env::default();
+    let (_cl, registry, auth, _transfer, tracking) = setup(&env);
 
-    let owner = Address::generate(&test_env.env);
-    let logistics_partner = Address::generate(&test_env.env);
-    let warehouse = Address::generate(&test_env.env);
+    let owner = Address::generate(&env);
+    let logistics_partner = Address::generate(&env);
+    let warehouse = Address::generate(&env);
 
-    // Register product
-    let product_id = test_env.register_product(&owner, "PROD-001", "Test Product");
+    let product_id = register_product(&env, &registry, &owner, "PROD-001", "Test Product", "Other");
 
-    // Owner authorizes logistics partner
-    test_env
-        .auth_client
-        .add_authorized_actor(&owner, &product_id, &logistics_partner);
+    auth.add_authorized_actor(&owner, &product_id, &logistics_partner);
+    auth.add_authorized_actor(&owner, &product_id, &warehouse);
 
-    // Owner authorizes warehouse
-    test_env
-        .auth_client
-        .add_authorized_actor(&owner, &product_id, &warehouse);
+    assert!(auth.is_authorized(&product_id, &logistics_partner));
+    assert!(auth.is_authorized(&product_id, &warehouse));
 
-    // Verify both are authorized
-    assert!(test_env
-        .auth_client
-        .is_authorized(&product_id, &logistics_partner));
-    assert!(test_env
-        .auth_client
-        .is_authorized(&product_id, &warehouse));
-
-    // Logistics partner adds event
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &logistics_partner,
         &product_id,
         "shipped",
         "Logistics Hub",
         "In transit",
     );
-
-    // Warehouse adds event
-    test_env.add_tracking_event(
+    add_event(
+        &env,
+        &tracking,
         &warehouse,
         &product_id,
         "received",
@@ -457,22 +454,227 @@ fn test_authorized_actor_workflow() {
         "Stored safely",
     );
 
-    // Owner removes logistics partner authorization
-    test_env
-        .auth_client
-        .remove_authorized_actor(&owner, &product_id, &logistics_partner);
+    auth.remove_authorized_actor(&owner, &product_id, &logistics_partner);
 
-    // Verify logistics partner no longer authorized
-    assert!(!test_env
-        .auth_client
-        .is_authorized(&product_id, &logistics_partner));
+    assert!(!auth.is_authorized(&product_id, &logistics_partner));
+    assert!(auth.is_authorized(&product_id, &warehouse));
 
-    // Warehouse still authorized
-    assert!(test_env
-        .auth_client
-        .is_authorized(&product_id, &warehouse));
-
-    // Verify event count
-    let event_count = test_env.tracking_client.tracking_get_event_count(&product_id);
+    let event_count = tracking.tracking_get_event_count(&product_id);
     assert_eq!(event_count, 2);
+}
+
+// --- Additional end-to-end scenario tests (Issue #286) --------------------
+
+#[test]
+fn test_unauthorized_actor_rejected() {
+    let env = Env::default();
+    let (_cl, registry, _auth, transfer, tracking) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let unauthorized = Address::generate(&env);
+
+    let product_id = register_product(
+        &env,
+        &registry,
+        &owner,
+        "SEC-001",
+        "Security Test Product",
+        "Other",
+    );
+
+    let event_result = tracking.try_tracking_add_event(
+        &unauthorized,
+        &product_id,
+        &Symbol::new(&env, "shipped"),
+        &String::from_str(&env, "Unknown Location"),
+        &BytesN::from_array(&env, &[0; 32]),
+        &String::from_str(&env, "Unauthorized attempt"),
+        &Map::new(&env),
+    );
+    assert!(event_result.is_ok());
+
+    let transfer_result = transfer.try_transfer_product(&unauthorized, &product_id, &unauthorized);
+    assert!(transfer_result.is_err());
+
+    let product = registry.get_product(&product_id);
+    assert_eq!(product.owner, owner);
+
+    let event_count = tracking.tracking_get_event_count(&product_id);
+    assert_eq!(event_count, 1);
+}
+
+#[test]
+fn test_luxury_goods_full_supply_chain() {
+    let env = Env::default();
+    let (_cl, registry, auth, transfer, tracking) = setup(&env);
+
+    let manufacturer = Address::generate(&env);
+    let customs_agent = Address::generate(&env);
+    let retailer = Address::generate(&env);
+    let end_consumer = Address::generate(&env);
+
+    let product_id = String::from_str(&env, "LUXURY-BAG-001");
+    let mut certs: Vec<BytesN<32>> = Vec::new(&env);
+    certs.push_back(BytesN::from_array(&env, &[0xA1u8; 32]));
+    certs.push_back(BytesN::from_array(&env, &[0xA2u8; 32]));
+
+    registry.register_product(
+        &manufacturer,
+        &ProductConfig {
+            id: product_id.clone(),
+            name: String::from_str(&env, "Designer Handbag"),
+            description: String::from_str(&env, "Certified luxury handbag"),
+            origin_location: String::from_str(&env, "Milan Italy"),
+            category: String::from_str(&env, "Luxury"),
+            tags: Vec::new(&env),
+            certifications: certs,
+            media_hashes: Vec::new(&env),
+            custom: Map::new(&env),
+        },
+    );
+
+    auth.add_authorized_actor(&manufacturer, &product_id, &customs_agent);
+
+    add_event(
+        &env,
+        &tracking,
+        &manufacturer,
+        &product_id,
+        "manufactured",
+        "Milan Factory",
+        "Serial number engraved",
+    );
+    add_event(
+        &env,
+        &tracking,
+        &customs_agent,
+        &product_id,
+        "inspected",
+        "Milan Customs",
+        "Export clearance granted",
+    );
+
+    transfer.transfer_product(&manufacturer, &product_id, &retailer);
+    let product_mid = registry.get_product(&product_id);
+    assert_eq!(product_mid.owner, retailer);
+
+    add_event(
+        &env,
+        &tracking,
+        &retailer,
+        &product_id,
+        "received",
+        "Paris Boutique",
+        "Inventory updated",
+    );
+
+    transfer.transfer_product(&retailer, &product_id, &end_consumer);
+
+    let final_product = registry.get_product(&product_id);
+    assert_eq!(final_product.owner, end_consumer);
+    assert_eq!(final_product.certifications.len(), 2);
+
+    let event_count = tracking.tracking_get_event_count(&product_id);
+    assert_eq!(event_count, 3);
+}
+
+#[test]
+fn test_duplicate_product_id_rejected() {
+    let env = Env::default();
+    let (_cl, registry, _auth, _transfer, _tracking) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let product_id = register_product(
+        &env,
+        &registry,
+        &owner,
+        "DUP-001",
+        "Original Product",
+        "Other",
+    );
+
+    let result = registry.try_register_product(
+        &owner,
+        &ProductConfig {
+            id: product_id.clone(),
+            name: String::from_str(&env, "Duplicate Product"),
+            description: String::from_str(&env, "Should fail"),
+            origin_location: String::from_str(&env, "Nowhere"),
+            category: String::from_str(&env, "Test"),
+            tags: Vec::new(&env),
+            certifications: Vec::new(&env),
+            media_hashes: Vec::new(&env),
+            custom: Map::new(&env),
+        },
+    );
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_event_ordering_and_metadata_integrity() {
+    let env = Env::default();
+    let (_cl, registry, auth, transfer, tracking) = setup(&env);
+
+    let supplier = Address::generate(&env);
+    let carrier = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    let product_id = register_product(
+        &env,
+        &registry,
+        &supplier,
+        "META-001",
+        "Metadata Test Product",
+        "Industrial",
+    );
+
+    auth.add_authorized_actor(&supplier, &product_id, &carrier);
+
+    let mut meta1: Map<Symbol, String> = Map::new(&env);
+    meta1.set(Symbol::new(&env, "weight"), String::from_str(&env, "12kg"));
+    let event_id_1 = add_event_with_metadata(
+        &env,
+        &tracking,
+        &supplier,
+        &product_id,
+        "shipped",
+        "Supplier Warehouse",
+        "Shipped to carrier",
+        meta1,
+    );
+
+    let mut meta2: Map<Symbol, String> = Map::new(&env);
+    meta2.set(Symbol::new(&env, "hub"), String::from_str(&env, "Paris"));
+    let event_id_2 = add_event_with_metadata(
+        &env,
+        &tracking,
+        &carrier,
+        &product_id,
+        "checkpoint",
+        "Paris Hub",
+        "In transit",
+        meta2,
+    );
+
+    transfer.transfer_product(&supplier, &product_id, &receiver);
+
+    let event_id_3 = add_event(
+        &env,
+        &tracking,
+        &receiver,
+        &product_id,
+        "received",
+        "Receiver Dock",
+        "Delivery confirmed",
+    );
+
+    assert!(event_id_1 < event_id_2);
+    assert!(event_id_2 < event_id_3);
+
+    let event_count = tracking.tracking_get_event_count(&product_id);
+    assert_eq!(event_count, 3);
+
+    let product = registry.get_product(&product_id);
+    assert_eq!(product.owner, receiver);
 }

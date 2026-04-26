@@ -19,6 +19,14 @@ pub fn set_multisig_contract(env: &Env, address: &Address) {
     StorageContract::set_multisig_contract(env, address)
 }
 
+pub fn get_timelock_contract(env: &Env) -> Option<Address> {
+    StorageContract::get_timelock_contract(env)
+}
+
+pub fn set_timelock_contract(env: &Env, address: &Address) {
+    StorageContract::set_timelock_contract(env, address)
+}
+
 // ─── Product ────────────────────────────────────────────────────────────────
 
 pub fn has_product(env: &Env, product_id: &String) -> bool {
