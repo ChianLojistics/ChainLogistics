@@ -9,7 +9,7 @@ use crate::{
     AppState,
     error::AppError,
     models::{TrackingEvent, NewTrackingEvent},
-    validation::{validate_string, validate_stellar_address, sanitize_input},
+    validation::{validate_string, validate_stellar_address, sanitize_input, validate_product_id, validate_location, sanitize_json_metadata},
 };
 
 #[derive(Debug, Deserialize)]
@@ -79,7 +79,7 @@ pub async fn list_events(
     let limit = query.limit.unwrap_or(20).min(100);
 
     let (events, total) = if let Some(product_id) = query.product_id {
-        validate_string("product_id", &product_id, 64)?;
+        validate_product_id(&product_id)?;
         let sanitized_product_id = sanitize_input(&product_id);
 
         let events = if let Some(event_type) = query.event_type {
@@ -124,9 +124,9 @@ pub async fn create_event(
     Json(request): Json<CreateEventRequest>,
 ) -> Result<Json<EventResponse>, AppError> {
     // Validate inputs
-    validate_string("product_id", &request.product_id, 64)?;
+    validate_product_id(&request.product_id)?;
     validate_stellar_address(&request.actor_address)?;
-    validate_string("location", &request.location, 256)?;
+    validate_location(&request.location)?;
     if request.note.len() > 256 {
         return Err(AppError::Validation("note must not exceed 256 characters".to_string()));
     }
@@ -150,7 +150,11 @@ pub async fn create_event(
         location: sanitize_input(&request.location),
         data_hash: request.data_hash,
         note: sanitize_input(&request.note),
-        metadata: request.metadata,
+        metadata: {
+            let mut meta = request.metadata;
+            sanitize_json_metadata(&mut meta);
+            meta
+        },
     };
 
     let event = state.event_service.create_event(new_event).await?;
