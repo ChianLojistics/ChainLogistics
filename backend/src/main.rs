@@ -18,12 +18,14 @@ mod blockchain;
 mod websocket;
 mod compliance;
 mod validation;
+mod monitoring;
 
 use config::Config;
 use database::Database;
 use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService};
 use utils::CronService;
 use error::AppError;
+use monitoring::ErrorMonitor;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -38,6 +40,7 @@ pub struct AppState {
     pub carbon_service: Arc<CarbonService>,
     pub redis_client: redis::Client,
     pub config: Config,
+    pub error_monitor: ErrorMonitor,
 }
 
 impl AppState {
@@ -66,6 +69,9 @@ impl AppState {
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
         
+        // Initialize error monitoring
+        let error_monitor = ErrorMonitor::new();
+        
         Ok(Self {
             db,
             product_service,
@@ -78,6 +84,7 @@ impl AppState {
             carbon_service,
             redis_client,
             config,
+            error_monitor,
         })
     }
 }
@@ -104,6 +111,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
+                .layer(middleware::from_fn(
+                    middleware::error_handler::request_logger,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middleware::error_handler::global_error_handler,
+                ))
                 .layer(middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::security::enforce_https,
