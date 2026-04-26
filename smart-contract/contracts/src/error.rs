@@ -59,4 +59,25 @@ pub enum Error {
     InvalidThreshold = 66,
     TooManySigners = 67,
     DuplicateSigner = 68,
+    ProposalRejected = 69,
+    TimeLockNotExpired = 70,
+    AlreadyRejected = 71,
+    ProposalExpired = 72,
+
+    // --- Oracle Security (73-80) ---
+    OracleFeedNotConfigured = 73,
+    OracleSourceNotFound = 74,
+    OracleReportStale = 75,
+    OracleValueOutOfRange = 76,
+    OracleConsensusBroken = 77,
+    OracleFallbackUnavailable = 78,
+    DuplicateOracleSource = 79,
+    OracleInvalidStake = 80,
+
+    // --- Timelock (81-90) ---
+    TimelockNotReady = 81,
+    TimelockExpired = 82,
+    TimelockDelayTooShort = 83,
+    TimelockDelayTooLong = 84,
+    TimelockCancelled = 85,
 }

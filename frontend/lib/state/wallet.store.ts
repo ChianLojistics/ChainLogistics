@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { connectWallet, disconnectWallet, getCurrentAddress, getFreighterNetwork } from "../stellar/wallet";
 
+const E2E_MOCKS_ENABLED = process.env.NEXT_PUBLIC_E2E_MOCKS === "true";
+
 export type WalletState = {
   status: "disconnected" | "connecting" | "connected" | "error";
   publicKey: string | null;
@@ -82,7 +84,6 @@ export const useWalletStore = create<WalletState>()(
             ),
           ]);
           const detectedNetwork = await getFreighterNetwork();
-          console.info("[wallet] detected freighter network:", detectedNetwork);
           set({
             status: "connected",
             publicKey: result.account.publicKey,
@@ -91,8 +92,6 @@ export const useWalletStore = create<WalletState>()(
           });
           startAccountWatcher(get, set);
         } catch (err: unknown) {
-          console.error("[wallet] connect failed", err);
-
           let message = err instanceof Error ? err.message : "Failed to connect wallet";
           if (message.toLowerCase().includes("timed out")) {
             message =
@@ -112,6 +111,13 @@ export const useWalletStore = create<WalletState>()(
 
       initialize: async () => {
         const { status, publicKey } = get();
+
+        if (E2E_MOCKS_ENABLED) {
+          if (status === "connected" && publicKey) {
+            startAccountWatcher(get, set);
+          }
+          return;
+        }
 
         // If the page refreshed mid-connection, persisted state can be stuck at "connecting".
         // Reset to a safe state on boot so the UI doesn't spin forever.
@@ -133,7 +139,6 @@ export const useWalletStore = create<WalletState>()(
         }
 
         const detectedNetwork = await getFreighterNetwork();
-        console.info("[wallet] detected freighter network (init):", detectedNetwork);
         set({ network: detectedNetwork });
 
         startAccountWatcher(get, set);

@@ -10,3 +10,4 @@ export * from "./badge";
 export * from "./loading-spinner";
 export * from "./Toast";
 export * from "./ToastContainer";
+export * from "./InlineErrorState";

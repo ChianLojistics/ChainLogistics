@@ -1,14 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import dynamic from "next/dynamic";
 import {
   Activity,
   Boxes,
@@ -22,12 +15,63 @@ import type { TimelineEvent } from "@/lib/types/tracking";
 import { useWalletStore } from "@/lib/state/wallet.store";
 import { getProductsByOwner } from "@/lib/contract/products";
 import { fetchProductEvents } from "@/lib/contract/events";
+import { ContractClientError } from "@/lib/stellar/contractClient";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_REFRESH_INTERVAL_MS, DASHBOARD_RECENT_EVENTS_LIMIT } from "@/lib/constants";
 
 import { StatCard } from "@/components/analytics/StatCard";
-import { EventsChart } from "@/components/analytics/EventsChart";
-import { ActivityFeed } from "@/components/analytics/ActivityFeed";
+
+// ─── Lazy-loaded heavy components (recharts, etc.) ───────────────────────────
+// These are large chart/feed components that are only needed after the initial
+// page paint, so they are split into separate JS chunks via next/dynamic.
+const EventsChart = dynamic(
+  () => import("@/components/analytics/EventsChart").then((m) => ({ default: m.EventsChart })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-72 w-full animate-pulse rounded-xl bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
+
+const ActivityFeed = dynamic(
+  () => import("@/components/analytics/ActivityFeed").then((m) => ({ default: m.ActivityFeed })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-40 w-full animate-pulse rounded-xl bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
+
+// recharts components are only imported inside the lazy chunk above — the main
+// bundle no longer carries them. The inline LineChart below is kept here
+// because it is co-located with the dashboard-specific activityOverTime state.
+// We defer the recharts import itself to avoid the initial bundle bloat.
+const DynamicLineChart = dynamic(
+  () =>
+    import("recharts").then(({ LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer }) => {
+      function ActivityLineChart({ data }: { data: { date: string; count: number }[] }) {
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      }
+      return { default: ActivityLineChart };
+    }),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full animate-pulse rounded-lg bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
 
 type EventsByTypeDatum = { type: string; count: number };
 type ActivityDatum = { date: string; count: number };
@@ -46,7 +90,17 @@ export default function DashboardPage() {
   const [products, setProducts] = React.useState<Product[]>([]);
   const [events, setEvents] = React.useState<TimelineEvent[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<
+    | null
+    | {
+        title: string;
+        message: string;
+        detail?: string;
+        variant: "warning" | "error";
+        canRetry: boolean;
+        showConfigHint: boolean;
+      }
+  >(null);
   const [lastUpdatedAt, setLastUpdatedAt] = React.useState<number | null>(null);
 
   const load = React.useCallback(async () => {
@@ -72,18 +126,45 @@ export default function DashboardPage() {
         .filter((r): r is PromiseFulfilledResult<TimelineEvent[]> => r.status === "fulfilled")
         .flatMap((r) => r.value);
 
+      const firstRejected = settled.find(
+        (r): r is PromiseRejectedResult => r.status === "rejected"
+      );
+
       all.sort((a, b) => b.timestamp - a.timestamp);
       setEvents(all);
       setLastUpdatedAt(Date.now());
 
       const rejectedCount = settled.filter((r) => r.status === "rejected").length;
       if (rejectedCount > 0 && all.length === 0) {
-        setError(
-          "Events could not be loaded (contract not configured or unavailable). Showing product-only insights."
-        );
+        const reason = firstRejected?.reason;
+        const normalizedTitle = "Events unavailable";
+        const isContractNotConfigured =
+          reason instanceof ContractClientError && reason.code === "CONTRACT_NOT_CONFIGURED";
+
+        setError({
+          title: normalizedTitle,
+          message: isContractNotConfigured
+            ? "Contract is not configured. Dashboard will show product-only insights."
+            : "We couldn't load tracking events. Dashboard will show product-only insights.",
+          detail: reason instanceof Error ? reason.message : undefined,
+          variant: "warning",
+          canRetry: true,
+          showConfigHint: isContractNotConfigured,
+        });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard data");
+      const isContractNotConfigured =
+        e instanceof ContractClientError && e.code === "CONTRACT_NOT_CONFIGURED";
+      setError({
+        title: "Failed to load dashboard",
+        message: isContractNotConfigured
+          ? "Contract is not configured. Add NEXT_PUBLIC_CONTRACT_ID and reload."
+          : "Unable to load dashboard data. Please check your connection and try again.",
+        detail: e instanceof Error ? e.message : undefined,
+        variant: "error",
+        canRetry: true,
+        showConfigHint: isContractNotConfigured,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -221,8 +302,43 @@ export default function DashboardPage() {
       ) : null}
 
       {error ? (
-        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {error}
+        <div
+          className={cn(
+            "mt-6 rounded-xl border p-4 text-sm",
+            error.variant === "warning"
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-red-200 bg-red-50 text-red-900"
+          )}
+        >
+          <div className="font-semibold">{error.title}</div>
+          <div className="mt-1">{error.message}</div>
+          {error.detail ? (
+            <div className="mt-1 text-xs opacity-80">{error.detail}</div>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {error.canRetry ? (
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={!canLoad || isLoading}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50",
+                  error.variant === "warning"
+                    ? "bg-amber-900 text-amber-50 hover:bg-amber-950"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                )}
+              >
+                Retry
+              </button>
+            ) : null}
+
+            {error.showConfigHint ? (
+              <div className="text-xs opacity-80">
+                Set `NEXT_PUBLIC_CONTRACT_ID` in `.env.local`, restart the dev server, then refresh.
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -271,14 +387,7 @@ export default function DashboardPage() {
                 No activity yet.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={activityOverTime} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <DynamicLineChart data={activityOverTime} />
             )}
           </div>
         </div>

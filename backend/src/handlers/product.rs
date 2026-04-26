@@ -11,6 +11,7 @@ use crate::{
     AppState,
     error::AppError,
     models::{Product, NewProduct, ProductFilters},
+    validation::{validate_string, sanitize_input, validate_stellar_address, validate_product_id, validate_location, sanitize_json_metadata},
 };
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -119,17 +120,28 @@ pub async fn list_products(
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(20).min(100); // Cap at 100
 
+    // Validate query parameters
+    if let Some(ref search) = query.search {
+        validate_string("search", search, 100)?;
+    }
+    if let Some(ref category) = query.category {
+        validate_string("category", category, 64)?;
+    }
+    if let Some(ref owner) = query.owner_address {
+        validate_stellar_address(owner)?;
+    }
+
     let products = if let Some(search_query) = query.search {
         state.product_service
-            .search_products(&search_query, limit)
+            .search_products(&sanitize_input(&search_query), limit)
             .await?
             .into_iter()
             .map(ProductResponse::from)
             .collect()
     } else {
         let filters = ProductFilters {
-            owner_address: query.owner_address,
-            category: query.category,
+            owner_address: query.owner_address.clone().map(|s| sanitize_input(&s)),
+            category: query.category.clone().map(|s| sanitize_input(&s)),
             is_active: query.is_active,
             created_after: None,
             created_before: None,
@@ -144,12 +156,11 @@ pub async fn list_products(
     };
 
     let total = if query.search.is_some() {
-        // For search, we don't have an efficient count, so we use the length
         products.len() as i64
     } else {
         let filters = ProductFilters {
-            owner_address: query.owner_address,
-            category: query.category,
+            owner_address: query.owner_address.map(|s| sanitize_input(&s)),
+            category: query.category.map(|s| sanitize_input(&s)),
             is_active: query.is_active,
             created_after: None,
             created_before: None,
@@ -187,19 +198,32 @@ pub async fn create_product(
     State(state): State<AppState>,
     Json(request): Json<CreateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
+    // Validate inputs
+    validate_product_id(&request.id)?;
+    validate_string("name", &request.name, 128)?;
+    validate_string("category", &request.category, 64)?;
+    validate_location(&request.origin_location)?;
+    if request.description.len() > 2048 {
+        return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
+    }
+
     // Get auth context
     let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
-    
+
     let new_product = NewProduct {
-        id: request.id,
-        name: request.name,
-        description: request.description,
-        origin_location: request.origin_location,
-        category: request.category,
-        tags: request.tags,
-        certifications: request.certifications,
-        media_hashes: request.media_hashes,
-        custom_fields: request.custom_fields,
+        id: sanitize_input(&request.id),
+        name: sanitize_input(&request.name),
+        description: sanitize_input(&request.description),
+        origin_location: sanitize_input(&request.origin_location),
+        category: sanitize_input(&request.category),
+        tags: request.tags.iter().map(|t| sanitize_input(t)).collect(),
+        certifications: request.certifications.iter().map(|c| sanitize_input(c)).collect(),
+        media_hashes: request.media_hashes.iter().map(|m| sanitize_input(m)).collect(),
+        custom_fields: {
+            let mut fields = request.custom_fields;
+            sanitize_json_metadata(&mut fields);
+            fields
+        },
         owner_address: auth_context.stellar_address.clone().unwrap_or_default(),
         created_by: auth_context.user_id.to_string(),
     };
@@ -229,6 +253,7 @@ pub async fn get_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ProductResponse>, AppError> {
+    validate_product_id(&id)?;
     let product = state
         .product_service
         .get_product(&id)
@@ -265,35 +290,44 @@ pub async fn update_product(
 ) -> Result<Json<ProductResponse>, AppError> {
     let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
     
+    validate_product_id(&id)?;
+
     let mut product = state
         .product_service
         .get_product(&id)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Product {} not found", id)))?;
 
-    // Update fields if provided
+    // Update fields if provided with validation
     if let Some(name) = request.name {
-        product.name = name;
+        validate_string("name", &name, 128)?;
+        product.name = sanitize_input(&name);
     }
     if let Some(description) = request.description {
-        product.description = description;
+        if description.len() > 2048 {
+            return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
+        }
+        product.description = sanitize_input(&description);
     }
     if let Some(origin_location) = request.origin_location {
-        product.origin_location = origin_location;
+        validate_location(&origin_location)?;
+        product.origin_location = sanitize_input(&origin_location);
     }
     if let Some(category) = request.category {
-        product.category = category;
+        validate_string("category", &category, 64)?;
+        product.category = sanitize_input(&category);
     }
     if let Some(tags) = request.tags {
-        product.tags = tags;
+        product.tags = tags.iter().map(|t| sanitize_input(t)).collect();
     }
     if let Some(certifications) = request.certifications {
-        product.certifications = certifications;
+        product.certifications = certifications.iter().map(|c| sanitize_input(c)).collect();
     }
     if let Some(media_hashes) = request.media_hashes {
-        product.media_hashes = media_hashes;
+        product.media_hashes = media_hashes.iter().map(|m| sanitize_input(m)).collect();
     }
-    if let Some(custom_fields) = request.custom_fields {
+    if let Some(mut custom_fields) = request.custom_fields {
+        sanitize_json_metadata(&mut custom_fields);
         product.custom_fields = custom_fields;
     }
     if let Some(is_active) = request.is_active {
@@ -328,6 +362,8 @@ pub async fn delete_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
+    validate_product_id(&id)?;
+
     // Check if product exists
     state
         .product_service

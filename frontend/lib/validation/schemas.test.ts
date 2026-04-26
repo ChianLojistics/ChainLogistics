@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { productIdSchema, stellarPublicKeySchema, productRegistrationSchema } from './schemas';
+import {
+  productIdSchema,
+  stellarPublicKeySchema,
+  productRegistrationSchema,
+  transferProductSchema,
+  productSearchSchema,
+} from './schemas';
 
 vi.mock("@stellar/stellar-sdk", async () => {
   const actual = await vi.importActual<typeof import("@stellar/stellar-sdk")>("@stellar/stellar-sdk");
@@ -61,6 +67,46 @@ describe('Validation Schemas', () => {
       const result = productRegistrationSchema.safeParse({
         id: 'prod-123'
       });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('transferProductSchema', () => {
+    it('should validate a correct transfer request', () => {
+      const result = transferProductSchema.safeParse({
+        productId: 'PROD-001',
+        recipientAddress: 'GBRPYHIL2CI3FN7YZXRLS62W3N5H3NVBUNNV3DPH3TSRY3OTYJ75SNCJ',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject a missing recipient address', () => {
+      const result = transferProductSchema.safeParse({ productId: 'PROD-001' });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject an invalid recipient Stellar address', () => {
+      const result = transferProductSchema.safeParse({
+        productId: 'PROD-001',
+        recipientAddress: 'not-a-stellar-key',
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('productSearchSchema', () => {
+    it('should validate a normal search query', () => {
+      const result = productSearchSchema.safeParse({ query: 'laptop' });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject an empty search query', () => {
+      const result = productSearchSchema.safeParse({ query: '' });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject a query with dangerous characters', () => {
+      const result = productSearchSchema.safeParse({ query: '<script>alert(1)</script>' });
       expect(result.success).toBe(false);
     });
   });

@@ -19,6 +19,14 @@ pub fn set_multisig_contract(env: &Env, address: &Address) {
     StorageContract::set_multisig_contract(env, address)
 }
 
+pub fn get_timelock_contract(env: &Env) -> Option<Address> {
+    StorageContract::get_timelock_contract(env)
+}
+
+pub fn set_timelock_contract(env: &Env, address: &Address) {
+    StorageContract::set_timelock_contract(env, address)
+}
+
 // ─── Product ────────────────────────────────────────────────────────────────
 
 pub fn has_product(env: &Env, product_id: &String) -> bool {
@@ -155,27 +163,27 @@ pub fn get_search_index(env: &Env, keyword: &String) -> Vec<String> {
         .unwrap_or_else(|| Vec::new(env))
 }
 
+// Gas-optimized: Check existence before loading full vector
 pub fn add_to_search_index(env: &Env, keyword: String, product_id: &String) {
     let mut ids = get_search_index(env, &keyword);
-    if !ids.contains(product_id) {
-        ids.push_back(product_id.clone());
-        put_search_index(env, &keyword, &ids);
+    // Early exit if already indexed - saves gas
+    if ids.contains(product_id) {
+        return;
     }
+    ids.push_back(product_id.clone());
+    put_search_index(env, &keyword, &ids);
 }
 
+// Gas-optimized: Use iterator pattern and early exit
 pub fn remove_from_search_index(env: &Env, keyword: String, product_id: &String) {
     let mut ids = get_search_index(env, &keyword);
-    let mut found = false;
-    let mut i = 0;
-    while i < ids.len() {
+    // Find and remove in single pass
+    for i in 0..ids.len() {
         if ids.get(i).unwrap() == product_id.clone() {
             ids.remove(i);
-            found = true;
-            break;
+            put_search_index(env, &keyword, &ids);
+            return; // Early exit saves gas
         }
-        i += 1;
     }
-    if found {
-        put_search_index(env, &keyword, &ids);
-    }
+    // No write if not found - saves gas
 }

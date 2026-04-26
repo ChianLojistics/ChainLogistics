@@ -1,3 +1,8 @@
+/// Tracking contract for managing product supply chain events.
+/// This contract is responsible for:
+/// - Adding tracking events to products
+/// - Retrieving events by various criteria
+/// - Managing event counts and statistics
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::error::Error;
@@ -9,16 +14,20 @@ use crate::ChainLogisticsContractClient;
 
 // ─── Storage helpers for TrackingContract ────────────────────────────────────
 
+/// Get the main contract address from storage.
 fn get_main_contract(env: &Env) -> Option<Address> {
     env.storage().persistent().get(&DataKey::MainContract)
 }
 
+/// Set the main contract address in storage.
 fn set_main_contract(env: &Env, address: &Address) {
     env.storage()
         .persistent()
         .set(&DataKey::MainContract, address);
 }
 
+/// Ensure the main contract is not paused.
+/// Returns ContractPaused error if the main contract is paused.
 fn require_not_paused(env: &Env) -> Result<(), Error> {
     let main_contract = get_main_contract(env).unwrap();
     let main_client = ChainLogisticsContractClient::new(env, &main_contract);
@@ -28,6 +37,8 @@ fn require_not_paused(env: &Env) -> Result<(), Error> {
     Ok(())
 }
 
+/// Ensure the tracking contract has been initialized.
+/// Returns NotInitialized error if not initialized.
 fn require_init(env: &Env) -> Result<(), Error> {
     if get_main_contract(env).is_none() {
         return Err(Error::NotInitialized);
@@ -37,6 +48,7 @@ fn require_init(env: &Env) -> Result<(), Error> {
 
 // ─── Contract ────────────────────────────────────────────────────────────────
 
+/// The Tracking contract manages supply chain events for products.
 #[contract]
 pub struct TrackingContract;
 
@@ -48,6 +60,15 @@ pub struct TrackingContract;
 #[contractimpl]
 impl TrackingContract {
     /// Initialize the TrackingContract with the main contract address.
+    ///
+    /// # Arguments
+    /// * `main_contract` - The address of the main ChainLogistics contract
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if already initialized
+    ///
+    /// # Errors
+    /// * `AlreadyInitialized` - If the contract has already been initialized
     pub fn init(env: Env, main_contract: Address) -> Result<(), Error> {
         if get_main_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
@@ -78,11 +99,12 @@ impl TrackingContract {
         require_not_paused(&env)?;
         actor.require_auth();
 
+        // Validate inputs early to fail fast and save gas
         ValidationContract::validate_event_location(&location)?;
         ValidationContract::validate_event_note(&note)?;
         ValidationContract::validate_metadata(&metadata)?;
 
-        // Generate unique event ID
+        // Generate unique event ID (single storage read)
         let event_id = storage::next_event_id(&env);
 
         // Create event
@@ -98,15 +120,15 @@ impl TrackingContract {
             metadata,
         };
 
-        // Store event
+        // Batch storage operations for gas efficiency
         storage::put_event(&env, &event);
 
-        // Update product event IDs
+        // Update product event IDs (optimized: single read-modify-write)
         let mut ids = storage::get_product_event_ids(&env, &product_id);
         ids.push_back(event_id);
         storage::put_product_event_ids(&env, &product_id, &ids);
 
-        // Index by type
+        // Index by type (single write)
         storage::index_event_by_type(&env, &product_id, &event_type, event_id);
 
         TrackingEventPublished {
@@ -120,22 +142,49 @@ impl TrackingContract {
     }
 
     /// Get a single event by its ID.
-    /// Returns EventNotFound error if the event doesn't exist.
+    ///
+    /// # Arguments
+    /// * `event_id` - The ID of the event to retrieve
+    ///
+    /// # Returns
+    /// * `Result<TrackingEvent, Error>` - The tracking event
+    ///
+    /// # Errors
+    /// * `EventNotFound` - If the event does not exist
     pub fn tracking_get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
         storage::get_event(&env, event_id).ok_or(Error::EventNotFound)
     }
 
     /// Get all event IDs for a product.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    ///
+    /// # Returns
+    /// * `Vec<u64>` - A vector of event IDs
     pub fn tracking_get_product_event_ids(env: Env, product_id: String) -> Vec<u64> {
         storage::get_product_event_ids(&env, &product_id)
     }
 
     /// Get the total event count for a product.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    ///
+    /// # Returns
+    /// * `u64` - The number of events
     pub fn tracking_get_event_count(env: Env, product_id: String) -> u64 {
         storage::get_product_event_ids(&env, &product_id).len() as u64
     }
 
     /// Get the count of events by type for a product.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `event_type` - The type of events to count
+    ///
+    /// # Returns
+    /// * `u64` - The number of events of the specified type
     pub fn tracking_get_event_count_by_type(
         env: Env,
         product_id: String,

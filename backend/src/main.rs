@@ -17,12 +17,15 @@ mod docs;
 mod blockchain;
 mod websocket;
 mod compliance;
+mod validation;
+mod monitoring;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService};
 use utils::CronService;
 use error::AppError;
+use monitoring::ErrorMonitor;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -33,7 +36,11 @@ pub struct AppState {
     pub api_key_service: Arc<ApiKeyService>,
     pub sync_service: Arc<SyncService>,
     pub financial_service: Arc<FinancialService>,
+    pub analytics_service: Arc<AnalyticsService>,
+    pub carbon_service: Arc<CarbonService>,
+    pub redis_client: redis::Client,
     pub config: Config,
+    pub error_monitor: ErrorMonitor,
 }
 
 impl AppState {
@@ -46,14 +53,25 @@ impl AppState {
         // Run migrations
         db.migrate().await?;
         
+        // Initialize Redis client
+        let redis_client = redis::Client::open(config.redis.url.as_str())?;
+        
         // Create services
-        let product_service = Arc::new(ProductService::new(db.pool().clone()));
-        let event_service = Arc::new(EventService::new(db.pool().clone()));
-        let user_service = Arc::new(UserService::new(db.pool().clone()));
+        let product_service = Arc::new(ProductService::new(db.pool().clone(), redis_client.clone()));
+        let event_service = Arc::new(EventService::new(db.pool().clone(), redis_client.clone()));
+        let user_service = Arc::new(UserService::new(db.pool().clone(), config.encryption_key.clone()));
         let api_key_service = Arc::new(ApiKeyService::new(db.pool().clone()));
-        let sync_service = Arc::new(SyncService::new(db.pool().clone()));
+        let sync_service = Arc::new(SyncService::new(db.pool().clone(), redis_client.clone()));
         let financial_service = Arc::new(FinancialService::new(db.pool().clone()));
-
+        let analytics_service = Arc::new(AnalyticsService::new(
+            db.pool().clone(),
+            config.redis.url.clone(),
+        ));
+        let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
+        
+        // Initialize error monitoring
+        let error_monitor = ErrorMonitor::new();
+        
         Ok(Self {
             db,
             product_service,
@@ -62,7 +80,11 @@ impl AppState {
             api_key_service,
             sync_service,
             financial_service,
+            analytics_service,
+            carbon_service,
+            redis_client,
             config,
+            error_monitor,
         })
     }
 }
@@ -77,11 +99,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create application state
     let app_state = AppState::new().await?;
     
-    // Start cron scheduler
-    let cron_service = CronService::new(app_state.db.pool().clone());
+    // Start background services
+    let cron_service = CronService::new(app_state.db.pool().clone(), app_state.redis_client.clone());
     cron_service.start_scheduler().await;
     
-    // Build router
+    // Build router with security middleware
     let app = Router::new()
         .merge(crate::routes::health_routes())
         .merge(crate::routes::api_routes())
@@ -89,9 +111,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CorsLayer::permissive())
+                .layer(middleware::from_fn(
+                    middleware::error_handler::request_logger,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middleware::error_handler::global_error_handler,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middleware::security::enforce_https,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middleware::security::security_headers,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    middleware::security::cors_policy,
+                ))
         )
-        .with_state(app_state);
+        .with_state(app_state.clone());
     
     // Run server
     let config = Config::from_env()?;
@@ -101,6 +141,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     
     tracing::info!("Server listening on {}", addr);
+    tracing::info!("HTTPS enforcement: {}", config.security.enforce_https);
+    tracing::info!("TLS enabled: {}", config.server.tls_enabled);
+    
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     
