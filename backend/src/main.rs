@@ -18,12 +18,14 @@ mod blockchain;
 mod websocket;
 mod compliance;
 mod validation;
+mod monitoring;
 
 use config::Config;
 use database::Database;
 use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, SustainabilityService, DigitalTwinService, ResilienceService};
 use utils::CronService;
 use error::AppError;
+use monitoring::ErrorMonitor;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -42,6 +44,7 @@ pub struct AppState {
     pub stellar_provider: Arc<blockchain::provider::StellarProvider>,
     pub redis_client: redis::Client,
     pub config: Config,
+    pub error_monitor: ErrorMonitor,
 }
 
 impl AppState {
@@ -79,6 +82,9 @@ impl AppState {
         let digital_twin_service = Arc::new(DigitalTwinService::new(db.pool().clone()));
         let resilience_service = Arc::new(ResilienceService::new(db.pool().clone()));
         
+        // Initialize error monitoring
+        let error_monitor = ErrorMonitor::new();
+        
         Ok(Self {
             db,
             product_service,
@@ -95,6 +101,7 @@ impl AppState {
             stellar_provider,
             redis_client,
             config,
+            error_monitor,
         })
     }
 }
@@ -118,13 +125,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(crate::routes::health_routes())
         .merge(crate::routes::api_routes())
         .merge(crate::docs::create_swagger_ui())
-        .layer(TraceLayer::new_for_http())
-        .layer(Extension(app_state.clone()))
-        .layer(axum::middleware::from_fn(middleware::security::enforce_https))
-        .layer(axum::middleware::from_fn(middleware::security::security_headers))
-        .layer(axum::middleware::from_fn(middleware::security::cors_policy))
-        .layer(axum::middleware::from_fn(middleware::auth::jwt_auth))
-        .layer(axum::middleware::from_fn(middleware::rate_limit::rate_limit_middleware))
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(Extension(app_state.clone()))
+                .layer(axum::middleware::from_fn(middleware::error_handler::request_logger))
+                .layer(axum::middleware::from_fn(middleware::error_handler::global_error_handler))
+                .layer(axum::middleware::from_fn(middleware::security::enforce_https))
+                .layer(axum::middleware::from_fn(middleware::security::security_headers))
+                .layer(axum::middleware::from_fn(middleware::security::cors_policy))
+                .layer(axum::middleware::from_fn(middleware::auth::jwt_auth))
+                .layer(axum::middleware::from_fn(middleware::rate_limit::rate_limit_middleware))
+        )
         .with_state(app_state.clone());
     
     // Run server

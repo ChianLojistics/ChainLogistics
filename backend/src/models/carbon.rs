@@ -111,7 +111,7 @@ pub struct CarbonReport {
 
 // ── Request / input types ─────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CalculateFootprintRequest {
     pub product_id: String,
     pub tracking_event_id: Option<i64>,
@@ -124,7 +124,7 @@ pub struct CalculateFootprintRequest {
     pub baseline_emissions: Option<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct GenerateCreditRequest {
     pub product_id: Option<String>,
     pub footprint_id: Uuid,
@@ -136,7 +136,7 @@ pub struct GenerateCreditRequest {
     pub verification_body: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreateTradeRequest {
     pub credit_id: Uuid,
     pub quantity: f64,
@@ -146,19 +146,19 @@ pub struct CreateTradeRequest {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct PurchaseCreditRequest {
     pub trade_id: Uuid,
     pub quantity: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct RetireCreditRequest {
     pub credit_id: Uuid,
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct RequestVerificationRequest {
     pub credit_id: Uuid,
     pub verifier_name: String,
@@ -167,14 +167,14 @@ pub struct RequestVerificationRequest {
     pub scope: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct GenerateReportRequest {
     pub report_type: Option<String>,
     pub period_start: DateTime<Utc>,
     pub period_end: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 pub struct ListTradesQuery {
     pub status: Option<String>,
     pub trade_type: Option<String>,
@@ -182,7 +182,7 @@ pub struct ListTradesQuery {
     pub limit: Option<i64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 pub struct ListCreditsQuery {
     pub status: Option<String>,
     pub vintage_year: Option<i32>,

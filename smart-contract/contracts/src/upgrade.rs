@@ -65,6 +65,10 @@ fn get_main_contract(env: &Env) -> Option<Address> {
     env.storage().persistent().get(&DataKey::MainContract)
 }
 
+fn get_timelock_contract(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::TimelockContract)
+}
+
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
@@ -79,7 +83,19 @@ fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
         .persistent()
         .get::<crate::types::DataKey, Address>(&crate::types::DataKey::MultiSigContract)
     {
-        if &multisig == caller && env.current_contract_address() == multisig {
+        if &multisig == caller {
+            if env.current_contract_address() != multisig {
+                caller.require_auth();
+            }
+            return Ok(());
+        }
+    }
+
+    if let Some(timelock) = get_timelock_contract(env) {
+        if &timelock == caller {
+            if env.current_contract_address() != timelock {
+                caller.require_auth();
+            }
             return Ok(());
         }
     }
@@ -147,6 +163,18 @@ impl UpgradeContract {
         env.storage()
             .persistent()
             .set(&DataKey::MultiSigContract, &multisig_contract);
+        Ok(())
+    }
+
+    pub fn set_timelock_contract(
+        env: Env,
+        caller: Address,
+        timelock_contract: Address,
+    ) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        env.storage()
+            .persistent()
+            .set(&DataKey::TimelockContract, &timelock_contract);
         Ok(())
     }
 

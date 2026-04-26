@@ -12,7 +12,7 @@ use crate::{
     error::AppError,
     models::{Product, NewProduct},
     database::{ProductRepository, ProductFilters},
-    validation::{validate_string, validate_stellar_address, sanitize_input},
+    validation::{validate_string, sanitize_input, validate_stellar_address, validate_product_id, validate_location, sanitize_json_metadata},
     middleware::auth::AuthContext,
 };
 
@@ -195,10 +195,10 @@ pub async fn create_product(
     Json(request): Json<CreateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
     // Validate inputs
-    validate_string("id", &request.id, 64)?;
+    validate_product_id(&request.id)?;
     validate_string("name", &request.name, 128)?;
     validate_string("category", &request.category, 64)?;
-    validate_string("origin_location", &request.origin_location, 256)?;
+    validate_location(&request.origin_location)?;
     if request.description.len() > 2048 {
         return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
     }
@@ -212,7 +212,11 @@ pub async fn create_product(
         tags: request.tags.iter().map(|t| sanitize_input(t)).collect(),
         certifications: request.certifications.iter().map(|c| sanitize_input(c)).collect(),
         media_hashes: request.media_hashes.iter().map(|m| sanitize_input(m)).collect(),
-        custom_fields: request.custom_fields,
+        custom_fields: {
+            let mut fields = request.custom_fields;
+            sanitize_json_metadata(&mut fields);
+            fields
+        },
         owner_address: auth_context.stellar_address.clone().unwrap_or_default(),
         created_by: auth_context.user_id.to_string(),
     };
@@ -242,6 +246,7 @@ pub async fn get_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ProductResponse>, AppError> {
+    validate_product_id(&id)?;
     let product = state
         .product_service
         .get_product(&id)
@@ -279,7 +284,7 @@ pub async fn update_product(
 ) -> Result<Json<ProductResponse>, AppError> {
     // Get auth context - already provided by Extension extractor
     
-    validate_string("id", &id, 64)?;
+    validate_product_id(&id)?;
 
     let mut product = state
         .product_service
@@ -299,7 +304,7 @@ pub async fn update_product(
         product.description = sanitize_input(&description);
     }
     if let Some(origin_location) = request.origin_location {
-        validate_string("origin_location", &origin_location, 256)?;
+        validate_location(&origin_location)?;
         product.origin_location = sanitize_input(&origin_location);
     }
     if let Some(category) = request.category {
@@ -315,7 +320,8 @@ pub async fn update_product(
     if let Some(media_hashes) = request.media_hashes {
         product.media_hashes = media_hashes.iter().map(|m| sanitize_input(m)).collect();
     }
-    if let Some(custom_fields) = request.custom_fields {
+    if let Some(mut custom_fields) = request.custom_fields {
+        sanitize_json_metadata(&mut custom_fields);
         product.custom_fields = custom_fields;
     }
     if let Some(is_active) = request.is_active {
@@ -350,6 +356,8 @@ pub async fn delete_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
+    validate_product_id(&id)?;
+
     // Check if product exists
     state
         .product_service

@@ -14,6 +14,7 @@ export const VALIDATION_MESSAGES = {
 
   eventTypeInvalid: "Event type must be one of the allowed types",
   timestampFuture: "Timestamp must not be in the future",
+  transferRecipientRequired: "Recipient address is required",
 } as const;
 
 export type ValidationMessageFormatter = (fieldLabel: string) => string;

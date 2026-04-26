@@ -1,5 +1,6 @@
 use axum::{extract::State, response::Json};
 use serde_json::json;
+use utoipa::ToSchema;
 
 use crate::{AppState, error::AppError, database::EventRepository};
 
@@ -8,7 +9,7 @@ use crate::{AppState, error::AppError, database::EventRepository};
     path = "/api/v1/stats",
     tag = "stats",
     responses(
-        (status = 200, description = "Global statistics retrieved successfully", body = Object),
+        (status = 200, description = "Statistics retrieved successfully", body = Object),
         (status = 401, description = "Unauthorized"),
         (status = 429, description = "Rate limit exceeded")
     ),

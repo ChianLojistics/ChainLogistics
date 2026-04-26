@@ -38,7 +38,7 @@ impl DigitalTwinService {
         .bind(Utc::now())
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(twin)
     }
@@ -67,7 +67,7 @@ impl DigitalTwinService {
         .bind(product_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(twins)
     }
@@ -91,7 +91,7 @@ impl DigitalTwinService {
         .bind(twin_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         // Record state history
         let state = sqlx::query_as::<_, TwinState>(
@@ -109,7 +109,7 @@ impl DigitalTwinService {
         .bind(&request.source)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(state)
     }
@@ -127,7 +127,7 @@ impl DigitalTwinService {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(states)
     }
@@ -158,7 +158,7 @@ impl DigitalTwinService {
         .bind(&request.created_by)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(simulation)
     }
@@ -179,7 +179,7 @@ impl DigitalTwinService {
         .bind(simulation_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         // Get simulation details
         let simulation = sqlx::query_as::<_, Simulation>(
@@ -188,7 +188,7 @@ impl DigitalTwinService {
         .bind(simulation_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         // Perform simulation based on type
         let results = self.execute_simulation(&simulation).await?;
@@ -210,7 +210,7 @@ impl DigitalTwinService {
         .bind(simulation_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(SimulationResult {
             simulation_id,
@@ -543,7 +543,7 @@ impl DigitalTwinService {
         .bind(twin_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(simulations)
     }
@@ -577,7 +577,7 @@ impl DigitalTwinService {
         .bind(Utc::now() + chrono::Duration::hours(request.prediction_horizon as i64))
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(prediction)
     }
@@ -640,7 +640,7 @@ impl DigitalTwinService {
         .bind(twin_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         let active_optimizations = sqlx::query_as::<_, Optimization>(
             "SELECT * FROM optimizations WHERE twin_id = $1 AND applied_at IS NULL ORDER BY created_at DESC LIMIT 5"
@@ -648,7 +648,7 @@ impl DigitalTwinService {
         .bind(twin_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         let simulation_count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM simulations WHERE twin_id = $1"
@@ -656,7 +656,7 @@ impl DigitalTwinService {
         .bind(twin_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         let state_history_count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM twin_states WHERE twin_id = $1"
@@ -664,7 +664,7 @@ impl DigitalTwinService {
         .bind(twin_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::Database(e))?;
 
         Ok(TwinAnalytics {
             twin_id,
