@@ -25,6 +25,9 @@ pub use digital_twin_service::DigitalTwinService;
 pub mod sustainability_service;
 pub use sustainability_service::SustainabilityService;
 
+pub mod resilience_service;
+pub use resilience_service::ResilienceService;
+
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {

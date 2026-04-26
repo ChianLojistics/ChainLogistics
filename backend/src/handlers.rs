@@ -12,3 +12,4 @@ pub mod carbon;
 pub mod digital_twin;
 pub mod api_keys;
 pub mod sustainability;
+pub mod resilience;

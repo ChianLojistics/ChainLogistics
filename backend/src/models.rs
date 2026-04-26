@@ -7,6 +7,7 @@ pub mod analytics;
 pub mod carbon;
 pub mod digital_twin;
 pub mod sustainability;
+pub mod resilience;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Product {

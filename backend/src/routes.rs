@@ -12,6 +12,7 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/analytics", analytics_routes())
         .nest("/api/v1/carbon", carbon_routes())
         .nest("/api/v1/sustainability", sustainability_routes())
+        .nest("/api/v1/resilience", resilience_routes())
         .nest("/api/v1/keys", key_management_routes())
 }
 
@@ -114,6 +115,16 @@ fn sustainability_routes() -> Router<AppState> {
         .route("/:product_id", get(crate::handlers::sustainability::get_product_sustainability))
         .route("/:product_id/verify", post(crate::handlers::sustainability::verify_metric))
         .route("/:product_id/report", post(crate::handlers::sustainability::generate_report))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn resilience_routes() -> Router<AppState> {
+    Router::new()
+        .route("/risk-scores", get(crate::handlers::resilience::get_risk_scores))
+        .route("/alerts", get(crate::handlers::resilience::get_disruption_alerts))
+        .route("/inventory-optimization/:product_id", get(crate::handlers::resilience::optimize_inventory))
+        .route("/scenario-plan", post(crate::handlers::resilience::generate_scenario_plan))
         .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }

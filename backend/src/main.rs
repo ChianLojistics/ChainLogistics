@@ -21,7 +21,7 @@ mod validation;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, SustainabilityService, DigitalTwinService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, SustainabilityService, DigitalTwinService, ResilienceService};
 use utils::CronService;
 use error::AppError;
 
@@ -38,6 +38,7 @@ pub struct AppState {
     pub carbon_service: Arc<CarbonService>,
     pub sustainability_service: Arc<SustainabilityService>,
     pub digital_twin_service: Arc<DigitalTwinService>,
+    pub resilience_service: Arc<ResilienceService>,
     pub stellar_provider: Arc<blockchain::provider::StellarProvider>,
     pub redis_client: redis::Client,
     pub config: Config,
@@ -76,6 +77,7 @@ impl AppState {
             stellar_provider.clone(),
         ));
         let digital_twin_service = Arc::new(DigitalTwinService::new(db.pool().clone()));
+        let resilience_service = Arc::new(ResilienceService::new(db.pool().clone()));
         
         Ok(Self {
             db,
@@ -89,6 +91,7 @@ impl AppState {
             carbon_service,
             sustainability_service,
             digital_twin_service,
+            resilience_service,
             stellar_provider,
             redis_client,
             config,
