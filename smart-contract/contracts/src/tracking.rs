@@ -60,9 +60,9 @@ impl TrackingContract {
     /// Requires authentication from the actor.
     /// Validates metadata and emits tracking event.
     // This function has 8 parameters which exceeds clippy's default limit of 7.
-// However, this is a public contract entrypoint and changing the signature would be
-// a breaking change for any existing clients. The parameters represent distinct
-// pieces of tracking information that are all required for a single atomic operation.
+    // However, this is a public contract entrypoint and changing the signature would be
+    // a breaking change for any existing clients. The parameters represent distinct
+    // pieces of tracking information that are all required for a single atomic operation.
     #[allow(clippy::too_many_arguments)]
     pub fn tracking_add_event(
         env: Env,

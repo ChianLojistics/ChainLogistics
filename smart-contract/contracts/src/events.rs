@@ -1,18 +1,18 @@
 // Typed Contract Events
-// 
+//
 // This module defines strongly-typed contract events using the `#[contractevent]` macro.
 // This approach replaces the deprecated `env.events().publish()` method with several
 // advantages:
-// 
+//
 // 1. **Type Safety**: Events have defined fields with specific types, preventing
 //    runtime errors from incorrect event data.
-// 
+//
 // 2. **Better Tooling**: IDEs can provide autocomplete and type checking for events.
-// 
+//
 // 3. **Easier Testing**: Events can be easily constructed and compared in tests.
-// 
+//
 // 4. **Documentation**: Each event struct serves as self-documenting API.
-// 
+//
 // Note: Some events include `_unused: u32` fields because the soroban-sdk 25.3.0
 // `#[contractevent]` macro requires at least one field and doesn't support unit structs.
 

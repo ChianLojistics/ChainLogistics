@@ -2,7 +2,8 @@ use soroban_sdk::{contract, contractimpl, Address, Env, Symbol};
 
 use crate::error::Error;
 use crate::events::{
-    EmergencyPause, EmergencyUnpause, UpgradeCompleted, UpgradeFailed, UpgradeInitiated, UpgradeReset,
+    EmergencyPause, EmergencyUnpause, UpgradeCompleted, UpgradeFailed, UpgradeInitiated,
+    UpgradeReset,
 };
 use crate::types::{ContractVersion, DataKey, UpgradeInfo, UpgradeStatus};
 use crate::ChainLogisticsContractClient;
