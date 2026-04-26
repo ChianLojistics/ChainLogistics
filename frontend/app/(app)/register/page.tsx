@@ -1,4 +1,21 @@
-import { ProductRegistrationForm } from "@/components/forms/ProductRegistrationForm";
+import dynamic from "next/dynamic";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+
+// Code-split: ProductRegistrationForm pulls in react-hook-form + zod + contract
+// clients — not needed on initial paint, so defer it to its own chunk.
+const ProductRegistrationForm = dynamic(
+  () =>
+    import("@/components/forms/ProductRegistrationForm").then((m) => ({
+      default: m.ProductRegistrationForm,
+    })),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-24">
+        <LoadingSpinner />
+      </div>
+    ),
+  }
+);
 
 export default function RegisterProductPage() {
   return (
