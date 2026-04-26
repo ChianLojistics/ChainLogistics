@@ -52,6 +52,7 @@ fn create_test_product(
             certifications: Vec::new(env),
             media_hashes: Vec::new(env),
             custom: Map::new(env),
+                privacy_proof: None,
         },
     );
     id

@@ -68,6 +68,7 @@ fn register_bulk(
                 certifications: Vec::new(env),
                 media_hashes: Vec::new(env),
                 custom: Map::new(env),
+                privacy_proof: None,
             },
         );
         ids.push_back(id);

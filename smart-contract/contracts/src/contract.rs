@@ -290,6 +290,7 @@ impl ChainLogisticsContract {
             data_hash,
             note,
             metadata,
+            privacy_proof: None,
         };
 
         storage::put_event(&env, &event);

@@ -447,6 +447,7 @@ mod test_event_query {
                 certifications: Vec::new(env),
                 media_hashes: Vec::new(env),
                 custom: Map::new(env),
+                privacy_proof: None,
             },
         );
         product_id
@@ -467,6 +468,7 @@ mod test_event_query {
             &BytesN::from_array(env, &[0; 32]),
             &String::from_str(env, "Test note"),
             &Map::new(env),
+            &None,
         )
     }
 

@@ -94,6 +94,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "tags"
                       },
                       "val": {
@@ -186,6 +192,12 @@
                       "val": {
                         "string": "Origin"
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
                     },
                     {
                       "key": {
@@ -528,6 +540,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "tags"
                     },
                     "val": {
@@ -666,6 +684,12 @@
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
                   },
                   {
                     "key": {

@@ -114,6 +114,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "tags"
                       },
                       "val": {
@@ -488,6 +494,12 @@
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
                   },
                   {
                     "key": {

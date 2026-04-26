@@ -116,6 +116,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "tags"
                       },
                       "val": {
@@ -160,7 +166,8 @@
                 },
                 {
                   "map": []
-                }
+                },
+                "void"
               ]
             }
           },
@@ -197,7 +204,8 @@
                 },
                 {
                   "map": []
-                }
+                },
+                "void"
               ]
             }
           },
@@ -234,7 +242,8 @@
                 },
                 {
                   "map": []
-                }
+                },
+                "void"
               ]
             }
           },
@@ -604,6 +613,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "tags"
                     },
                     "val": {
@@ -885,6 +900,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "product_id"
                     },
                     "val": {
@@ -985,6 +1006,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "product_id"
                     },
                     "val": {
@@ -1082,6 +1109,12 @@
                     "val": {
                       "string": "Test note"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
                   },
                   {
                     "key": {

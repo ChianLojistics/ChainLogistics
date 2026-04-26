@@ -100,6 +100,7 @@ impl TrackingContract {
         data_hash: BytesN<32>,
         note: String,
         metadata: Map<Symbol, String>,
+        privacy_proof: Option<BytesN<32>>,
     ) -> Result<u64, Error> {
         require_init(&env)?;
         require_not_paused(&env)?;
@@ -124,6 +125,7 @@ impl TrackingContract {
             data_hash,
             note,
             metadata,
+            privacy_proof,
         };
 
         // Batch storage operations for gas efficiency
@@ -274,6 +276,7 @@ mod test_tracking {
                 certifications: Vec::new(env),
                 media_hashes: Vec::new(env),
                 custom: Map::new(env),
+                privacy_proof: None,
             },
         );
         product_id
@@ -304,6 +307,7 @@ mod test_tracking {
             &data_hash,
             &note,
             &metadata,
+            &None,
         );
 
         // Verify event ID is sequential
@@ -339,6 +343,7 @@ mod test_tracking {
             &data_hash,
             &note,
             &metadata,
+            &None,
         );
 
         // Get event
@@ -388,6 +393,7 @@ mod test_tracking {
             &data_hash,
             &note,
             &metadata,
+            &None,
         );
         assert_eq!(res, Err(Ok(Error::ContractPaused)));
 
@@ -401,6 +407,7 @@ mod test_tracking {
             &data_hash,
             &note,
             &metadata,
+            &None,
         );
         assert_eq!(event_id, 1);
     }
@@ -429,6 +436,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "First event"),
             &metadata,
+            &None,
         );
 
         let event_id2 = tracking_client.tracking_add_event(
@@ -439,6 +447,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Second event"),
             &metadata,
+            &None,
         );
 
         // Verify IDs are sequential
@@ -474,6 +483,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Event 1"),
             &metadata,
+            &None,
         );
 
         tracking_client.tracking_add_event(
@@ -484,6 +494,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Event 2"),
             &metadata,
+            &None,
         );
 
         // Get event IDs
@@ -516,6 +527,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Created"),
             &metadata,
+            &None,
         );
 
         tracking_client.tracking_add_event(
@@ -526,6 +538,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Shipped"),
             &metadata,
+            &None,
         );
 
         tracking_client.tracking_add_event(
@@ -536,6 +549,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Shipped again"),
             &metadata,
+            &None,
         );
 
         // Verify counts by type
@@ -578,6 +592,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "With metadata"),
             &metadata,
+            &None,
         );
 
         // Verify event
@@ -636,6 +651,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Too much metadata"),
             &metadata,
+            &None,
         );
 
         assert_eq!(res, Err(Ok(Error::TooManyCustomFields)));
@@ -680,6 +696,7 @@ mod test_tracking {
             &data_hash,
             &String::from_str(&env, "Test event"),
             &metadata,
+            &None,
         );
 
         assert_eq!(res, Err(Ok(Error::NotInitialized)));

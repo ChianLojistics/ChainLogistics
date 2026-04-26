@@ -114,6 +114,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "tags"
                       },
                       "val": {
@@ -197,7 +203,8 @@
                 },
                 {
                   "map": []
-                }
+                },
+                "void"
               ]
             }
           },
@@ -566,6 +573,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "tags"
                     },
                     "val": {
@@ -844,6 +857,12 @@
                     "val": {
                       "string": "Product created"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
                   },
                   {
                     "key": {
@@ -1226,6 +1245,12 @@
                   "val": {
                     "string": "Product created"
                   }
+                },
+                {
+                  "key": {
+                    "symbol": "privacy_proof"
+                  },
+                  "val": "void"
                 },
                 {
                   "key": {

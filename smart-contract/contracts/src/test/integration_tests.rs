@@ -64,6 +64,7 @@ fn register_product(
             certifications: Vec::new(env),
             media_hashes: Vec::new(env),
             custom: Map::new(env),
+            privacy_proof: None,
         },
     );
     product_id
@@ -86,6 +87,7 @@ fn add_tracking_event(
         &BytesN::from_array(env, &[0; 32]),
         note,
         &Map::new(env),
+        &None,
     )
 }
 
@@ -265,6 +267,7 @@ fn error_cases_integration() {
         &BytesN::from_array(&env, &[0; 32]),
         &String::from_str(&env, "Y"),
         &Map::new(&env),
+        &None,
     );
     assert_eq!(res, Err(Ok(Error::ContractPaused)));
 }

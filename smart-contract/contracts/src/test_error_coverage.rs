@@ -163,6 +163,7 @@ fn test_product_event_ids_pagination_and_count() {
                 media_hashes: Vec::new(&env),
                 custom: soroban_sdk::Map::new(&env),
                 deactivation_info: Vec::new(&env),
+                privacy_proof: None,
             },
         );
 

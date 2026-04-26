@@ -35,6 +35,7 @@ fn register_test_product(
         certifications: Vec::new(env),
         media_hashes: Vec::new(env),
         custom: Map::new(env),
+                privacy_proof: None,
     };
 
     client.register_product(owner, &config);
@@ -102,6 +103,7 @@ fn test_duplicate_product_rejected() {
         certifications: Vec::new(&env),
         media_hashes: Vec::new(&env),
         custom: Map::new(&env),
+                privacy_proof: None,
     };
 
     let res = client.try_register_product(&owner, &config);
@@ -125,6 +127,7 @@ fn test_register_rejects_empty_id() {
         certifications: Vec::new(&env),
         media_hashes: Vec::new(&env),
         custom: Map::new(&env),
+                privacy_proof: None,
     };
 
     let res = client.try_register_product(&owner, &config);
@@ -148,6 +151,7 @@ fn test_register_rejects_empty_origin() {
         certifications: Vec::new(&env),
         media_hashes: Vec::new(&env),
         custom: Map::new(&env),
+                privacy_proof: None,
     };
 
     let res = client.try_register_product(&owner, &config);
@@ -363,6 +367,7 @@ fn test_multiple_products_stats_tracking() {
             certifications: Vec::new(&env),
             media_hashes: Vec::new(&env),
             custom: Map::new(&env),
+                privacy_proof: None,
         };
         client.register_product(&owner, &config);
     }
@@ -419,6 +424,7 @@ fn test_search_products_by_name() {
         certifications: Vec::new(&env),
         media_hashes: Vec::new(&env),
         custom: Map::new(&env),
+                privacy_proof: None,
     };
     client.register_product(&owner, &tea_config);
 
@@ -460,6 +466,7 @@ fn test_search_products_by_origin() {
         certifications: Vec::new(&env),
         media_hashes: Vec::new(&env),
         custom: Map::new(&env),
+                privacy_proof: None,
     };
     client.register_product(&owner, &tea_config);
 
@@ -495,6 +502,7 @@ fn test_search_products_by_category() {
         certifications: Vec::new(&env),
         media_hashes: Vec::new(&env),
         custom: Map::new(&env),
+                privacy_proof: None,
     };
     client.register_product(&owner, &tea_config);
 
@@ -536,6 +544,7 @@ fn test_search_products_with_limit() {
             certifications: Vec::new(&env),
             media_hashes: Vec::new(&env),
             custom: Map::new(&env),
+                privacy_proof: None,
         };
         client.register_product(&owner, &config);
     }

@@ -66,6 +66,7 @@ fn register_product(
             certifications: Vec::new(env),
             media_hashes: Vec::new(env),
             custom: Map::new(env),
+            privacy_proof: None,
         },
     );
     product_id
@@ -88,6 +89,7 @@ fn add_event(
         &BytesN::from_array(env, &[0; 32]),
         &String::from_str(env, note),
         &Map::new(env),
+        &None,
     )
 }
 
@@ -109,6 +111,7 @@ fn add_event_with_metadata(
         &BytesN::from_array(env, &[0; 32]),
         &String::from_str(env, note),
         &metadata,
+        &None,
     )
 }
 
@@ -214,6 +217,7 @@ fn test_pharmaceutical_cold_chain_with_compliance() {
             certifications,
             media_hashes: Vec::new(&env),
             custom: Map::new(&env),
+            privacy_proof: None,
         },
     );
 
@@ -348,6 +352,7 @@ fn test_food_supply_chain_with_recall() {
         &BytesN::from_array(&env, &[0; 32]),
         &String::from_str(&env, "Safely disposed"),
         &Map::new(&env),
+        &None,
     );
     assert!(result.is_ok());
 
@@ -490,6 +495,7 @@ fn test_unauthorized_actor_rejected() {
         &BytesN::from_array(&env, &[0; 32]),
         &String::from_str(&env, "Unauthorized attempt"),
         &Map::new(&env),
+        &None,
     );
     assert!(event_result.is_ok());
 
@@ -530,6 +536,7 @@ fn test_luxury_goods_full_supply_chain() {
             certifications: certs,
             media_hashes: Vec::new(&env),
             custom: Map::new(&env),
+            privacy_proof: None,
         },
     );
 
@@ -605,6 +612,7 @@ fn test_duplicate_product_id_rejected() {
             certifications: Vec::new(&env),
             media_hashes: Vec::new(&env),
             custom: Map::new(&env),
+            privacy_proof: None,
         },
     );
 

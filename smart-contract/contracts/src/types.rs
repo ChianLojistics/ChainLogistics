@@ -45,6 +45,8 @@ pub struct ProductConfig {
     pub media_hashes: Vec<BytesN<32>>,
     /// Custom key-value metadata
     pub custom: Map<Symbol, String>,
+    /// Optional ZK proof hash for privacy verification
+    pub privacy_proof: Option<BytesN<32>>,
 }
 
 /// Complete product information stored on-chain.
@@ -77,6 +79,8 @@ pub struct Product {
     pub custom: Map<Symbol, String>,
     /// Deactivation history
     pub deactivation_info: Vec<DeactInfo>,
+    /// Optional ZK proof hash for privacy verification
+    pub privacy_proof: Option<BytesN<32>>,
 }
 
 /// A tracking event in the product's supply chain journey.
@@ -101,6 +105,8 @@ pub struct TrackingEvent {
     pub note: String,
     /// Additional event metadata
     pub metadata: Map<Symbol, String>,
+    /// Optional ZK proof hash for privacy verification
+    pub privacy_proof: Option<BytesN<32>>,
 }
 
 /// Paginated result for tracking events.
@@ -177,6 +183,7 @@ pub struct TrackingEventInput {
     pub event_type: Symbol,
     pub data_hash: BytesN<32>,
     pub note: String,
+    pub privacy_proof: Option<BytesN<32>>,
 }
 
 #[contracttype]

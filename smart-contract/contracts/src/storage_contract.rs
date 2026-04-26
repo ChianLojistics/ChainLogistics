@@ -327,6 +327,7 @@ mod test_storage_contract {
             media_hashes: Vec::new(&env),
             custom: Map::new(&env),
             deactivation_info: Vec::new(&env),
+            privacy_proof: None,
         };
 
         env.as_contract(&contract_id, || {
@@ -633,6 +634,7 @@ mod test_storage_contract {
             metadata: Map::new(&env),
             actor: owner,
             timestamp: 0,
+            privacy_proof: None,
         };
 
         env.as_contract(&contract_id, || {

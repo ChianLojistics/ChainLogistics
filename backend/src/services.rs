@@ -21,6 +21,9 @@ pub use carbon::CarbonService;
 pub mod digital_twin_service;
 pub use digital_twin_service::DigitalTwinService;
 
+pub mod privacy_service;
+pub use privacy_service::{PrivacyService, MockZkProof};
+
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {
@@ -62,8 +65,8 @@ impl ProductRepository for ProductService {
             INSERT INTO products (
                 id, name, description, origin_location, category, tags,
                 certifications, media_hashes, custom_fields, owner_address,
-                is_active, created_by, updated_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, $11, $11)
+                is_active, created_by, updated_by, zk_proof, encrypted_data, selective_disclosure
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, $11, $11, $12, $13, $14)
             RETURNING *
             "#,
             product.id,
@@ -76,7 +79,10 @@ impl ProductRepository for ProductService {
             &product.media_hashes,
             product.custom_fields,
             product.owner_address,
-            product.created_by
+            product.created_by,
+            product.zk_proof,
+            product.encrypted_data,
+            product.selective_disclosure
         )
         .fetch_one(&self.pool)
         .await?;
@@ -142,7 +148,10 @@ impl ProductRepository for ProductService {
                 custom_fields = $9,
                 owner_address = $10,
                 is_active = $11,
-                updated_by = $12
+                updated_by = $12,
+                zk_proof = $13,
+                encrypted_data = $14,
+                selective_disclosure = $15
             WHERE id = $1
             RETURNING *
             "#,
@@ -157,7 +166,10 @@ impl ProductRepository for ProductService {
             product.custom_fields,
             product.owner_address,
             product.is_active,
-            product.updated_by
+            product.updated_by,
+            product.zk_proof,
+            product.encrypted_data,
+            product.selective_disclosure
         )
         .fetch_one(&self.pool)
         .await?;
@@ -374,8 +386,8 @@ impl EventRepository for EventService {
             r#"
             INSERT INTO tracking_events (
                 product_id, actor_address, timestamp, event_type,
-                location, data_hash, note, metadata
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                location, data_hash, note, metadata, zk_proof, encrypted_data, selective_disclosure
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
             "#,
             event.product_id,
@@ -385,7 +397,10 @@ impl EventRepository for EventService {
             event.location,
             event.data_hash,
             event.note,
-            event.metadata
+            event.metadata,
+            event.zk_proof,
+            event.encrypted_data,
+            event.selective_disclosure
         )
         .fetch_one(&self.pool)
         .await?;

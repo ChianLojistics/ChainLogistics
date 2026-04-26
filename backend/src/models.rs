@@ -25,6 +25,9 @@ pub struct Product {
     pub updated_at: DateTime<Utc>,
     pub created_by: String,
     pub updated_by: String,
+    pub zk_proof: Option<String>,
+    pub encrypted_data: Option<String>,
+    pub selective_disclosure: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
@@ -39,6 +42,9 @@ pub struct TrackingEvent {
     pub note: String,
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    pub zk_proof: Option<String>,
+    pub encrypted_data: Option<String>,
+    pub selective_disclosure: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, ToSchema)]
@@ -125,6 +131,9 @@ pub struct NewProduct {
     pub custom_fields: serde_json::Value,
     pub owner_address: String,
     pub created_by: String,
+    pub zk_proof: Option<String>,
+    pub encrypted_data: Option<String>,
+    pub selective_disclosure: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -137,6 +146,9 @@ pub struct NewTrackingEvent {
     pub data_hash: String,
     pub note: String,
     pub metadata: serde_json::Value,
+    pub zk_proof: Option<String>,
+    pub encrypted_data: Option<String>,
+    pub selective_disclosure: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

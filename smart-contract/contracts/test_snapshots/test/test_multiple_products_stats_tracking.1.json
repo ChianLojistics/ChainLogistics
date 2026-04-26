@@ -89,6 +89,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "tags"
                       },
                       "val": {
@@ -184,6 +190,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "tags"
                       },
                       "val": {
@@ -276,6 +288,12 @@
                       "val": {
                         "string": "Origin"
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
                     },
                     {
                       "key": {
@@ -778,6 +796,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "tags"
                     },
                     "val": {
@@ -919,6 +943,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "tags"
                     },
                     "val": {
@@ -1057,6 +1087,12 @@
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
                   },
                   {
                     "key": {

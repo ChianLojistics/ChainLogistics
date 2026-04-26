@@ -166,6 +166,7 @@ impl ProductRegistryContract {
             media_hashes: config.media_hashes,
             custom: config.custom,
             deactivation_info: Vec::new(&env),
+            privacy_proof: config.privacy_proof,
         };
 
         write_product(&env, &product);

@@ -114,6 +114,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "privacy_proof"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "tags"
                       },
                       "val": {
@@ -175,7 +181,8 @@
                       }
                     }
                   ]
-                }
+                },
+                "void"
               ]
             }
           },
@@ -545,6 +552,12 @@
                   },
                   {
                     "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "tags"
                     },
                     "val": {
@@ -840,6 +853,12 @@
                     "val": {
                       "string": "With metadata"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "privacy_proof"
+                    },
+                    "val": "void"
                   },
                   {
                     "key": {
