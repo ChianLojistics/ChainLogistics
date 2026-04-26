@@ -11,6 +11,7 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/admin", admin_api_routes())
         .nest("/api/v1/analytics", analytics_routes())
         .nest("/api/v1/carbon", carbon_routes())
+        .nest("/api/v1/sustainability", sustainability_routes())
         .nest("/api/v1/keys", key_management_routes())
 }
 
@@ -103,6 +104,16 @@ fn carbon_routes() -> Router<AppState> {
         .route("/verify/:credit_id", get(crate::handlers::carbon::list_verifications))
         // Reports
         .route("/reports", get(crate::handlers::carbon::list_reports).post(crate::handlers::carbon::generate_report))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn sustainability_routes() -> Router<AppState> {
+    Router::new()
+        .route("/iot", post(crate::handlers::sustainability::add_iot_reading))
+        .route("/:product_id", get(crate::handlers::sustainability::get_product_sustainability))
+        .route("/:product_id/verify", post(crate::handlers::sustainability::verify_metric))
+        .route("/:product_id/report", post(crate::handlers::sustainability::generate_report))
         .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }

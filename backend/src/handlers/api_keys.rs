@@ -11,6 +11,7 @@ use crate::{
     AppState,
     error::AppError,
     models::{ApiKey, ApiKeyTier, NewApiKey},
+    database::ApiKeyRepository,
 };
 
 #[derive(Debug, Deserialize)]

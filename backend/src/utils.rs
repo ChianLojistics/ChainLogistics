@@ -1,6 +1,6 @@
 use std::time::Duration;
 use sqlx::PgPool;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Timelike};
 use crate::services::{SyncService, ProductService, EventService, ApiKeyService};
 
 pub mod aggregation;
@@ -64,7 +64,7 @@ impl BackupService {
         let mut removed_files = Vec::new();
 
         while let Some(entry) = dir.next_entry().await
-            .map_err(|e| sqlx::Error::Io(e.into))? {
+            .map_err(|e| sqlx::Error::Io(e))? {
             
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("sql") {

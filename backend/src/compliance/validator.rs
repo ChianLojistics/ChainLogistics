@@ -104,7 +104,7 @@ impl ComplianceValidator {
             violations.push("Conflict Minerals: Audit report required".to_string());
         }
 
-        if data.get("verified_by_auditor").as_bool() != Some(true) {
+        if data.get("verified_by_auditor").and_then(|v| v.as_bool()) != Some(true) {
             warnings.push("Conflict Minerals: Awaiting auditor verification".to_string());
         }
     }

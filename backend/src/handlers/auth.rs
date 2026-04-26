@@ -1,6 +1,6 @@
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
-use crate::{AppState, error::AppError, models::{UserRole, NewUser, User}, middleware::auth::Claims, validation::{validate_email, validate_string}};
+use crate::{AppState, error::AppError, models::{UserRole, NewUser, User}, middleware::auth::Claims, validation::{validate_email, validate_string}, database::UserRepository};
 use bcrypt::verify;
 use jsonwebtoken::{encode, Header, EncodingKey};
 

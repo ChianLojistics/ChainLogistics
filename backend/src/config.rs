@@ -9,6 +9,13 @@ pub struct Config {
     pub security: SecurityConfig,
     pub encryption_key: String,
     pub jwt_secret: String,
+    pub blockchain: BlockchainConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockchainConfig {
+    pub rpc_url: String,
+    pub network: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +95,11 @@ impl Default for Config {
                 .unwrap_or_else(|_| "0123456789abcdef0123456789abcdef".to_string()), // 32 chars for AES-256
             jwt_secret: env::var("JWT_SECRET")
                 .unwrap_or_else(|_| "default_jwt_secret_change_me_in_production".to_string()),
+            blockchain: BlockchainConfig {
+                rpc_url: env::var("BLOCKCHAIN_RPC_URL")
+                    .unwrap_or_else(|_| "https://soroban-testnet.stellar.org".to_string()),
+                network: env::var("BLOCKCHAIN_NETWORK").unwrap_or_else(|_| "testnet".to_string()),
+            },
         }
     }
 }

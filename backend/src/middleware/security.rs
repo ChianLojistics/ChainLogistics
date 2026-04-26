@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Request, State},
+    extract::{Request, State, Extension},
     http::{header, HeaderValue, StatusCode, Uri},
     middleware::Next,
     response::{IntoResponse, Response},
@@ -10,28 +10,22 @@ use crate::{AppState, error::AppError};
 /// Middleware to enforce HTTPS connections
 /// Redirects HTTP requests to HTTPS in production
 pub async fn enforce_https(
-    State(state): State<AppState>,
+    Extension(state): Extension<AppState>,
     request: Request,
     next: Next,
-) -> Result<Response, AppError> {
-    // Skip enforcement if disabled (e.g., local development)
+) -> Response {
     if !state.config.security.enforce_https {
-        return Ok(next.run(request).await);
+        return next.run(request).await;
     }
 
-    // Check if request is already HTTPS
     let is_https = request
         .headers()
         .get("x-forwarded-proto")
         .and_then(|v| v.to_str().ok())
         .map(|v| v == "https")
-        .unwrap_or_else(|| {
-            // Check if TLS is enabled on the server
-            state.config.server.tls_enabled
-        });
+        .unwrap_or_else(|| state.config.server.tls_enabled);
 
     if !is_https {
-        // Redirect to HTTPS
         let uri = request.uri();
         let host = request
             .headers()
@@ -41,23 +35,23 @@ pub async fn enforce_https(
 
         let https_url = format!("https://{}{}", host, uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/"));
 
-        return Ok((
+        return (
             StatusCode::MOVED_PERMANENTLY,
             [(header::LOCATION, https_url)],
         )
-            .into_response());
+            .into_response();
     }
 
-    Ok(next.run(request).await)
+    next.run(request).await
 }
 
 /// Middleware to add security headers
 /// Implements HSTS, CSP, and other security best practices
 pub async fn security_headers(
-    State(state): State<AppState>,
+    Extension(state): Extension<AppState>,
     request: Request,
     next: Next,
-) -> Result<Response, AppError> {
+) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
 
@@ -106,7 +100,7 @@ pub async fn security_headers(
     // X-XSS-Protection
     // Enables browser XSS protection (legacy browsers)
     headers.insert(
-        HeaderValue::from_static("x-xss-protection"),
+        "X-XSS-Protection",
         HeaderValue::from_static("1; mode=block"),
     );
 
@@ -120,41 +114,42 @@ pub async fn security_headers(
     // Permissions-Policy (formerly Feature-Policy)
     // Controls which browser features can be used
     headers.insert(
-        HeaderValue::from_static("permissions-policy"),
+        "Permissions-Policy",
         HeaderValue::from_static(
             "geolocation=(), microphone=(), camera=(), payment=()"
         ),
     );
 
-    Ok(response)
+    response
 }
 
 /// Middleware to validate and enforce CORS policies
 pub async fn cors_policy(
-    State(state): State<AppState>,
+    Extension(state): Extension<AppState>,
     request: Request,
     next: Next,
-) -> Result<Response, AppError> {
+) -> Response {
     let origin = request
         .headers()
         .get(header::ORIGIN)
-        .and_then(|v| v.to_str().ok());
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
 
     // Check if origin is allowed
-    if let Some(origin_value) = origin {
+    if let Some(origin_value) = origin.clone() {
         let is_allowed = state.config.security.allowed_origins.iter().any(|allowed| {
             // Support wildcard subdomains
             if allowed.starts_with("*.") {
                 let domain = &allowed[2..];
                 origin_value.ends_with(domain)
             } else {
-                origin_value == allowed
+                origin_value == *allowed
             }
         });
 
         if !is_allowed {
             tracing::warn!("Blocked request from unauthorized origin: {}", origin_value);
-            return Err(AppError::Forbidden);
+            return AppError::Forbidden("Unauthorized origin".to_string()).into_response();
         }
     }
 
@@ -165,7 +160,7 @@ pub async fn cors_policy(
         let headers = response.headers_mut();
         headers.insert(
             header::ACCESS_CONTROL_ALLOW_ORIGIN,
-            HeaderValue::from_str(origin_value).unwrap(),
+            HeaderValue::from_str(&origin_value).unwrap(),
         );
         headers.insert(
             header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
@@ -185,7 +180,7 @@ pub async fn cors_policy(
         );
     }
 
-    Ok(response)
+    response
 }
 
 #[cfg(test)]

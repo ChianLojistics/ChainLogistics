@@ -1,8 +1,9 @@
 use async_trait::async_trait;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, QueryBuilder, Row, FromRow};
 use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use rand::Rng;
+use crate::error::AppError;
 use crate::database::{ProductRepository, EventRepository, UserRepository, ApiKeyRepository, ProductFilters, GlobalStats};
 use crate::models::*;
 use bcrypt::{hash, DEFAULT_COST};
@@ -21,6 +22,9 @@ pub use carbon::CarbonService;
 pub mod digital_twin_service;
 pub use digital_twin_service::DigitalTwinService;
 
+pub mod sustainability_service;
+pub use sustainability_service::SustainabilityService;
+
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {
@@ -31,6 +35,20 @@ pub struct ProductService {
 impl ProductService {
     pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
         Self { pool, redis_client }
+    }
+
+    async fn invalidate_product_cache(&self, id: &str) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del(format!("cache:product:{}", id)).await;
+        }
+        Ok(())
+    }
+
+    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del("cache:global_stats").await;
+        }
+        Ok(())
     }
 }
 
@@ -249,12 +267,16 @@ impl ProductRepository for ProductService {
         // Build dynamic query
         let mut q = sqlx::QueryBuilder::new(query);
         for binding in bindings {
-            q = q.bind(binding);
+            q.push_bind(binding);
         }
 
-        q.build_query_as::<Product>()
+        let rows = q.build()
             .fetch_all(&self.pool)
-            .await
+            .await?;
+        
+        rows.iter()
+            .map(|row| Product::from_row(row).map_err(|e| sqlx::Error::Decode(Box::new(e))))
+            .collect()
     }
 
     async fn count_products(&self, filters: Option<ProductFilters>) -> Result<i64, sqlx::Error> {
@@ -292,12 +314,14 @@ impl ProductRepository for ProductService {
 
         let mut q = sqlx::QueryBuilder::new(query);
         for binding in bindings {
-            q = q.bind(binding);
+            q.push_bind(binding);
         }
 
-        q.build_scalar::<i64>()
+        let row = q.build()
             .fetch_one(&self.pool)
-            .await
+            .await?;
+        
+        Ok(row.get(0))
     }
 
 /// Performs full-text search across products using PostgreSQL's built-in search capabilities.
@@ -339,20 +363,6 @@ impl ProductRepository for ProductService {
         .fetch_all(&self.pool)
         .await
     }
-
-    async fn invalidate_product_cache(&self, id: &str) -> Result<(), AppError> {
-        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
-            let _: Result<(), _> = conn.del(format!("cache:product:{}", id)).await;
-        }
-        Ok(())
-    }
-
-    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
-        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
-            let _: Result<(), _> = conn.del("cache:global_stats").await;
-        }
-        Ok(())
-    }
 }
 
 pub struct EventService {
@@ -363,6 +373,13 @@ pub struct EventService {
 impl EventService {
     pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
         Self { pool, redis_client }
+    }
+
+    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del("cache:global_stats").await;
+        }
+        Ok(())
     }
 }
 
@@ -430,7 +447,7 @@ impl EventRepository for EventService {
         )
         .fetch_one(&self.pool)
         .await
-        .unwrap_or(0)
+        .map(|res| res.unwrap_or(0))
     }
 
     async fn list_events_by_type(
@@ -515,14 +532,8 @@ impl EventRepository for EventService {
 
         Ok(global_stats)
     }
-
-    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
-        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
-            let _: Result<(), _> = conn.del("cache:global_stats").await;
-        }
-        Ok(())
-    }
 }
+
 
 pub struct UserService {
     pool: PgPool,
@@ -836,10 +847,10 @@ impl ApiKeyRepository for ApiKeyService {
 /// This service handles bidirectional sync between smart contract data and
 /// the relational database, ensuring both systems stay in sync.
 pub struct SyncService {
-    pool: PgPool,
-    redis_client: redis::Client,
-    product_service: ProductService,
-    event_service: EventService,
+    pub pool: PgPool,
+    pub redis_client: redis::Client,
+    pub product_service: ProductService,
+    pub event_service: EventService,
 }
 
 impl SyncService {

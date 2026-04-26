@@ -96,6 +96,23 @@ pub fn is_authorized(env: &Env, product_id: &String, actor: &Address) -> bool {
     StorageContract::is_authorized(env, product_id, actor)
 }
 
+// ─── Sustainability ──────────────────────────────────────────────────────────
+
+pub fn put_sustainability_verification(
+    env: &Env,
+    verification: &crate::types::SustainabilityVerification,
+) {
+    StorageContract::put_sustainability_verification(env, verification)
+}
+
+pub fn get_sustainability_verification(
+    env: &Env,
+    product_id: &String,
+    metric_type: &Symbol,
+) -> Option<crate::types::SustainabilityVerification> {
+    StorageContract::get_sustainability_verification(env, product_id, metric_type)
+}
+
 // ─── Global Management ───────────────────────────────────────────────────────
 
 pub fn has_admin(env: &Env) -> bool {

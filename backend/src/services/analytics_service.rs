@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Timelike};
 use redis::AsyncCommands;
 use sqlx::PgPool;
 
@@ -11,7 +11,7 @@ use crate::utils::aggregation::{
     build_hourly_distribution, compute_percentages, fill_time_series_gaps, safe_average,
 };
 
-const CACHE_TTL_SECS: usize = 300; // 5 minutes
+const CACHE_TTL_SECS: u64 = 300; // 5 minutes
 
 pub struct AnalyticsService {
     pool: PgPool,

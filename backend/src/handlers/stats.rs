@@ -1,8 +1,21 @@
 use axum::{extract::State, response::Json};
 use serde_json::json;
 
-use crate::{AppState, error::AppError};
+use crate::{AppState, error::AppError, database::EventRepository};
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/stats",
+    tag = "stats",
+    responses(
+        (status = 200, description = "Global statistics retrieved successfully", body = Object),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 pub async fn get_stats(State(state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
     let global_stats = state.event_service.get_global_stats().await?;
     

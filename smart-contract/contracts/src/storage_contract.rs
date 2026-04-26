@@ -41,6 +41,10 @@ impl StorageContract {
         DataKey::Auth(product_id.clone(), actor.clone())
     }
 
+    pub fn sustainability_verification_key(product_id: &String, metric_type: &Symbol) -> DataKey {
+        DataKey::SustainabilityVerification(product_id.clone(), metric_type.clone())
+    }
+
     pub fn admin_key() -> DataKey {
         DataKey::Admin
     }
@@ -229,6 +233,26 @@ impl StorageContract {
             .persistent()
             .get(&Self::auth_key(product_id, actor))
             .unwrap_or(false)
+    }
+
+    pub fn put_sustainability_verification(
+        env: &Env,
+        verification: &crate::types::SustainabilityVerification,
+    ) {
+        env.storage().persistent().set(
+            &Self::sustainability_verification_key(&verification.product_id, &verification.metric_type),
+            verification,
+        );
+    }
+
+    pub fn get_sustainability_verification(
+        env: &Env,
+        product_id: &String,
+        metric_type: &Symbol,
+    ) -> Option<crate::types::SustainabilityVerification> {
+        env.storage()
+            .persistent()
+            .get(&Self::sustainability_verification_key(product_id, metric_type))
     }
 
     pub fn has_admin(env: &Env) -> bool {

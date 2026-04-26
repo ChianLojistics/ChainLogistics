@@ -157,6 +157,7 @@ pub enum DataKey {
     MainContract,          // Main contract address
     TransferContract,      // Transfer contract address
     MultiSigContract,      // Multisig contract address
+    SustainabilityVerification(String, Symbol), // product_id, metric_type -> verification
 }
 
 #[contracttype]
@@ -281,4 +282,28 @@ pub struct Proposal {
     pub approvals: Vec<Address>,
     /// Addresses that have rejected the proposal
     pub rejections: Vec<Address>,
+}
+
+/// Verification of sustainability metrics.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SustainabilityVerification {
+    pub product_id: String,
+    pub metric_type: Symbol,
+    pub verifier: Address,
+    pub timestamp: u64,
+    pub certificate_hash: BytesN<32>,
+    pub certificate_url: String,
+    pub notes: String,
+}
+
+/// Input for recording sustainability verification.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SustainabilityVerificationInput {
+    pub product_id: String,
+    pub metric_type: Symbol,
+    pub certificate_hash: BytesN<32>,
+    pub certificate_url: String,
+    pub notes: String,
 }

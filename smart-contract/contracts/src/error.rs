@@ -63,4 +63,7 @@ pub enum Error {
     TimeLockNotExpired = 70,
     AlreadyRejected = 71,
     ProposalExpired = 72,
+
+    // --- Sustainability (80-90) ---
+    SustainabilityVerificationNotFound = 80,
 }

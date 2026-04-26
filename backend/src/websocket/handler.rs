@@ -1,7 +1,7 @@
 use crate::websocket::{ConnectionManager, WebSocketMessage, MessageType};
 use tokio::sync::mpsc;
 use futures::{SinkExt, StreamExt};
-use warp::ws::{WebSocket, Message};
+use axum::extract::ws::{WebSocket, Message};
 
 pub struct WebSocketHandler {
     manager: ConnectionManager,
@@ -25,8 +25,8 @@ impl WebSocketHandler {
             while let Some(result) = user_ws_rx.next().await {
                 match result {
                     Ok(msg) => {
-                        if let Ok(text) = msg.to_str() {
-                            if let Ok(ws_msg) = serde_json::from_str::<WebSocketMessage>(text) {
+                        if let Message::Text(text) = msg {
+                            if let Ok(ws_msg) = serde_json::from_str::<WebSocketMessage>(&text) {
                                 match ws_msg.message_type {
                                     MessageType::Subscribe { channel } => {
                                         let _ = manager.subscribe(&conn_id, &channel).await;
@@ -54,7 +54,7 @@ impl WebSocketHandler {
         // Spawn task to handle outgoing messages
         tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
-                if user_ws_tx.send(Message::text(msg)).await.is_err() {
+                if user_ws_tx.send(Message::Text(msg.into())).await.is_err() {
                     break;
                 }
             }

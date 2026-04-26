@@ -1,9 +1,8 @@
-use sqlx::PgPool;
+use sqlx::{PgPool, FromRow};
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
-use decimal::Decimal;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Transaction {
     pub id: String,
     pub user_id: String,
@@ -15,7 +14,7 @@ pub struct Transaction {
     pub blockchain_tx_hash: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Invoice {
     pub id: String,
     pub user_id: String,
@@ -26,7 +25,7 @@ pub struct Invoice {
     pub due_date: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct FinancingRequest {
     pub id: String,
     pub user_id: String,

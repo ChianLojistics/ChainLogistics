@@ -1,7 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::error::Error;
-use crate::types::{Product, TrackingEvent, TrackingEventFilter, TrackingEventPage};
+use crate::types::{Product, TrackingEvent, TrackingEventFilter, TrackingEventPage, SustainabilityVerification, SustainabilityVerificationInput};
 use crate::validation_contract::ValidationContract;
 use crate::{storage, AuthorizationContractClient};
 
@@ -633,6 +633,64 @@ impl ChainLogisticsContract {
     /// * `Result<(), Error>` - Returns error if pause fails
     pub fn __simulate_multisig_pause(env: Env, caller: Address) -> Result<(), Error> {
         Self::pause(env, caller)
+    }
+
+    /// Record a sustainability verification for a product.
+    ///
+    /// # Arguments
+    /// * `verifier` - The address of the verifier (must be authorized)
+    /// * `input` - The verification data
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if not authorized or product not found
+    pub fn record_sustain_verify(
+        env: Env,
+        verifier: Address,
+        input: SustainabilityVerificationInput,
+    ) -> Result<(), Error> {
+        require_not_paused(&env)?;
+        let product = read_product(&env, &input.product_id)?;
+        require_can_add_event(&env, &input.product_id, &product, &verifier)?;
+
+        let verification = SustainabilityVerification {
+            product_id: input.product_id.clone(),
+            metric_type: input.metric_type.clone(),
+            verifier: verifier.clone(),
+            timestamp: env.ledger().timestamp(),
+            certificate_hash: input.certificate_hash,
+            certificate_url: input.certificate_url,
+            notes: input.notes,
+        };
+
+        storage::put_sustainability_verification(&env, &verification);
+
+        env.events().publish(
+            (
+                Symbol::new(&env, "sustainability_verification"),
+                input.product_id,
+                input.metric_type,
+            ),
+            verification,
+        );
+
+        Ok(())
+    }
+
+    /// Get a sustainability verification for a product and metric type.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `metric_type` - The type of metric (e.g., "carbon_footprint")
+    ///
+    /// # Returns
+    /// * `Result<SustainabilityVerification, Error>` - The verification data
+    pub fn get_sustain_verify(
+        env: Env,
+        product_id: String,
+        metric_type: Symbol,
+    ) -> Result<SustainabilityVerification, Error> {
+        storage::get_sustainability_verification(&env, &product_id, &metric_type)
+            .ok_or(Error::SustainabilityVerificationNotFound)
     }
 }
 

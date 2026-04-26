@@ -1,4 +1,4 @@
-use axum::{Router, routing::{get, post}, middleware};
+use axum::{Router, routing::{get, post}, middleware as axum_middleware, extract::{Extension}};
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use std::net::SocketAddr;
@@ -21,7 +21,7 @@ mod validation;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, SustainabilityService, DigitalTwinService};
 use utils::CronService;
 use error::AppError;
 
@@ -36,6 +36,9 @@ pub struct AppState {
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
+    pub sustainability_service: Arc<SustainabilityService>,
+    pub digital_twin_service: Arc<DigitalTwinService>,
+    pub stellar_provider: Arc<blockchain::provider::StellarProvider>,
     pub redis_client: redis::Client,
     pub config: Config,
 }
@@ -65,6 +68,14 @@ impl AppState {
             config.redis.url.clone(),
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
+        let stellar_provider = Arc::new(blockchain::provider::StellarProvider::new(
+            config.blockchain.rpc_url.clone(),
+        ));
+        let sustainability_service = Arc::new(SustainabilityService::new(
+            db.pool().clone(),
+            stellar_provider.clone(),
+        ));
+        let digital_twin_service = Arc::new(DigitalTwinService::new(db.pool().clone()));
         
         Ok(Self {
             db,
@@ -76,6 +87,9 @@ impl AppState {
             financial_service,
             analytics_service,
             carbon_service,
+            sustainability_service,
+            digital_twin_service,
+            stellar_provider,
             redis_client,
             config,
         })
@@ -101,22 +115,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(crate::routes::health_routes())
         .merge(crate::routes::api_routes())
         .merge(crate::docs::create_swagger_ui())
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(middleware::from_fn_with_state(
-                    app_state.clone(),
-                    middleware::security::enforce_https,
-                ))
-                .layer(middleware::from_fn_with_state(
-                    app_state.clone(),
-                    middleware::security::security_headers,
-                ))
-                .layer(middleware::from_fn_with_state(
-                    app_state.clone(),
-                    middleware::security::cors_policy,
-                ))
-        )
+        .layer(TraceLayer::new_for_http())
+        .layer(Extension(app_state.clone()))
+        .layer(axum::middleware::from_fn(middleware::security::enforce_https))
+        .layer(axum::middleware::from_fn(middleware::security::security_headers))
+        .layer(axum::middleware::from_fn(middleware::security::cors_policy))
+        .layer(axum::middleware::from_fn(middleware::auth::jwt_auth))
+        .layer(axum::middleware::from_fn(middleware::rate_limit::rate_limit_middleware))
         .with_state(app_state.clone());
     
     // Run server

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{State, Path, Query},
+    extract::{State, Path, Query, Extension},
     http::StatusCode,
     response::Json,
 };
@@ -10,11 +10,15 @@ use utoipa::ToSchema;
 use crate::{
     AppState,
     error::AppError,
-    models::{Product, NewProduct, ProductFilters},
-    validation::{validate_string, sanitize_input},
+    models::{Product, NewProduct},
+    database::{ProductRepository, ProductFilters},
+    validation::{validate_string, validate_stellar_address, sanitize_input},
+    middleware::auth::AuthContext,
 };
 
-#[derive(Debug, Deserialize, ToSchema)]
+use utoipa::IntoParams;
+
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct ListProductsQuery {
     pub offset: Option<i64>,
     pub limit: Option<i64>,
@@ -22,6 +26,14 @@ pub struct ListProductsQuery {
     pub category: Option<String>,
     pub is_active: Option<bool>,
     pub search: Option<String>,
+}
+
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+pub struct ListEventsQuery {
+    pub offset: Option<i64>,
+    pub limit: Option<i64>,
+    pub product_id: Option<String>,
+    pub event_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -135,9 +147,6 @@ pub async fn list_products(
         state.product_service
             .search_products(&sanitize_input(&search_query), limit)
             .await?
-            .into_iter()
-            .map(ProductResponse::from)
-            .collect()
     } else {
         let filters = ProductFilters {
             owner_address: query.owner_address.clone().map(|s| sanitize_input(&s)),
@@ -150,28 +159,14 @@ pub async fn list_products(
         state.product_service
             .list_products(offset, limit, Some(filters))
             .await?
-            .into_iter()
-            .map(ProductResponse::from)
-            .collect()
     };
 
-    let total = if query.search.is_some() {
-        products.len() as i64
-    } else {
-        let filters = ProductFilters {
-            owner_address: query.owner_address.map(|s| sanitize_input(&s)),
-            category: query.category.map(|s| sanitize_input(&s)),
-            is_active: query.is_active,
-            created_after: None,
-            created_before: None,
-        };
-        state.product_service
-            .count_products(Some(filters))
-            .await?
-    };
+    let total = state.product_service
+        .count_products(None)
+        .await?;
 
     Ok(Json(PaginatedProductsResponse {
-        products,
+        products: products.into_iter().map(ProductResponse::from).collect(),
         total,
         offset,
         limit,
@@ -196,6 +191,7 @@ pub async fn list_products(
 )]
 pub async fn create_product(
     State(state): State<AppState>,
+    Extension(auth_context): Extension<AuthContext>,
     Json(request): Json<CreateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
     // Validate inputs
@@ -206,9 +202,6 @@ pub async fn create_product(
     if request.description.len() > 2048 {
         return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
     }
-
-    // Get auth context
-    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
 
     let new_product = NewProduct {
         id: sanitize_input(&request.id),
@@ -280,10 +273,11 @@ pub async fn get_product(
 )]
 pub async fn update_product(
     State(state): State<AppState>,
+    Extension(auth_context): Extension<AuthContext>,
     Path(id): Path<String>,
     Json(request): Json<UpdateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
-    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
+    // Get auth context - already provided by Extension extractor
     
     validate_string("id", &id, 64)?;
 

@@ -1,7 +1,12 @@
 use sqlx::{PgPool, Pool, Postgres};
+use sqlx::postgres::PgPoolOptions;
+use std::str::FromStr;
 use std::time::Duration;
 use crate::config::DatabaseConfig;
 use crate::models::*;
+use uuid::Uuid;
+use serde::{Serialize, Deserialize};
+use utoipa::{ToSchema, IntoParams};
 
 #[derive(Debug, Clone)]
 pub struct Database {
@@ -10,15 +15,15 @@ pub struct Database {
 
 impl Database {
     pub async fn new(config: &DatabaseConfig) -> Result<Self, sqlx::Error> {
-        let pool = PgPool::connect_with(
-            sqlx::postgres::PgConnectOptions::from_str(&config.url)?
-                .acquire_timeout(Duration::from_secs(config.connect_timeout))
-                .idle_timeout(Duration::from_secs(config.idle_timeout))
-        ).await?;
+        let options = sqlx::postgres::PgConnectOptions::from_str(&config.url)?;
 
-        // Configure pool size
-        pool.set_max_connections(config.max_connections);
-        pool.set_min_connections(config.min_connections);
+        let pool = PgPoolOptions::new()
+            .max_connections(config.max_connections)
+            .min_connections(config.min_connections)
+            .acquire_timeout(Duration::from_secs(config.connect_timeout))
+            .idle_timeout(Duration::from_secs(config.idle_timeout))
+            .connect_with(options)
+            .await?;
 
         Ok(Self { pool })
     }
