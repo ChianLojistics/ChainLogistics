@@ -146,4 +146,4 @@ export const useWalletStore = create<WalletState>()(
         startAccountWatcher(get, set);
       },
     }),
-};
+);
