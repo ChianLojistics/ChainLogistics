@@ -67,12 +67,12 @@ export function FacetedFilter({
 
     if (group) {
       const filterKey = groupId as keyof SearchFilters;
-      const currentValues = (newFilters[filterKey] as string[]) || [];
+      const currentValues = Array.isArray(newFilters[filterKey]) ? (newFilters[filterKey] as string[]) : [];
 
       if (checked) {
-        newFilters[filterKey] = [...currentValues, value];
+        (newFilters[filterKey] as string[]) = [...currentValues, value];
       } else {
-        newFilters[filterKey] = currentValues.filter((v) => v !== value);
+        (newFilters[filterKey] as string[]) = currentValues.filter((v) => v !== value);
       }
 
       onFiltersChange(newFilters);
@@ -209,8 +209,8 @@ export function FacetedFilter({
                 {group.type === "radio" && (
                   <div className="space-y-2">
                     {group.options.map((option) => {
-                      const isChecked =
-                        (filters[group.id as keyof SearchFilters] as string) === option.value;
+                      const filterValue = filters[group.id as keyof SearchFilters];
+                      const isChecked = typeof filterValue === "string" && filterValue === option.value;
 
                       return (
                         <label
@@ -223,7 +223,7 @@ export function FacetedFilter({
                             checked={isChecked}
                             onChange={() => {
                               const newFilters = { ...filters };
-                              newFilters[group.id as keyof SearchFilters] = option.value;
+                              (newFilters as Record<string, unknown>)[group.id] = option.value;
                               onFiltersChange(newFilters);
                             }}
                             className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"

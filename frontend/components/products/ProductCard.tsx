@@ -66,7 +66,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center gap-2">
             <CalendarPlus className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Created:</span>
-            <span>{formatDate(product.created_at)}</span>
+            <span>{formatDate(product.createdAt)}</span>
           </div>
         </div>
       </CardContent>

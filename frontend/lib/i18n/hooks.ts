@@ -3,12 +3,7 @@
  */
 
 import { useTranslation } from "react-i18next";
-import { useFormatter, useNow } from "next-intl";
 import {
-  formatNumber as formatNumberUtil,
-  formatDate as formatDateUtil,
-  formatCurrency as formatCurrencyUtil,
-  formatRelativeTime as formatRelativeTimeUtil,
   isRTL as isRTLUtil,
   setLanguage as setLanguageUtil,
   getLanguageInfo as getLanguageInfoUtil,

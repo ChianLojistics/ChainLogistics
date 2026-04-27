@@ -223,7 +223,7 @@ export default function DashboardPage() {
   const eventsByType: EventsByTypeDatum[] = React.useMemo(() => {
     const map = new Map<string, number>();
     for (const e of events) {
-      const t = e.event_type || "UNKNOWN";
+      const t = e.eventType || "UNKNOWN";
       map.set(t, (map.get(t) ?? 0) + 1);
     }
     return Array.from(map.entries()).map(([type, count]) => ({ type, count }));

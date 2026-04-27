@@ -38,13 +38,13 @@ export function ActivityFeed({
         ) : (
           <ul className="divide-y divide-zinc-100">
             {events.map((e) => (
-              <li key={e.event_id} className="py-3">
+              <li key={e.eventId} className="py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-zinc-900 truncate">
-                      {e.event_type}
+                      {e.eventType}
                       <span className="text-zinc-400 font-normal"> · </span>
-                      <span className="text-zinc-600 font-medium">{e.product_id}</span>
+                      <span className="text-zinc-600 font-medium">{e.productId}</span>
                     </p>
                     {e.note ? (
                       <p className="mt-0.5 text-sm text-zinc-600 wrap-break-word">

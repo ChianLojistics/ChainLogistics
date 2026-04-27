@@ -57,13 +57,13 @@ export function ProductList({
       // Date range filter
       if (filters.dateFrom) {
         const fromDate = new Date(filters.dateFrom).getTime() / 1000;
-        if (product.created_at < fromDate) return false;
+        if (product.createdAt < fromDate) return false;
       }
       if (filters.dateTo) {
         const toDate = new Date(filters.dateTo).getTime() / 1000;
         // Add one day to include the entire end date
         const toDateEnd = toDate + 24 * 60 * 60;
-        if (product.created_at > toDateEnd) return false;
+        if (product.createdAt > toDateEnd) return false;
       }
 
       return true;
@@ -75,9 +75,9 @@ export function ProductList({
     const sorted = [...filteredProducts];
     switch (sortBy) {
       case "newest":
-        return sorted.sort((a, b) => b.created_at - a.created_at);
+        return sorted.sort((a, b) => b.createdAt - a.createdAt);
       case "oldest":
-        return sorted.sort((a, b) => a.created_at - b.created_at);
+        return sorted.sort((a, b) => a.createdAt - b.createdAt);
       case "name":
         return sorted.sort((a, b) => a.name.localeCompare(b.name));
       default:
