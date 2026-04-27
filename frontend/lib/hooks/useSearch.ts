@@ -83,7 +83,7 @@ export function useSearch<T extends { title: string; description?: string; tags?
   // Debounced search function
   const debouncedSearch = useMemo(
     () =>
-      debounce(() => {
+      debounce((_query: string) => {
         setIsLoading(true);
         setTimeout(() => setIsLoading(false), 100); // Simulate async
       }, debounceMs),
