@@ -14,18 +14,21 @@ export type EventMetadata = {
 export type TrackingEvent = {
   productId: ProductId;
   type: TrackingEventType;
-  timestamp: number;
+  timestamp: number; // Unix timestamp in seconds (matching smart contract u64)
+  location?: string;
+  dataHash?: string;
+  note?: string; // Added to match backend and smart contract
   metadata?: EventMetadata;
 };
 
 export type TimelineEvent = {
-  event_id: number;
-  product_id: string;
+  eventId: number;
+  productId: string;
   actor: string;
-  timestamp: number;
-  event_type: string;
+  timestamp: number; // Unix timestamp in seconds
+  eventType: string;
   note: string;
-  data_hash?: string;
+  dataHash?: string;
 };
 
 export type EventCardProps = {

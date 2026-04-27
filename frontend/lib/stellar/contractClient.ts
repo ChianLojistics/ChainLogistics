@@ -293,13 +293,13 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
     },
 
     async get_event(eventId: number): Promise<{
-      event_id: number;
-      product_id: string;
+      eventId: number;
+      productId: string;
       actor: string;
       timestamp: number;
-      event_type: string;
+      eventType: string;
       note: string;
-      data_hash?: string;
+      dataHash?: string;
     } | null> {
       const startedAt = now();
       try {
@@ -315,7 +315,7 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
             sequenceNumber: "0",
           };
         }
-        
+
         const transaction = new TransactionBuilder(sourceAccount as any, {
           fee: "100",
           networkPassphrase,
@@ -339,14 +339,15 @@ export function createContractClient(config?: Partial<ContractClientConfig>) {
         const jsValue = scValToJs((result as any).retval);
         if (!jsValue || typeof jsValue !== "object") return null;
 
+        // Convert snake_case from smart contract to camelCase for frontend
         const parsedEvent = {
-          event_id: Number(jsValue.event_id || 0),
-          product_id: scValToString(jsValue.product_id) || "",
+          eventId: Number(jsValue.event_id || 0),
+          productId: scValToString(jsValue.product_id) || "",
           actor: scValToString(jsValue.actor) || "",
           timestamp: Number(jsValue.timestamp || 0),
-          event_type: scValToString(jsValue.event_type) || "",
+          eventType: scValToString(jsValue.event_type) || "",
           note: scValToString(jsValue.note) || "",
-          data_hash: jsValue.data_hash ? scValToString(jsValue.data_hash) : undefined,
+          dataHash: jsValue.data_hash ? scValToString(jsValue.data_hash) : undefined,
         };
 
         trackContractInteraction({

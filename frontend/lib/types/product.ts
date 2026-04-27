@@ -8,7 +8,7 @@ export type Product = {
     location: string;
   };
   owner: string; // Address as string
-  created_at: number; // Unix timestamp
+  createdAt: number; // Unix timestamp in seconds (matching smart contract u64)
   active: boolean;
   category: string;
   tags: string[];

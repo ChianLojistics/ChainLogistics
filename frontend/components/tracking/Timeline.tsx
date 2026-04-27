@@ -123,7 +123,7 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
       <div className="space-y-0">
         {events.map((event, index) => (
           <EventCard
-            key={event.event_id}
+            key={event.eventId}
             event={event}
             isFirst={index === 0}
             isLast={index === events.length - 1}

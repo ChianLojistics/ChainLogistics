@@ -7,7 +7,7 @@ import { shortenPublicKey } from "@/lib/utils/format";
 import { EventTypeBadge, getEventTypeBadgeMeta } from "./EventTypeBadge";
 
 export function EventCard({ event, isLast }: Readonly<EventCardProps>) {
-  const meta = getEventTypeBadgeMeta(event.event_type);
+  const meta = getEventTypeBadgeMeta(event.eventType);
   const Icon = meta.icon;
 
   return (
@@ -30,7 +30,7 @@ export function EventCard({ event, isLast }: Readonly<EventCardProps>) {
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <EventTypeBadge eventType={event.event_type} size="md" />
+                <EventTypeBadge eventType={event.eventType} size="md" />
                 <span className="text-xs sm:text-sm text-gray-500">
                   {getRelativeTime(event.timestamp)}
                 </span>

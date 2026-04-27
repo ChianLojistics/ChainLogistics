@@ -20,27 +20,27 @@ function getE2EMockEvents(productId: string): TimelineEvent[] {
   const nowSec = Math.floor(Date.now() / 1000);
   return [
     {
-      event_id: 3,
-      product_id: productId,
+      eventId: 3,
+      productId: productId,
       actor: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
       timestamp: nowSec - 3600,
-      event_type: "SHIP",
+      eventType: "SHIP",
       note: "Mock: Shipment dispatched",
     },
     {
-      event_id: 2,
-      product_id: productId,
+      eventId: 2,
+      productId: productId,
       actor: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
       timestamp: nowSec - 7200,
-      event_type: "PACKAGE",
+      eventType: "PACKAGE",
       note: "Mock: Packaged for shipping",
     },
     {
-      event_id: 1,
-      product_id: productId,
+      eventId: 1,
+      productId: productId,
       actor: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
       timestamp: nowSec - 10_800,
-      event_type: "HARVEST",
+      eventType: "HARVEST",
       note: "Mock: Harvested at origin",
     },
   ];
