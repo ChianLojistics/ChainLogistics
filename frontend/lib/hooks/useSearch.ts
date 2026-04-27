@@ -83,7 +83,7 @@ export function useSearch<T extends { title: string; description?: string; tags?
   // Debounced search function
   const debouncedSearch = useMemo(
     () =>
-      debounce((_query: string) => {
+      debounce(() => {
         setIsLoading(true);
         setTimeout(() => setIsLoading(false), 100); // Simulate async
       }, debounceMs),
@@ -98,7 +98,7 @@ export function useSearch<T extends { title: string; description?: string; tags?
   // Update debounced search when query changes
   useEffect(() => {
     if (query) {
-      debouncedSearch(query);
+      debouncedSearch();
     }
   }, [query, debouncedSearch]);
 
@@ -177,7 +177,8 @@ export function useAutocomplete(
       setAutocompleteSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [query, allSuggestions, maxSuggestions, setAutocompleteSuggestions, setShowSuggestions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, allSuggestions, maxSuggestions]);
 
   const selectSuggestion = useCallback((suggestion: string) => {
     setAutocompleteSuggestions([]);
@@ -289,7 +290,8 @@ export function useSearchHistory() {
         console.error("Failed to load search history:", e);
       }
     }
-  }, [setHistory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addToHistory = useCallback((query: string, category: SearchCategory, resultCount: number) => {
     setHistory((prev) => {
