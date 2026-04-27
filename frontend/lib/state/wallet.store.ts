@@ -114,9 +114,13 @@ export const useWalletStore = create<WalletState>()(
         const { status, publicKey } = get();
 
         if (E2E_MOCKS_ENABLED) {
-          if (status === "connected" && publicKey) {
-            startAccountWatcher(get, set);
-          }
+          set({
+            status: "connected",
+            publicKey: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            network: "testnet",
+            error: null,
+          });
+          startAccountWatcher(get, set);
           return;
         }
 
