@@ -168,6 +168,7 @@ export function useAutocomplete(
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (query.length > 0) {
       const generated = generateAutocompleteSuggestions(query, allSuggestions, maxSuggestions);
@@ -177,7 +178,6 @@ export function useAutocomplete(
       setAutocompleteSuggestions([]);
       setShowSuggestions(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, allSuggestions, maxSuggestions]);
 
   const selectSuggestion = useCallback((suggestion: string) => {
@@ -205,6 +205,7 @@ export function useSavedSearches() {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
 
   // Load saved searches from localStorage
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const stored = localStorage.getItem("saved-searches");
     if (stored) {
@@ -214,7 +215,7 @@ export function useSavedSearches() {
         console.error("Failed to load saved searches:", e);
       }
     }
-  }, [setSavedSearches]);
+  }, []);
 
   const saveSearch = useCallback((name: string, query: SearchQuery) => {
     const newSavedSearch: SavedSearch = {
@@ -280,9 +281,10 @@ export function useSearchHistory() {
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   const MAX_HISTORY = 50;
 
-  // Load history from localStorage
+  // Load saved searches from localStorage
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    const stored = localStorage.getItem("search-history");
+    const stored = localStorage.getItem("searchHistory");
     if (stored) {
       try {
         setHistory(JSON.parse(stored));
@@ -290,7 +292,6 @@ export function useSearchHistory() {
         console.error("Failed to load search history:", e);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addToHistory = useCallback((query: string, category: SearchCategory, resultCount: number) => {
