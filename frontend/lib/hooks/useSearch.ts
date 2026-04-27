@@ -266,7 +266,6 @@ export function useSavedSearches() {
 
   return {
     savedSearches,
-    isLoading,
     saveSearch,
     loadSearch,
     deleteSearch,
@@ -323,8 +322,8 @@ export function useSearchHistory() {
   }, []);
 
   const removeFromHistory = useCallback((id: string) => {
-    setHistory((prev) => {
-      const updated = prev.filter((item) => item.id !== id);
+    setHistory((prev: SearchHistoryItem[]) => {
+      const updated = prev.filter((item: SearchHistoryItem) => item.id !== id);
       localStorage.setItem("searchHistory", JSON.stringify(updated));
       return updated;
     });
@@ -333,7 +332,7 @@ export function useSearchHistory() {
   const getRecentSearches = useCallback((category?: SearchCategory, limit: number = 10) => {
     let filtered = history;
     if (category) {
-      filtered = history.filter((item) => item.category === category);
+      filtered = history.filter((item: SearchHistoryItem) => item.category === category);
     }
     return filtered.slice(0, limit);
   }, [history]);
