@@ -2,7 +2,7 @@
  * Fuzzy search utility with autocomplete and relevance scoring
  */
 
-import type { SearchResult, SearchFilters, SearchSortOption } from "@/lib/types/search";
+import type { SearchFilters, SearchSortOption } from "@/lib/types/search";
 
 /**
  * Levenshtein distance calculation for fuzzy matching
@@ -123,7 +123,7 @@ export function applyFilters<T>(
     eventType?: string;
     status?: string;
     tags?: string[];
-    [key: string]: any;
+    [key: string]: string | number | boolean | Date | string[] | undefined;
   }
 ): T[] {
   return items.filter((item) => {
@@ -315,7 +315,7 @@ export function paginateResults<T>(
 /**
  * Debounce function for search input
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {

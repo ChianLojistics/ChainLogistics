@@ -46,7 +46,7 @@ export function SearchBar({
     suggestions,
     5
   );
-  const { history, getRecentSearches, addToHistory } = useSearchHistory();
+  const { getRecentSearches, addToHistory } = useSearchHistory();
   const recentSearches = getRecentSearches(category, 5);
 
   // Close dropdown when clicking outside

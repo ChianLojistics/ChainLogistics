@@ -144,8 +144,6 @@ export function useRTL() {
  * Hook for language management
  */
 export function useLanguage() {
-  const { i18n, locale } = useI18n();
-
   const changeLanguage = (langCode: string) => {
     setLanguageUtil(langCode);
   };
@@ -159,7 +157,6 @@ export function useLanguage() {
   };
 
   return {
-    currentLanguage: locale,
     changeLanguage,
     getCurrentLanguage,
     getLanguageInfo,
@@ -170,9 +167,9 @@ export function useLanguage() {
  * Hook for pluralization
  */
 export function usePlural() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
 
-  const pluralize = (key: string, count: number, options?: Record<string, any>) => {
+  const pluralize = (key: string, count: number, options?: Record<string, string | number>) => {
     // Get the plural form based on count
     const pluralKey = count === 1 ? `${key}_one` : `${key}_other`;
     return t(pluralKey, { count, ...options });

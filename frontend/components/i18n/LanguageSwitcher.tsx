@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Languages, ChevronDown, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { languages, setLanguage, isRTL } from "@/lib/i18n/config";
+import { languages, setLanguage } from "@/lib/i18n/config";
 
 export function LanguageSwitcher() {
   const { i18n } = useTranslation();

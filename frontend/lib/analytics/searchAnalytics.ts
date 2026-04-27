@@ -20,7 +20,7 @@ class SearchAnalyticsTracker {
     const analytics: SearchAnalytics = {
       searchId,
       query,
-      category: category as any,
+      category: category as "product" | "event" | "partner" | "document" | "analytics",
       timestamp: new Date(),
       resultCount: 0,
       filtersApplied,

@@ -35,7 +35,7 @@ export function useSearch<T extends { title: string; description?: string; tags?
       eventType?: string;
       status?: string;
       tags?: string[];
-      [key: string]: any;
+      [key: string]: string | number | boolean | Date | string[] | undefined;
     };
     dateAccessor?: (item: T) => Date | undefined;
     nameAccessor?: (item: T) => string;
@@ -44,7 +44,7 @@ export function useSearch<T extends { title: string; description?: string; tags?
   const {
     threshold = 0.3,
     debounceMs = 300,
-    itemAccessor = (item) => item as any,
+    itemAccessor = (item) => item as T,
     dateAccessor,
     nameAccessor,
   } = options;
@@ -83,7 +83,7 @@ export function useSearch<T extends { title: string; description?: string; tags?
   // Debounced search function
   const debouncedSearch = useMemo(
     () =>
-      debounce((searchQuery: string) => {
+      debounce(() => {
         setIsLoading(true);
         setTimeout(() => setIsLoading(false), 100); // Simulate async
       }, debounceMs),
@@ -177,7 +177,7 @@ export function useAutocomplete(
       setAutocompleteSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [query, allSuggestions, maxSuggestions]);
+  }, [query, allSuggestions, maxSuggestions, setAutocompleteSuggestions, setShowSuggestions]);
 
   const selectSuggestion = useCallback((suggestion: string) => {
     setAutocompleteSuggestions([]);
@@ -202,11 +202,10 @@ export function useAutocomplete(
  */
 export function useSavedSearches() {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Load saved searches from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("savedSearches");
+    const stored = localStorage.getItem("saved-searches");
     if (stored) {
       try {
         setSavedSearches(JSON.parse(stored));
@@ -214,7 +213,7 @@ export function useSavedSearches() {
         console.error("Failed to load saved searches:", e);
       }
     }
-  }, []);
+  }, [setSavedSearches]);
 
   const saveSearch = useCallback((name: string, query: SearchQuery) => {
     const newSavedSearch: SavedSearch = {
@@ -227,7 +226,7 @@ export function useSavedSearches() {
 
     setSavedSearches((prev: SavedSearch[]) => {
       const updated = [newSavedSearch, ...prev];
-      localStorage.setItem("savedSearches", JSON.stringify(updated));
+      localStorage.setItem("saved-searches", JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -244,7 +243,7 @@ export function useSavedSearches() {
             }
           : search
       );
-      localStorage.setItem("savedSearches", JSON.stringify(updated));
+      localStorage.setItem("saved-searches", JSON.stringify(updated));
       return updated;
     });
 
@@ -254,14 +253,14 @@ export function useSavedSearches() {
   const deleteSearch = useCallback((id: string) => {
     setSavedSearches((prev: SavedSearch[]) => {
       const updated = prev.filter((search: SavedSearch) => search.id !== id);
-      localStorage.setItem("savedSearches", JSON.stringify(updated));
+      localStorage.setItem("saved-searches", JSON.stringify(updated));
       return updated;
     });
   }, []);
 
   const clearAllSearches = useCallback(() => {
     setSavedSearches([]);
-    localStorage.removeItem("savedSearches");
+    localStorage.removeItem("saved-searches");
   }, []);
 
   return {
@@ -282,7 +281,7 @@ export function useSearchHistory() {
 
   // Load history from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("searchHistory");
+    const stored = localStorage.getItem("search-history");
     if (stored) {
       try {
         setHistory(JSON.parse(stored));
@@ -290,7 +289,7 @@ export function useSearchHistory() {
         console.error("Failed to load search history:", e);
       }
     }
-  }, []);
+  }, [setHistory]);
 
   const addToHistory = useCallback((query: string, category: SearchCategory, resultCount: number) => {
     setHistory((prev) => {

@@ -35,7 +35,7 @@ export type SearchSortOption =
   | "created_desc"
   | "created_asc";
 
-export interface SearchResult<T = any> {
+export interface SearchResult<T = unknown> {
   id: string;
   type: SearchCategory;
   title: string;
@@ -51,7 +51,7 @@ export interface SearchMetadata {
   updatedAt: Date;
   category?: string;
   tags?: string[];
-  [key: string]: any;
+  [key: string]: string | number | Date | string[] | undefined;
 }
 
 export interface SearchSuggestions {
