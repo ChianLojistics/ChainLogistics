@@ -1,23 +1,21 @@
 /**
- * React hooks for search functionality
+ * Search hooks for frontend
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type {
-  SearchCategory,
-  SearchFilters,
+, SearchFilters,
   SearchQuery,
+  SearchResult,
   SearchSortOption,
   SavedSearch,
   SearchHistoryItem,
+  SearchCategory,
 } from "@/lib/types/search";
 import {
   fuzzySearch,
   applyFilters,
-  sortResults,
+  paginateResults,
   generateAutocompleteSuggestions,
   debounce,
-  paginateResults,
 } from "@/lib/utils/search";
 
 /**
@@ -168,7 +166,7 @@ export function useAutocomplete(
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (query.length > 0) {
       const generated = generateAutocompleteSuggestions(query, allSuggestions, maxSuggestions);
@@ -179,6 +177,7 @@ export function useAutocomplete(
       setShowSuggestions(false);
     }
   }, [query, allSuggestions, maxSuggestions]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectSuggestion = useCallback((suggestion: string) => {
     setAutocompleteSuggestions([]);
@@ -197,25 +196,22 @@ export function useAutocomplete(
     hideSuggestions,
   };
 }
-
 /**
  * Hook for saved searches
  */
 export function useSavedSearches() {
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
-
-  // Load saved searches from localStorage
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => {
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(() => {
     const stored = localStorage.getItem("saved-searches");
     if (stored) {
       try {
-        setSavedSearches(JSON.parse(stored));
+        return JSON.parse(stored);
       } catch (e) {
         console.error("Failed to load saved searches:", e);
+        return [];
       }
     }
-  }, []);
+    return [];
+  });
 
   const saveSearch = useCallback((name: string, query: SearchQuery) => {
     const newSavedSearch: SavedSearch = {
@@ -273,26 +269,23 @@ export function useSavedSearches() {
     clearAllSearches,
   };
 }
-
 /**
  * Hook for search history
  */
 export function useSearchHistory() {
-  const [history, setHistory] = useState<SearchHistoryItem[]>([]);
-  const MAX_HISTORY = 50;
-
-  // Load saved searches from localStorage
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => {
+  const [history, setHistory] = useState<SearchHistoryItem[]>(() => {
     const stored = localStorage.getItem("searchHistory");
     if (stored) {
       try {
-        setHistory(JSON.parse(stored));
+        return JSON.parse(stored);
       } catch (e) {
         console.error("Failed to load search history:", e);
+        return [];
       }
     }
-  }, []);
+    return [];
+  });
+  const MAX_HISTORY = 50;
 
   const addToHistory = useCallback((query: string, category: SearchCategory, resultCount: number) => {
     setHistory((prev) => {
@@ -347,3 +340,4 @@ export function useSearchHistory() {
     getRecentSearches,
   };
 }
+/* eslint-enable react-hooks/set-state-in-effect */
