@@ -9,20 +9,15 @@ import Link from 'next/link';
 import type { Product } from "@/lib/types/product";
 import { normalizeUnixSeconds } from "@/lib/types/product";
 import { shortenPublicKey } from "@/lib/utils/format";
+import { formatDate, formatNumber } from "@/lib/i18n/format";
+import { useTranslation } from "react-i18next";
 
 interface ProductCardProps {
   product: Product;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const formatDate = (timestamp: number) => {
-    const seconds = normalizeUnixSeconds(timestamp);
-    return new Date(seconds * 1000).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const { t } = useTranslation();
 
   const owner = product.owner || product.owner_address || "";
   const isActive = product.active ?? product.is_active ?? product.isActive ?? false;
@@ -60,18 +55,24 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
           <div className="flex items-center gap-2">
             <Tag className="h-4 w-4" aria-hidden="true" />
-            <span className="font-medium">Category:</span>
+            <span className="font-medium">{t("category")}:</span>
             <span>{product.category}</span>
           </div>
           <div className="flex items-center gap-2">
             <User className="h-4 w-4" aria-hidden="true" />
-            <span className="font-medium">Owner:</span>
+            <span className="font-medium">{t("owner")}:</span>
             <span className="font-mono">{shortenPublicKey(owner)}</span>
           </div>
           <div className="flex items-center gap-2">
             <CalendarPlus className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Created:</span>
-            <span>{formatDate(product.created_at ?? product.createdAt ?? 0)}</span>
+            <span>
+              {formatDate(normalizeUnixSeconds(product.created_at ?? product.createdAt ?? 0) * 1000, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
           </div>
         </div>
       </CardContent>
@@ -79,7 +80,7 @@ export function ProductCard({ product }: ProductCardProps) {
       <CardFooter className="flex items-center justify-between gap-2 z-10 relative border-t border-zinc-100 pt-4">
         <div className="flex items-center gap-2 text-sm text-zinc-600">
           <Badge variant="outline" className="font-normal bg-zinc-50 border-zinc-200">
-            {product.eventCount ?? 0} {product.eventCount === 1 ? 'Event' : 'Events'}
+            {formatNumber(product.eventCount ?? 0)} {product.eventCount === 1 ? 'Event' : 'Events'}
           </Badge>
         </div>
 

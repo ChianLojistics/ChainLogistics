@@ -8,5 +8,43 @@
   "status": "Estado",
   "date": "Fecha",
   "owner": "Propietario",
-  "category": "Categoría"
+  "category": "Categoría",
+
+  "skip_to_main": "Saltar al contenido principal",
+
+  "dashboard_title": "Panel",
+  "dashboard_subtitle": "Analíticas de la cadena de suministro para tus productos registrados.",
+  "refresh": "Actualizar",
+
+  "connect_your_wallet": "Conecta tu billetera",
+  "connect_wallet_to_load": "Conecta una billetera para cargar productos y eventos para análisis.",
+
+  "events_unavailable": "Eventos no disponibles",
+  "contract_not_configured_warning": "El contrato no está configurado. El panel mostrará solo información de productos.",
+  "events_load_warning": "No pudimos cargar los eventos de seguimiento. El panel mostrará solo información de productos.",
+  "failed_to_load_dashboard": "No se pudo cargar el panel",
+  "contract_not_configured_error": "El contrato no está configurado. Agrega NEXT_PUBLIC_CONTRACT_ID y recarga.",
+  "unable_to_load_dashboard": "No se pudieron cargar los datos del panel. Verifica tu conexión e inténtalo de nuevo.",
+  "retry": "Reintentar",
+  "auto_refreshes": "Se actualiza automáticamente mientras la pestaña está visible.",
+
+  "total_products": "Productos totales",
+  "total_events": "Eventos totales",
+  "top_origin": "Origen principal",
+  "last_updated": "Última actualización",
+
+  "products_visible_to_wallet": "Productos visibles actualmente para tu billetera.",
+  "all_loaded_events": "Todos los eventos de seguimiento cargados.",
+
+  "no_products_yet": "Aún no hay productos.",
+
+  "activity_over_time": "Actividad a lo largo del tiempo",
+  "events_grouped_by_day": "Eventos agrupados por día.",
+  "no_activity_yet": "Aún no hay actividad.",
+
+  "top_origins": "Orígenes principales",
+  "most_common_origins": "Orígenes de productos más comunes.",
+
+  "products_count_one": "{{count}} producto",
+  "products_count_other": "{{count}} productos"
 }
