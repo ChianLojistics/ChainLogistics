@@ -8,5 +8,8 @@ export * from "./sonner";
 export * from "./skeleton";
 export * from "./badge";
 export * from "./loading-spinner";
+export * from "./progress-bar";
+export * from "./progress-indicator";
+export * from "./async-state";
 export * from "./Toast";
 export * from "./ToastContainer";
