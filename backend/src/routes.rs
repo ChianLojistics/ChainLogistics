@@ -13,6 +13,10 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/carbon", carbon_routes())
         .nest("/api/v1/keys", key_management_routes())
         .nest("/api/v1/monitoring", monitoring_routes())
+        .nest("/api/regulatory", regulatory_routes())
+        .nest("/api/iot", iot_routes())
+        .nest("/api/quality", quality_routes())
+        .nest("/api/suppliers", supplier_routes())
 }
 
 fn public_api_routes() -> Router<AppState> {
@@ -117,6 +121,99 @@ fn monitoring_routes() -> Router<AppState> {
         .route("/infrastructure", get(crate::handlers::monitoring::get_infrastructure_metrics))
         .route("/alerts/check", post(crate::handlers::monitoring::check_alerts))
         .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator])))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn regulatory_routes() -> Router<AppState> {
+    Router::new()
+        // Requirements
+        .route("/requirements", get(crate::handlers::regulatory::list_requirements).post(crate::handlers::regulatory::create_requirement))
+        .route("/requirements/:requirement_id", get(crate::handlers::regulatory::get_requirement).put(crate::handlers::regulatory::update_requirement))
+        // Product Compliance
+        .route("/compliance", post(crate::handlers::regulatory::create_product_compliance))
+        .route("/compliance/:product_id", get(crate::handlers::regulatory::list_product_compliance))
+        .route("/compliance/:product_id/:requirement_id", get(crate::handlers::regulatory::get_product_compliance))
+        // Automated Checks
+        .route("/check", post(crate::handlers::regulatory::run_compliance_check))
+        // Audit Trail
+        .route("/audit/:product_id", get(crate::handlers::regulatory::get_audit_trail))
+        // Reports
+        .route("/reports", get(crate::handlers::regulatory::list_reports).post(crate::handlers::regulatory::generate_report))
+        .route("/reports/:report_id", get(crate::handlers::regulatory::get_report))
+        .layer(middleware::from_fn(require_role(vec![UserRole::Auditor, UserRole::Administrator, UserRole::Inspector])))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn iot_routes() -> Router<AppState> {
+    Router::new()
+        // Devices
+        .route("/devices", get(crate::handlers::iot::list_devices).post(crate::handlers::iot::create_device))
+        .route("/devices/:device_id", get(crate::handlers::iot::get_device))
+        // Readings
+        .route("/readings", get(crate::handlers::iot::get_readings).post(crate::handlers::iot::create_reading))
+        // Thresholds
+        .route("/thresholds", post(crate::handlers::iot::create_threshold))
+        .route("/thresholds/:product_id", get(crate::handlers::iot::get_thresholds))
+        // Alerts
+        .route("/alerts", get(crate::handlers::iot::get_alerts))
+        .route("/alerts/:alert_id/acknowledge", post(crate::handlers::iot::acknowledge_alert))
+        .route("/alerts/:alert_id/resolve", post(crate::handlers::iot::resolve_alert))
+        // Summaries
+        .route("/summaries/:device_id", get(crate::handlers::iot::get_summaries))
+        .layer(middleware::from_fn(require_role(vec![UserRole::Inspector, UserRole::Administrator, UserRole::Supplier])))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn quality_routes() -> Router<AppState> {
+    Router::new()
+        // Checkpoints
+        .route("/checkpoints", get(crate::handlers::quality::list_checkpoints).post(crate::handlers::quality::create_checkpoint))
+        .route("/checkpoints/:checkpoint_id", get(crate::handlers::quality::get_checkpoint))
+        // Workflows
+        .route("/workflows", get(crate::handlers::quality::list_workflows).post(crate::handlers::quality::create_workflow))
+        .route("/workflows/:workflow_id", get(crate::handlers::quality::get_workflow))
+        .route("/workflows/execute", post(crate::handlers::quality::execute_workflow))
+        // Inspections
+        .route("/inspections", get(crate::handlers::quality::list_inspections).post(crate::handlers::quality::create_inspection))
+        .route("/inspections/:inspection_id", get(crate::handlers::quality::get_inspection))
+        .route("/inspections/:inspection_id/status", put(crate::handlers::quality::update_inspection_status))
+        // Non-Conformances
+        .route("/non-conformances", get(crate::handlers::quality::list_non_conformances).post(crate::handlers::quality::create_non_conformance))
+        .route("/non-conformances/:nc_id", put(crate::handlers::quality::update_non_conformance))
+        .route("/non-conformances/:nc_id/verify", post(crate::handlers::quality::verify_non_conformance))
+        // Metrics
+        .route("/metrics", get(crate::handlers::quality::list_metrics).post(crate::handlers::quality::create_metric))
+        .layer(middleware::from_fn(require_role(vec![UserRole::Inspector, UserRole::Administrator, UserRole::Auditor])))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn supplier_routes() -> Router<AppState> {
+    Router::new()
+        // Suppliers
+        .route("/", get(crate::handlers::supplier::list_suppliers).post(crate::handlers::supplier::create_supplier))
+        .route("/:supplier_id", get(crate::handlers::supplier::get_supplier))
+        .route("/:supplier_id/verification", put(crate::handlers::supplier::update_verification))
+        .route("/:supplier_id/summary", get(crate::handlers::supplier::get_supplier_summary))
+        // Ratings
+        .route("/ratings", post(crate::handlers::supplier::create_rating))
+        .route("/:supplier_id/ratings", get(crate::handlers::supplier::get_ratings))
+        // Performance
+        .route("/performance", post(crate::handlers::supplier::create_performance))
+        .route("/:supplier_id/performance", get(crate::handlers::supplier::get_performance))
+        // Compliance
+        .route("/compliance", post(crate::handlers::supplier::create_compliance))
+        .route("/:supplier_id/compliance", get(crate::handlers::supplier::get_compliance))
+        .route("/compliance/:compliance_id/verify", put(crate::handlers::supplier::verify_compliance))
+        // Products
+        .route("/products", post(crate::handlers::supplier::add_supplier_product))
+        .route("/:supplier_id/products", get(crate::handlers::supplier::get_supplier_products))
+        // Audit Trail
+        .route("/:supplier_id/audit", get(crate::handlers::supplier::get_audit_trail))
+        .layer(middleware::from_fn(require_role(vec![UserRole::Administrator, UserRole::Auditor])))
         .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }

@@ -7,6 +7,10 @@ use utoipa::ToSchema;
 pub mod analytics;
 pub mod carbon;
 pub mod digital_twin;
+pub mod regulatory;
+pub mod iot;
+pub mod quality;
+pub mod supplier;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Product {
