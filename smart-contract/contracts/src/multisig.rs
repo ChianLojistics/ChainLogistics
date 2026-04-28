@@ -6,8 +6,8 @@
 /// - Proposal execution
 use crate::error::Error;
 use crate::types::{DataKey, MultiSigConfig, Proposal, ProposalStatus};
-use soroban_sdk::{contract, contractimpl, Address, Env, Map, Symbol, Val, Vec};
 use crate::{storage, validation_contract::ValidationContract};
+use soroban_sdk::{contract, contractimpl, Address, Env, Map, Symbol, Val, Vec};
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
@@ -430,7 +430,8 @@ impl MultiSigContract {
         // However, for generic support, we just pass the args as provided.
         let scope = Symbol::new(&env, "multisig_exec");
         storage::acquire_reentrancy_lock(&env, &scope)?;
-        let _result: Val = env.invoke_contract(&proposal.target, &proposal.kind, proposal.args.clone());
+        let _result: Val =
+            env.invoke_contract(&proposal.target, &proposal.kind, proposal.args.clone());
         storage::release_reentrancy_lock(&env, &scope);
 
         // Emit execution event

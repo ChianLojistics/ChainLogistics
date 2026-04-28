@@ -177,7 +177,9 @@ impl StorageContract {
             .get(&Self::event_seq_key())
             .unwrap_or(0);
         let next = seq.checked_add(1).ok_or(Error::ArithmeticOverflow)?;
-        env.storage().persistent().set(&Self::event_seq_key(), &next);
+        env.storage()
+            .persistent()
+            .set(&Self::event_seq_key(), &next);
         Ok(next)
     }
 
