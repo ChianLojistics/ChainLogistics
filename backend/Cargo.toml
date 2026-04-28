@@ -17,13 +17,17 @@ bcrypt = "0.15"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 thiserror = "1.0"
 anyhow = "1.0"
 config = "0.14"
 async-trait = "0.1"
+sha2 = "0.10"
+hex = "0.4"
+rand = { version = "0.8", features = ["std"] }
+regex = "1.10"
+lazy_static = "1.4"
 # Stellar/Soroban dependencies
-stellar-sdk = "0.24"
 soroban-sdk = "21.0"
 # OpenAPI documentation
 utoipa = { version = "4.0", features = ["axum_extras"] }
@@ -33,3 +37,9 @@ utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
 tower-test = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 testcontainers = "0.15"
+
+[dependencies.aes-gcm]
+version = "0.10"
+
+[dependencies.base64]
+version = "0.21"

@@ -1,5 +1,6 @@
 use soroban_sdk::{Address, Env, Map, String, Symbol, Vec};
 
+use crate::error::Error;
 use crate::storage_contract::StorageContract;
 use crate::types::{Product, TrackingEvent, QualityCertification, QualityReading, QualityParameter, ParameterStats, SensorInfo, QualityDataKey};
 
@@ -17,6 +18,14 @@ pub fn get_multisig_contract(env: &Env) -> Option<Address> {
 
 pub fn set_multisig_contract(env: &Env, address: &Address) {
     StorageContract::set_multisig_contract(env, address)
+}
+
+pub fn get_timelock_contract(env: &Env) -> Option<Address> {
+    StorageContract::get_timelock_contract(env)
+}
+
+pub fn set_timelock_contract(env: &Env, address: &Address) {
+    StorageContract::set_timelock_contract(env, address)
 }
 
 // ─── Product ────────────────────────────────────────────────────────────────
@@ -62,14 +71,27 @@ pub fn get_event(env: &Env, event_id: u64) -> Option<TrackingEvent> {
     StorageContract::get_event(env, event_id)
 }
 
-pub fn next_event_id(env: &Env) -> u64 {
+pub fn next_event_id(env: &Env) -> Result<u64, Error> {
     StorageContract::next_event_id(env)
 }
 
 // ─── Event type index ────────────────────────────────────────────────────────
 
-pub fn index_event_by_type(env: &Env, product_id: &String, event_type: &Symbol, event_id: u64) {
+pub fn index_event_by_type(
+    env: &Env,
+    product_id: &String,
+    event_type: &Symbol,
+    event_id: u64,
+) -> Result<(), Error> {
     StorageContract::index_event_by_type(env, product_id, event_type, event_id)
+}
+
+pub fn acquire_reentrancy_lock(env: &Env, scope: &Symbol) -> Result<(), Error> {
+    StorageContract::acquire_reentrancy_lock(env, scope)
+}
+
+pub fn release_reentrancy_lock(env: &Env, scope: &Symbol) {
+    StorageContract::release_reentrancy_lock(env, scope)
 }
 
 pub fn get_event_ids_by_type(
@@ -154,29 +176,29 @@ pub fn get_search_index(env: &Env, keyword: &String) -> Vec<String> {
         .unwrap_or_else(|| Vec::new(env))
 }
 
+// Gas-optimized: Check existence before loading full vector
 pub fn add_to_search_index(env: &Env, keyword: String, product_id: &String) {
     let mut ids = get_search_index(env, &keyword);
-    if !ids.contains(product_id) {
-        ids.push_back(product_id.clone());
-        put_search_index(env, &keyword, &ids);
+    // Early exit if already indexed - saves gas
+    if ids.contains(product_id) {
+        return;
     }
+    ids.push_back(product_id.clone());
+    put_search_index(env, &keyword, &ids);
 }
 
+// Gas-optimized: Use iterator pattern and early exit
 pub fn remove_from_search_index(env: &Env, keyword: String, product_id: &String) {
     let mut ids = get_search_index(env, &keyword);
-    let mut found = false;
-    let mut i = 0;
-    while i < ids.len() {
+    // Find and remove in single pass
+    for i in 0..ids.len() {
         if ids.get(i).unwrap() == product_id.clone() {
             ids.remove(i);
-            found = true;
-            break;
+            put_search_index(env, &keyword, &ids);
+            return; // Early exit saves gas
         }
-        i += 1;
     }
-    if found {
-        put_search_index(env, &keyword, &ids);
-    }
+    // No write if not found - saves gas
 }
 
 // ─── Quality Control ────────────────────────────────────────────────────────

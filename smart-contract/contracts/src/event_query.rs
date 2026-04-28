@@ -3,6 +3,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Sy
 use crate::error::Error;
 use crate::types::TrackingEventFilter;
 use crate::types::TrackingEventPage;
+use crate::validation_contract::ValidationContract;
 use crate::{ProductRegistryContractClient, TrackingContractClient};
 
 #[contracttype]
@@ -37,6 +38,8 @@ fn set_tracking_contract(env: &Env, address: &Address) {
 }
 
 fn ensure_product_exists(env: &Env, product_id: &String) -> Result<(), Error> {
+    ValidationContract::non_empty(product_id)?;
+    ValidationContract::max_len(product_id, ValidationContract::MAX_PRODUCT_ID_LEN)?;
     let registry = get_registry_contract(env).ok_or(Error::NotInitialized)?;
     let registry_client = ProductRegistryContractClient::new(env, &registry);
 
@@ -62,6 +65,8 @@ impl EventQueryContract {
         if get_registry_contract(&env).is_some() || get_tracking_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
+        ValidationContract::validate_contract_address(&env, &registry_contract)?;
+        ValidationContract::validate_contract_address(&env, &tracking_contract)?;
         set_registry_contract(&env, &registry_contract);
         set_tracking_contract(&env, &tracking_contract);
         Ok(())
@@ -75,8 +80,9 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        // Validate input parameters
-        if limit == 0 || limit > 1000 {
+        if ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)
+            .is_err()
+        {
             return Ok(TrackingEventPage {
                 events: Vec::new(&env),
                 total_count: 0,
@@ -115,7 +121,10 @@ impl EventQueryContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = offset
+            .checked_add(events.len() as u64)
+            .ok_or(Error::ArithmeticOverflow)?
+            < total_count;
 
         Ok(TrackingEventPage {
             events,
@@ -132,8 +141,9 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        // Validate input parameters
-        if limit == 0 || limit > 1000 {
+        if ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)
+            .is_err()
+        {
             return Ok(TrackingEventPage {
                 events: Vec::new(&env),
                 total_count: 0,
@@ -172,7 +182,8 @@ impl EventQueryContract {
         }
 
         let start = offset as u32;
-        let end = ((offset + limit) as u32).min(matching_ids.len());
+        let end_u64 = offset.checked_add(limit).ok_or(Error::ArithmeticOverflow)?;
+        let end = (end_u64.min(u32::MAX as u64) as u32).min(matching_ids.len());
 
         let mut events = Vec::new(&env);
         for i in start..end {
@@ -185,7 +196,10 @@ impl EventQueryContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = offset
+            .checked_add(events.len() as u64)
+            .ok_or(Error::ArithmeticOverflow)?
+            < total_count;
 
         Ok(TrackingEventPage {
             events,
@@ -203,14 +217,16 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        // Validate input parameters
-        if limit == 0 || limit > 1000 {
+        if ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)
+            .is_err()
+        {
             return Ok(TrackingEventPage {
                 events: Vec::new(&env),
                 total_count: 0,
                 has_more: false,
             });
         }
+        ValidationContract::validate_time_range(&env, start_time, end_time)?;
 
         ensure_product_exists(&env, &product_id)?;
 
@@ -256,7 +272,10 @@ impl EventQueryContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = offset
+            .checked_add(events.len() as u64)
+            .ok_or(Error::ArithmeticOverflow)?
+            < total_count;
 
         Ok(TrackingEventPage {
             events,
@@ -274,13 +293,17 @@ impl EventQueryContract {
         offset: u64,
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
-        // Validate input parameters
-        if limit == 0 || limit > 1000 {
+        if ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)
+            .is_err()
+        {
             return Ok(TrackingEventPage {
                 events: Vec::new(&env),
                 total_count: 0,
                 has_more: false,
             });
+        }
+        if filter.start_time > 0 || filter.end_time < u64::MAX {
+            ValidationContract::validate_time_range(&env, filter.start_time, filter.end_time)?;
         }
 
         ensure_product_exists(&env, &product_id)?;
@@ -332,7 +355,8 @@ impl EventQueryContract {
         }
 
         let start = offset as u32;
-        let end = ((offset + limit) as u32).min(matching_ids.len());
+        let end_u64 = offset.checked_add(limit).ok_or(Error::ArithmeticOverflow)?;
+        let end = (end_u64.min(u32::MAX as u64) as u32).min(matching_ids.len());
 
         let mut events = Vec::new(&env);
         for i in start..end {
@@ -345,7 +369,10 @@ impl EventQueryContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = offset
+            .checked_add(events.len() as u64)
+            .ok_or(Error::ArithmeticOverflow)?
+            < total_count;
 
         Ok(TrackingEventPage {
             events,

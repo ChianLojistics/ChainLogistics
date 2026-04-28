@@ -1,5 +1,5 @@
 #![allow(clippy::len_zero)]
-use soroban_sdk::{Address, Map, String, Symbol};
+use soroban_sdk::{Address, Env, Map, String, Symbol};
 
 use crate::error::Error;
 use crate::types::ProductConfig;
@@ -24,6 +24,7 @@ impl ValidationContract {
     pub const MAX_MEDIA_HASHES: u32 = 50;
     pub const MAX_CUSTOM_FIELDS: u32 = 20;
     pub const MAX_METADATA_FIELDS: u32 = 20;
+    pub const MAX_PAGE_LIMIT: u64 = 1_000;
 
     // --- Primitive validators ---
     pub fn non_empty(s: &String) -> Result<(), Error> {
@@ -42,6 +43,48 @@ impl ValidationContract {
 
     pub fn require_auth(actor: &Address) -> Result<(), Error> {
         actor.require_auth();
+        Ok(())
+    }
+
+    pub fn validate_contract_address(env: &Env, address: &Address) -> Result<(), Error> {
+        if *address == env.current_contract_address() {
+            return Err(Error::InvalidAddress);
+        }
+        Ok(())
+    }
+
+    pub fn validate_distinct_addresses(a: &Address, b: &Address) -> Result<(), Error> {
+        if a == b {
+            return Err(Error::InvalidAddress);
+        }
+        Ok(())
+    }
+
+    pub fn validate_event_type(env: &Env, event_type: &Symbol) -> Result<(), Error> {
+        if *event_type == Symbol::new(env, "") {
+            return Err(Error::InvalidInput);
+        }
+        Ok(())
+    }
+
+    pub fn validate_pagination_limit(limit: u64, max: u64) -> Result<(), Error> {
+        if limit == 0 || limit > max {
+            return Err(Error::InvalidInput);
+        }
+        Ok(())
+    }
+
+    pub fn validate_time_range(env: &Env, start_time: u64, end_time: u64) -> Result<(), Error> {
+        let now = env.ledger().timestamp();
+        if end_time == u64::MAX {
+            if start_time > now {
+                return Err(Error::InvalidTimestamp);
+            }
+            return Ok(());
+        }
+        if start_time > end_time || end_time > now {
+            return Err(Error::InvalidTimestamp);
+        }
         Ok(())
     }
 

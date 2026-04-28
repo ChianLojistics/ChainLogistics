@@ -1,0 +1,5 @@
+[security]
+enforce_https = true
+
+[server]
+tls_enabled = true
