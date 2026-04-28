@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import "./globals.css";
 
+const enablePerformanceToasts = process.env.NODE_ENV !== "production";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -68,7 +70,7 @@ export default function RootLayout({
             Skip to main content
           </a>
           <MonitoringBootstrap />
-          <PerformanceBudgetAlerts />
+          {enablePerformanceToasts ? <PerformanceBudgetAlerts /> : null}
           {children}
           <Toaster />
           <ToastContainer />
