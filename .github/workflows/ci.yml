@@ -94,6 +94,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+
       # Fixed: was running `npm run build` here (type check) AND again below (build verification)
       # Use tsc --noEmit for type checking, keep the real build separate
       - name: Type checking
