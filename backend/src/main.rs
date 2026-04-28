@@ -25,7 +25,7 @@ use database::Database;
 use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService};
 use utils::CronService;
 use error::AppError;
-use monitoring::ErrorMonitor;
+use monitoring::MonitoringSystem;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -40,7 +40,7 @@ pub struct AppState {
     pub carbon_service: Arc<CarbonService>,
     pub redis_client: redis::Client,
     pub config: Config,
-    pub error_monitor: ErrorMonitor,
+    pub monitoring_system: MonitoringSystem,
 }
 
 impl AppState {
@@ -69,8 +69,8 @@ impl AppState {
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
         
-        // Initialize error monitoring
-        let error_monitor = ErrorMonitor::new();
+        // Initialize comprehensive monitoring system
+        let monitoring_system = MonitoringSystem::new();
         
         Ok(Self {
             db,
@@ -84,7 +84,7 @@ impl AppState {
             carbon_service,
             redis_client,
             config,
-            error_monitor,
+            monitoring_system,
         })
     }
 }
