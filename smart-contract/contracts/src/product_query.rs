@@ -2,6 +2,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 
 use crate::error::Error;
 use crate::types::{DataKey, Product, ProductStats};
+use crate::validation_contract::ValidationContract;
 use crate::ProductRegistryContractClient;
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ impl ProductQueryContract {
         if get_main_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
+        ValidationContract::validate_contract_address(&env, &registry_contract)?;
         set_main_contract(&env, &registry_contract);
         Ok(())
     }
@@ -35,6 +37,8 @@ impl ProductQueryContract {
     /// Retrieve a single product by its ID.
     /// Delegates to ProductRegistryContract.
     pub fn query_product(env: Env, product_id: String) -> Result<Product, Error> {
+        ValidationContract::non_empty(&product_id)?;
+        ValidationContract::max_len(&product_id, ValidationContract::MAX_PRODUCT_ID_LEN)?;
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
 
@@ -56,6 +60,8 @@ impl ProductQueryContract {
 
     /// Check if a product exists in the system.
     pub fn query_product_exists(env: Env, product_id: String) -> Result<bool, Error> {
+        ValidationContract::non_empty(&product_id)?;
+        ValidationContract::max_len(&product_id, ValidationContract::MAX_PRODUCT_ID_LEN)?;
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
 

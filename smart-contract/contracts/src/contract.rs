@@ -58,6 +58,13 @@ fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
 
+fn calc_has_more(offset: u64, current_len: u64, total_count: u64) -> Result<bool, Error> {
+    let consumed = offset
+        .checked_add(current_len)
+        .ok_or(Error::ArithmeticOverflow)?;
+    Ok(consumed < total_count)
+}
+
 /// Ensures the caller is the product owner.
 /// Returns Unauthorized if caller is not the owner.
 fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
@@ -123,6 +130,7 @@ impl ChainLogisticsContract {
             return Err(Error::AlreadyInitialized);
         }
         admin.require_auth();
+        ValidationContract::validate_contract_address(&env, &auth_contract)?;
         storage::set_admin(&env, &admin);
         storage::set_paused(&env, false);
         storage::set_auth_contract(&env, &auth_contract);
@@ -197,6 +205,7 @@ impl ChainLogisticsContract {
         new_admin: Address,
     ) -> Result<(), Error> {
         require_admin(&env, &current_admin)?;
+        ValidationContract::validate_distinct_addresses(&current_admin, &new_admin)?;
         new_admin.require_auth();
         storage::set_admin(&env, &new_admin);
         Ok(())
@@ -220,6 +229,7 @@ impl ChainLogisticsContract {
         multisig_contract: Address,
     ) -> Result<(), Error> {
         require_admin(&env, &caller)?;
+        ValidationContract::validate_contract_address(&env, &multisig_contract)?;
         storage::set_multisig_contract(&env, &multisig_contract);
         Ok(())
     }
@@ -230,6 +240,7 @@ impl ChainLogisticsContract {
         timelock_contract: Address,
     ) -> Result<(), Error> {
         require_admin(&env, &caller)?;
+        ValidationContract::validate_contract_address(&env, &timelock_contract)?;
         storage::set_timelock_contract(&env, &timelock_contract);
         Ok(())
     }
@@ -272,6 +283,9 @@ impl ChainLogisticsContract {
         metadata: Map<Symbol, String>,
     ) -> Result<u64, Error> {
         require_not_paused(&env)?;
+        ValidationContract::non_empty(&product_id)?;
+        ValidationContract::max_len(&product_id, ValidationContract::MAX_PRODUCT_ID_LEN)?;
+        ValidationContract::validate_event_type(&env, &event_type)?;
         let product = read_product(&env, &product_id)?;
         require_can_add_event(&env, &product_id, &product, &actor)?;
 
@@ -279,7 +293,7 @@ impl ChainLogisticsContract {
         ValidationContract::validate_event_note(&note)?;
         ValidationContract::validate_metadata(&metadata)?;
 
-        let event_id = storage::next_event_id(&env);
+        let event_id = storage::next_event_id(&env)?;
         let event = TrackingEvent {
             event_id,
             product_id: product_id.clone(),
@@ -298,7 +312,7 @@ impl ChainLogisticsContract {
         ids.push_back(event_id);
         storage::put_product_event_ids(&env, &product_id, &ids);
 
-        storage::index_event_by_type(&env, &product_id, &event_type, event_id);
+        storage::index_event_by_type(&env, &product_id, &event_type, event_id)?;
 
         env.events().publish(
             (
@@ -345,6 +359,7 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
 
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let total_count = all_ids.len() as u64;
@@ -359,7 +374,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (event_ids.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, event_ids.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,
@@ -389,6 +404,8 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_event_type(&env, &event_type)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
 
         let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
         let event_ids =
@@ -402,7 +419,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (event_ids.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, event_ids.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,
@@ -434,6 +451,8 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_time_range(&env, start_time, end_time)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
 
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let mut matching_ids = Vec::new(&env);
@@ -451,7 +470,9 @@ impl ChainLogisticsContract {
 
         let mut events = Vec::new(&env);
         let start = offset as u32;
-        let end = ((offset + limit) as u32).min(matching_ids.len());
+        let end_u64 = offset.checked_add(limit).ok_or(Error::ArithmeticOverflow)?;
+        let capped_end = end_u64.min(u32::MAX as u64) as u32;
+        let end = capped_end.min(matching_ids.len());
 
         for i in start..end {
             let eid = matching_ids.get_unchecked(i);
@@ -460,7 +481,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, events.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,
@@ -490,6 +511,10 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
+        if filter.start_time > 0 || filter.end_time < u64::MAX {
+            ValidationContract::validate_time_range(&env, filter.start_time, filter.end_time)?;
+        }
 
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let mut matching_ids = Vec::new(&env);
@@ -525,7 +550,9 @@ impl ChainLogisticsContract {
 
         let mut events = Vec::new(&env);
         let start = offset as u32;
-        let end = ((offset + limit) as u32).min(matching_ids.len());
+        let end_u64 = offset.checked_add(limit).ok_or(Error::ArithmeticOverflow)?;
+        let capped_end = end_u64.min(u32::MAX as u64) as u32;
+        let end = capped_end.min(matching_ids.len());
 
         for i in start..end {
             let eid = matching_ids.get_unchecked(i);
@@ -534,7 +561,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, events.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,

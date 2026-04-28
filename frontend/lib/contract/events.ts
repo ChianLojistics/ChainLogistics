@@ -1,4 +1,5 @@
 import type { TimelineEvent } from "@/lib/types/tracking";
+import { normalizeTimelineEvent } from "@/lib/types/tracking";
 import { createContractClient } from "@/lib/stellar/contractClient";
 import { trackContractInteraction, trackError } from "@/lib/analytics";
 import { CONTRACT_CONFIG, validateContractConfig } from "./config";
@@ -88,6 +89,7 @@ export async function fetchProductEventsPage(
     const events = await Promise.all(pagedIds.map((id) => contractClient.get_event(id)));
     const validEvents = events
       .filter((e): e is TimelineEvent => e !== null)
+      .map(normalizeTimelineEvent)
       .sort((a, b) => b.timestamp - a.timestamp);
 
     const page: ProductEventsPage = {

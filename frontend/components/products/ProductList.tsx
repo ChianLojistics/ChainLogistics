@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useMemo, useState, useEffect } from "react";
 import type { Product } from "@/lib/types/product";
+import { normalizeUnixSeconds } from "@/lib/types/product";
 import type { FilterState } from "./ProductFilters";
 import { ProductCard } from "./ProductCard";
 import { Skeleton } from "@/components/ui";
@@ -51,19 +52,21 @@ export function ProductList({
       // Status filter
       if (filters.status !== "all") {
         const isActive = filters.status === "active";
-        if (product.active !== isActive) return false;
+        const productIsActive = product.active ?? product.is_active ?? product.isActive ?? false;
+        if (productIsActive !== isActive) return false;
       }
 
       // Date range filter
+      const createdAt = normalizeUnixSeconds(product.created_at ?? product.createdAt ?? 0);
       if (filters.dateFrom) {
         const fromDate = new Date(filters.dateFrom).getTime() / 1000;
-        if (product.created_at < fromDate) return false;
+        if (createdAt < fromDate) return false;
       }
       if (filters.dateTo) {
         const toDate = new Date(filters.dateTo).getTime() / 1000;
         // Add one day to include the entire end date
         const toDateEnd = toDate + 24 * 60 * 60;
-        if (product.created_at > toDateEnd) return false;
+        if (createdAt > toDateEnd) return false;
       }
 
       return true;
@@ -75,9 +78,17 @@ export function ProductList({
     const sorted = [...filteredProducts];
     switch (sortBy) {
       case "newest":
-        return sorted.sort((a, b) => b.created_at - a.created_at);
+        return sorted.sort(
+          (a, b) =>
+            normalizeUnixSeconds(b.created_at ?? b.createdAt ?? 0) -
+            normalizeUnixSeconds(a.created_at ?? a.createdAt ?? 0)
+        );
       case "oldest":
-        return sorted.sort((a, b) => a.created_at - b.created_at);
+        return sorted.sort(
+          (a, b) =>
+            normalizeUnixSeconds(a.created_at ?? a.createdAt ?? 0) -
+            normalizeUnixSeconds(b.created_at ?? b.createdAt ?? 0)
+        );
       case "name":
         return sorted.sort((a, b) => a.name.localeCompare(b.name));
       default:
