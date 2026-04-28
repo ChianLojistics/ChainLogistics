@@ -1,9 +1,4 @@
 {
-  "scripts": {
-    "lint": "npm run lint:frontend && npm run lint:smart-contract",
-    "lint:frontend": "npm --prefix frontend run lint",
-    "lint:smart-contract": "cargo clippy --manifest-path smart-contract/Cargo.toml --all-targets --all-features"
-  },
   "devDependencies": {
     "@types/node": "^25.5.0"
   }
