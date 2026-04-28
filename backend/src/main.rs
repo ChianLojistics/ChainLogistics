@@ -22,7 +22,7 @@ mod monitoring;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, RecallService};
 use utils::CronService;
 use error::AppError;
 use monitoring::ErrorMonitor;
@@ -38,6 +38,7 @@ pub struct AppState {
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
+    pub recall_service: Arc<RecallService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub error_monitor: ErrorMonitor,
@@ -68,6 +69,7 @@ impl AppState {
             config.redis.url.clone(),
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
+        let recall_service = Arc::new(RecallService::new(db.pool().clone()));
         
         // Initialize error monitoring
         let error_monitor = ErrorMonitor::new();
@@ -82,6 +84,7 @@ impl AppState {
             financial_service,
             analytics_service,
             carbon_service,
+            recall_service,
             redis_client,
             config,
             error_monitor,

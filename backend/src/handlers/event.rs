@@ -229,6 +229,69 @@ pub async fn create_event(
     };
 
     let event = state.event_service.create_event(new_event).await?;
+
+    // Automated recall trigger: failed quality check creates a recall and queues notifications.
+    if event.event_type == "QUALITY_CHECK" {
+        let passed = event
+            .metadata
+            .get("passed")
+            .and_then(|v| v.as_bool());
+        let result = event
+            .metadata
+            .get("result")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_ascii_lowercase());
+        let is_failed = passed == Some(false) || matches!(result.as_deref(), Some("fail") | Some("failed"));
+
+        if is_failed {
+            let batch_id = event
+                .metadata
+                .get("batch_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            if let Some(product) = state.product_service.get_product(&event.product_id).await? {
+                let title = format!("Automated recall: failed quality check for {}", event.product_id);
+                let reason = "Quality check failed";
+
+                let recall = state
+                    .recall_service
+                    .create_recall(
+                        &event.product_id,
+                        batch_id.as_deref(),
+                        &title,
+                        reason,
+                        "high",
+                        "quality_check",
+                        Some(&event.actor_address),
+                        Some(event.id),
+                        serde_json::json!({"source": "automated", "event_id": event.id}),
+                    )
+                    .await?;
+
+                let _ = state
+                    .recall_service
+                    .identify_affected_items(recall.id, &event.product_id, batch_id.as_deref())
+                    .await?;
+
+                let recipients = vec![event.actor_address.clone(), product.owner_address];
+                let payload = serde_json::json!({
+                    "recall_id": recall.id,
+                    "product_id": recall.product_id,
+                    "batch_id": recall.batch_id,
+                    "severity": recall.severity,
+                    "reason": recall.reason,
+                    "triggered_event_id": event.id
+                });
+
+                let _ = state
+                    .recall_service
+                    .queue_notifications(recall.id, recipients, "in_app", payload)
+                    .await?;
+            }
+        }
+    }
+
     Ok(Json(EventResponse::from(event)))
 }
 
