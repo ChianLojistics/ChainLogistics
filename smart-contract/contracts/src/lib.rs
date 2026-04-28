@@ -13,6 +13,7 @@ mod authorization;
 mod contract;
 mod error;
 mod multisig;
+pub mod rbac;
 mod storage;
 mod storage_contract;
 mod types;
