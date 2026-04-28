@@ -2,6 +2,14 @@
 
 The official Python SDK for the ChainLogistics API, providing a convenient interface for managing supply chain products and tracking events on the blockchain.
 
+Shared SDK documentation is available in:
+
+- `sdk/README.md`
+- `sdk/INSTALLATION.md`
+- `sdk/API_REFERENCE.md`
+- `sdk/EXAMPLES.md`
+- `sdk/MIGRATION_GUIDE.md`
+
 ## Installation
 
 ```bash
