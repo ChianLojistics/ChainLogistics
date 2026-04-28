@@ -1,8 +1,11 @@
-use soroban_sdk::{Address, Env, Map, String, Symbol, Vec};
+use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
 use crate::storage_contract::StorageContract;
-use crate::types::{Product, TrackingEvent, QualityCertification, QualityReading, QualityParameter, ParameterStats, SensorInfo, QualityDataKey};
+use crate::types::{
+    ParameterStats, Product, QualityCertification, QualityDataKey, QualityParameter,
+    QualityReading, SensorInfo, TrackingEvent,
+};
 
 pub fn get_auth_contract(env: &Env) -> Option<Address> {
     StorageContract::get_auth_contract(env)
@@ -204,34 +207,57 @@ pub fn remove_from_search_index(env: &Env, keyword: String, product_id: &String)
 // ─── Quality Control ────────────────────────────────────────────────────────
 
 pub fn set_quality_control_enabled(env: &Env, product_id: &String, enabled: bool) {
-    env.storage().persistent().set(&QualityDataKey::QualityControlEnabled(product_id.clone()), &enabled);
+    env.storage().persistent().set(
+        &QualityDataKey::QualityControlEnabled(product_id.clone()),
+        &enabled,
+    );
 }
 
 pub fn is_quality_control_enabled(env: &Env, product_id: &String) -> bool {
-    env.storage().persistent().get(&QualityDataKey::QualityControlEnabled(product_id.clone())).unwrap_or(false)
+    env.storage()
+        .persistent()
+        .get(&QualityDataKey::QualityControlEnabled(product_id.clone()))
+        .unwrap_or(false)
 }
 
 pub fn set_quality_control_admin(env: &Env, product_id: &String, admin: &Address) {
-    env.storage().persistent().set(&QualityDataKey::QualityControlAdmin(product_id.clone()), admin);
+    env.storage().persistent().set(
+        &QualityDataKey::QualityControlAdmin(product_id.clone()),
+        admin,
+    );
 }
 
 pub fn get_quality_control_admin(env: &Env, product_id: &String) -> Option<Address> {
-    env.storage().persistent().get(&QualityDataKey::QualityControlAdmin(product_id.clone()))
+    env.storage()
+        .persistent()
+        .get(&QualityDataKey::QualityControlAdmin(product_id.clone()))
 }
 
-pub fn add_quality_certification(env: &Env, product_id: &String, certification: &QualityCertification) {
-    let key = QualityDataKey::QualityCertification(product_id.clone(), certification.certification_id.clone());
+pub fn add_quality_certification(
+    env: &Env,
+    product_id: &String,
+    certification: &QualityCertification,
+) {
+    let key = QualityDataKey::QualityCertification(
+        product_id.clone(),
+        certification.certification_id.clone(),
+    );
     env.storage().persistent().set(&key, certification);
-    
+
     // Add to certifications list
     let list_key = QualityDataKey::QualityCertifications(product_id.clone());
-    let mut certs: Vec<QualityCertification> = env.storage().persistent().get(&list_key).unwrap_or_else(|| Vec::new(env));
+    let mut certs: Vec<QualityCertification> = env
+        .storage()
+        .persistent()
+        .get(&list_key)
+        .unwrap_or_else(|| Vec::new(env));
     certs.push_back(certification.clone());
     env.storage().persistent().set(&list_key, &certs);
 }
 
 pub fn get_quality_certifications(env: &Env, product_id: &String) -> Vec<QualityCertification> {
-    env.storage().persistent()
+    env.storage()
+        .persistent()
         .get(&QualityDataKey::QualityCertifications(product_id.clone()))
         .unwrap_or_else(|| Vec::new(env))
 }
@@ -239,38 +265,59 @@ pub fn get_quality_certifications(env: &Env, product_id: &String) -> Vec<Quality
 pub fn add_quality_reading(env: &Env, product_id: &String, reading: &QualityReading) {
     let key = QualityDataKey::QualityReading(product_id.clone(), reading.reading_id.clone());
     env.storage().persistent().set(&key, reading);
-    
+
     // Add to readings list
     let list_key = QualityDataKey::QualityReadings(product_id.clone());
-    let mut readings: Vec<QualityReading> = env.storage().persistent().get(&list_key).unwrap_or_else(|| Vec::new(env));
+    let mut readings: Vec<QualityReading> = env
+        .storage()
+        .persistent()
+        .get(&list_key)
+        .unwrap_or_else(|| Vec::new(env));
     readings.push_back(reading.clone());
     env.storage().persistent().set(&list_key, &readings);
 }
 
 pub fn get_quality_readings(env: &Env, product_id: &String) -> Vec<QualityReading> {
-    env.storage().persistent()
+    env.storage()
+        .persistent()
         .get(&QualityDataKey::QualityReadings(product_id.clone()))
         .unwrap_or_else(|| Vec::new(env))
 }
 
 pub fn set_quality_parameters(env: &Env, product_id: &String, parameters: &Vec<QualityParameter>) {
-    env.storage().persistent().set(&QualityDataKey::QualityParameters(product_id.clone()), parameters);
+    env.storage().persistent().set(
+        &QualityDataKey::QualityParameters(product_id.clone()),
+        parameters,
+    );
 }
 
 pub fn get_quality_parameters(env: &Env, product_id: &String) -> Vec<QualityParameter> {
-    env.storage().persistent()
+    env.storage()
+        .persistent()
         .get(&QualityDataKey::QualityParameters(product_id.clone()))
         .unwrap_or_else(|| Vec::new(env))
 }
 
-pub fn set_parameter_stats(env: &Env, product_id: &String, parameter: &String, stats: &ParameterStats) {
-    env.storage().persistent().set(&QualityDataKey::ParameterStats(product_id.clone(), parameter.clone()), stats);
+pub fn set_parameter_stats(
+    env: &Env,
+    product_id: &String,
+    parameter: &String,
+    stats: &ParameterStats,
+) {
+    env.storage().persistent().set(
+        &QualityDataKey::ParameterStats(product_id.clone(), parameter.clone()),
+        stats,
+    );
 }
 
 pub fn get_parameter_stats(env: &Env, product_id: &String, parameter: &String) -> ParameterStats {
-    env.storage().persistent()
-        .get(&QualityDataKey::ParameterStats(product_id.clone(), parameter.clone()))
-        .unwrap_or_else(|| ParameterStats {
+    env.storage()
+        .persistent()
+        .get(&QualityDataKey::ParameterStats(
+            product_id.clone(),
+            parameter.clone(),
+        ))
+        .unwrap_or(ParameterStats {
             count: 0,
             sum: 0,
             min: 0,
@@ -281,7 +328,13 @@ pub fn get_parameter_stats(env: &Env, product_id: &String, parameter: &String) -
         })
 }
 
-pub fn authorize_sensor(env: &Env, product_id: &String, sensor_address: &Address, sensor_id: &String, sensor_type: &String) {
+pub fn authorize_sensor(
+    env: &Env,
+    product_id: &String,
+    sensor_address: &Address,
+    sensor_id: &String,
+    sensor_type: &String,
+) {
     let key = QualityDataKey::AuthorizedSensor(product_id.clone(), sensor_address.clone());
     let info = SensorInfo {
         address: sensor_address.clone(),
@@ -290,10 +343,14 @@ pub fn authorize_sensor(env: &Env, product_id: &String, sensor_address: &Address
         authorized: true,
     };
     env.storage().persistent().set(&key, &info);
-    
+
     // Add to authorized sensors list
     let list_key = QualityDataKey::AuthorizedSensors(product_id.clone());
-    let mut sensors: Vec<Address> = env.storage().persistent().get(&list_key).unwrap_or_else(|| Vec::new(env));
+    let mut sensors: Vec<Address> = env
+        .storage()
+        .persistent()
+        .get(&list_key)
+        .unwrap_or_else(|| Vec::new(env));
     if !sensors.contains(sensor_address) {
         sensors.push_back(sensor_address.clone());
         env.storage().persistent().set(&list_key, &sensors);
@@ -302,7 +359,11 @@ pub fn authorize_sensor(env: &Env, product_id: &String, sensor_address: &Address
 
 pub fn revoke_sensor_authorization(env: &Env, product_id: &String, sensor_address: &Address) {
     let key = QualityDataKey::AuthorizedSensor(product_id.clone(), sensor_address.clone());
-    if let Some(mut info) = env.storage().persistent().get::<QualityDataKey, SensorInfo>(&key) {
+    if let Some(mut info) = env
+        .storage()
+        .persistent()
+        .get::<QualityDataKey, SensorInfo>(&key)
+    {
         info.authorized = false;
         env.storage().persistent().set(&key, &info);
     }
@@ -310,7 +371,8 @@ pub fn revoke_sensor_authorization(env: &Env, product_id: &String, sensor_addres
 
 pub fn is_authorized_sensor(env: &Env, product_id: &String, sensor_address: &Address) -> bool {
     let key = QualityDataKey::AuthorizedSensor(product_id.clone(), sensor_address.clone());
-    env.storage().persistent()
+    env.storage()
+        .persistent()
         .get::<QualityDataKey, SensorInfo>(&key)
         .map(|info| info.authorized)
         .unwrap_or(false)

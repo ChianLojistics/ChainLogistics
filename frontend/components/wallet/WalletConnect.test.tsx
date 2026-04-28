@@ -59,7 +59,7 @@ describe('WalletConnect component', () => {
 
     render(<WalletConnect />);
 
-    const button = screen.getByRole('button', { name: /connecting/i });
+    const button = screen.getByRole('button', { name: /connect freighter wallet/i });
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();

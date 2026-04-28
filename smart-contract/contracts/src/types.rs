@@ -506,11 +506,11 @@ pub enum QualityDataKey {
     QualityControlEnabled(String),
     QualityControlAdmin(String),
     QualityCertification(String, String), // product_id, certification_id
-    QualityCertifications(String),         // product_id -> Vec<certification_id>
-    QualityReading(String, String),        // product_id, reading_id
-    QualityReadings(String),               // product_id -> Vec<reading_id>
-    QualityParameters(String),             // product_id -> Vec<QualityParameter>
-    ParameterStats(String, String),        // product_id, parameter_name
-    AuthorizedSensor(String, Address),     // product_id, sensor_address
-    AuthorizedSensors(String),             // product_id -> Vec<sensor_address>
+    QualityCertifications(String),        // product_id -> Vec<certification_id>
+    QualityReading(String, String),       // product_id, reading_id
+    QualityReadings(String),              // product_id -> Vec<reading_id>
+    QualityParameters(String),            // product_id -> Vec<QualityParameter>
+    ParameterStats(String, String),       // product_id, parameter_name
+    AuthorizedSensor(String, Address),    // product_id, sensor_address
+    AuthorizedSensors(String),            // product_id -> Vec<sensor_address>
 }

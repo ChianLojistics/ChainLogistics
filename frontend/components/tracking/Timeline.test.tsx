@@ -7,6 +7,8 @@ import type { TimelineEvent } from '@/lib/types/tracking';
 // Mock the events module
 vi.mock('@/lib/contract/events', () => ({
   fetchProductEventsPage: vi.fn(),
+  getRelativeTime: vi.fn((ts: number) => `${Math.floor((Date.now() / 1000 - ts) / 86400)} days ago`),
+  formatEventTimestamp: vi.fn((ts: number) => new Date(ts * 1000).toLocaleString()),
 }));
 
 const mockFetchProductEventsPage = vi.mocked(fetchProductEventsPage);
@@ -23,16 +25,16 @@ const mockEvents: TimelineEvent[] = [
   {
     event_id: 2,
     product_id: 'prod-123',
-    actor: 'GCFXHS5DRCQZ4QZ7Z4X7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7',
-    event_type: 'PROCESSING',
+    actor: 'GCFXHS5DRCQZ4QZ7Z4X7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7',
+    event_type: 'SHIP',
     timestamp: Math.floor(Date.now() / 1000) - 86400 * 2, // 2 days ago
     note: 'Washed and dried',
   },
   {
     event_id: 3,
     product_id: 'prod-123',
-    actor: 'GCFXHS5DRCQZ4QZ7Z4X7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7',
-    event_type: 'SHIPPING',
+    actor: 'GCFXHS5DRCQZ4QZ7Z4X7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7',
+    event_type: 'RECEIVE',
     timestamp: Math.floor(Date.now() / 1000) - 86400, // 1 day ago
     note: 'Shipped to destination',
   },
@@ -63,9 +65,9 @@ describe('Timeline component', () => {
     render(<Timeline productId="prod-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText('HARVEST')).toBeInTheDocument();
-      expect(screen.getByText('PROCESSING')).toBeInTheDocument();
-      expect(screen.getByText('SHIPPING')).toBeInTheDocument();
+      expect(screen.getByText('Harvest')).toBeInTheDocument();
+      expect(screen.getByText('Ship')).toBeInTheDocument();
+      expect(screen.getByText('Receive')).toBeInTheDocument();
     });
   });
 

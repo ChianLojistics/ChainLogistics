@@ -73,7 +73,7 @@ describe('ProductCard component', () => {
   it('should truncate owner address correctly', () => {
     render(<ProductCard product={mockProduct} />);
 
-    expect(screen.getByText('GCFXHS...Z7Z7')).toBeInTheDocument();
+    expect(screen.getByText('GCFX…Z7Z7')).toBeInTheDocument();
   });
 
   it('should display tags when available', () => {
@@ -86,7 +86,7 @@ describe('ProductCard component', () => {
   it('should have correct link to product details', () => {
     render(<ProductCard product={mockProduct} />);
 
-    const viewLink = screen.getByRole('link', { name: /view/i });
+    const viewLink = screen.getByRole('link', { name: /^view$/i });
     expect(viewLink).toHaveAttribute('href', '/products/PROD-TEST-123');
   });
 
@@ -112,7 +112,7 @@ describe('ProductCard component', () => {
   it('should have accessible elements', () => {
     render(<ProductCard product={mockProduct} />);
 
-    expect(screen.getByRole('button', { name: /add event/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /add event/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /view details/i })).toBeInTheDocument();
   });
 });
