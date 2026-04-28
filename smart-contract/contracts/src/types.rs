@@ -168,6 +168,7 @@ pub enum DataKey {
     TimelockConfig,
     TimelockOperation(u64),
     NextTimelockOperationId,
+    ReentrancyLock(Symbol),
 }
 
 #[contracttype]

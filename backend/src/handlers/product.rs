@@ -18,8 +18,10 @@ use crate::{
 pub struct ListProductsQuery {
     pub offset: Option<i64>,
     pub limit: Option<i64>,
+    #[serde(alias = "ownerAddress")]
     pub owner_address: Option<String>,
     pub category: Option<String>,
+    #[serde(alias = "isActive")]
     pub is_active: Option<bool>,
     pub search: Option<String>,
 }
@@ -29,11 +31,14 @@ pub struct CreateProductRequest {
     pub id: String,
     pub name: String,
     pub description: String,
+    #[serde(alias = "originLocation")]
     pub origin_location: String,
     pub category: String,
     pub tags: Vec<String>,
     pub certifications: Vec<String>,
+    #[serde(alias = "mediaHashes")]
     pub media_hashes: Vec<String>,
+    #[serde(alias = "customFields")]
     pub custom_fields: serde_json::Value,
 }
 
@@ -41,12 +46,16 @@ pub struct CreateProductRequest {
 pub struct UpdateProductRequest {
     pub name: Option<String>,
     pub description: Option<String>,
+    #[serde(alias = "originLocation")]
     pub origin_location: Option<String>,
     pub category: Option<String>,
     pub tags: Option<Vec<String>>,
     pub certifications: Option<Vec<String>>,
+    #[serde(alias = "mediaHashes")]
     pub media_hashes: Option<Vec<String>>,
+    #[serde(alias = "customFields")]
     pub custom_fields: Option<serde_json::Value>,
+    #[serde(alias = "isActive")]
     pub is_active: Option<bool>,
 }
 

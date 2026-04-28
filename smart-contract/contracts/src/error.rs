@@ -80,4 +80,10 @@ pub enum Error {
     TimelockDelayTooShort = 83,
     TimelockDelayTooLong = 84,
     TimelockCancelled = 85,
+
+    // --- Security / Arithmetic (91-110) ---
+    InvalidAddress = 91,
+    InvalidTimestamp = 92,
+    ArithmeticOverflow = 93,
+    ReentrancyDetected = 94,
 }

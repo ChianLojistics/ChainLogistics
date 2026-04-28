@@ -1,5 +1,6 @@
 use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
+use crate::error::Error;
 use crate::storage_contract::StorageContract;
 use crate::types::{Product, TrackingEvent};
 
@@ -70,14 +71,27 @@ pub fn get_event(env: &Env, event_id: u64) -> Option<TrackingEvent> {
     StorageContract::get_event(env, event_id)
 }
 
-pub fn next_event_id(env: &Env) -> u64 {
+pub fn next_event_id(env: &Env) -> Result<u64, Error> {
     StorageContract::next_event_id(env)
 }
 
 // ─── Event type index ────────────────────────────────────────────────────────
 
-pub fn index_event_by_type(env: &Env, product_id: &String, event_type: &Symbol, event_id: u64) {
+pub fn index_event_by_type(
+    env: &Env,
+    product_id: &String,
+    event_type: &Symbol,
+    event_id: u64,
+) -> Result<(), Error> {
     StorageContract::index_event_by_type(env, product_id, event_type, event_id)
+}
+
+pub fn acquire_reentrancy_lock(env: &Env, scope: &Symbol) -> Result<(), Error> {
+    StorageContract::acquire_reentrancy_lock(env, scope)
+}
+
+pub fn release_reentrancy_lock(env: &Env, scope: &Symbol) {
+    StorageContract::release_reentrancy_lock(env, scope)
 }
 
 pub fn get_event_ids_by_type(

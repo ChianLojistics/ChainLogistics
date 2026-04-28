@@ -6,6 +6,7 @@
 /// - Proposal execution
 use crate::error::Error;
 use crate::types::{DataKey, MultiSigConfig, Proposal, ProposalStatus};
+use crate::{storage, validation_contract::ValidationContract};
 use soroban_sdk::{contract, contractimpl, Address, Env, Map, Symbol, Val, Vec};
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
@@ -97,7 +98,11 @@ fn rejection_threshold_reached(env: &Env, kind: &Symbol, rejections: &Vec<Addres
             .thresholds
             .get(kind.clone())
             .unwrap_or(config.threshold);
-        let max_rejections = config.signers.len() - threshold + 1;
+        let max_rejections = config
+            .signers
+            .len()
+            .saturating_sub(threshold)
+            .saturating_add(1);
         rejections.len() >= max_rejections
     } else {
         false
@@ -226,9 +231,14 @@ impl MultiSigContract {
     ) -> Result<u64, Error> {
         require_signer(&env, &proposer)?;
         proposer.require_auth();
+        ValidationContract::validate_contract_address(&env, &target)?;
+        ValidationContract::validate_event_type(&env, &kind)?;
 
         let proposal_id = get_next_proposal_id(&env);
-        set_next_proposal_id(&env, proposal_id + 1);
+        let next_id = proposal_id
+            .checked_add(1)
+            .ok_or(Error::ArithmeticOverflow)?;
+        set_next_proposal_id(&env, next_id);
 
         let proposal = Proposal {
             id: proposal_id,
@@ -402,7 +412,11 @@ impl MultiSigContract {
 
         // Check time lock
         let time_lock = get_time_lock(&env, &proposal.kind);
-        if env.ledger().timestamp() < proposal.approved_at + time_lock {
+        let unlock_at = proposal
+            .approved_at
+            .checked_add(time_lock)
+            .ok_or(Error::ArithmeticOverflow)?;
+        if env.ledger().timestamp() < unlock_at {
             return Err(Error::TimeLockNotExpired);
         }
 
@@ -414,8 +428,11 @@ impl MultiSigContract {
         // We pass the current contract address as the first argument if the target expects a 'caller' argument
         // Many functions in our contracts take 'caller' as the first or second argument.
         // However, for generic support, we just pass the args as provided.
+        let scope = Symbol::new(&env, "multisig_exec");
+        storage::acquire_reentrancy_lock(&env, &scope)?;
         let _result: Val =
             env.invoke_contract(&proposal.target, &proposal.kind, proposal.args.clone());
+        storage::release_reentrancy_lock(&env, &scope);
 
         // Emit execution event
         env.events().publish(

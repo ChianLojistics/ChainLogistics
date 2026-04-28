@@ -67,6 +67,7 @@ impl TrackingContract {
         if get_main_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
+        ValidationContract::validate_contract_address(&env, &main_contract)?;
         set_main_contract(&env, &main_contract);
         Ok(())
     }
@@ -104,6 +105,9 @@ impl TrackingContract {
         require_init(&env)?;
         require_not_paused(&env)?;
         actor.require_auth();
+        ValidationContract::non_empty(&product_id)?;
+        ValidationContract::max_len(&product_id, ValidationContract::MAX_PRODUCT_ID_LEN)?;
+        ValidationContract::validate_event_type(&env, &event_type)?;
 
         // Validate inputs early to fail fast and save gas
         ValidationContract::validate_event_location(&location)?;
@@ -111,7 +115,7 @@ impl TrackingContract {
         ValidationContract::validate_metadata(&metadata)?;
 
         // Generate unique event ID (single storage read)
-        let event_id = storage::next_event_id(&env);
+        let event_id = storage::next_event_id(&env)?;
 
         // Create event
         let event = TrackingEvent {
@@ -135,7 +139,7 @@ impl TrackingContract {
         storage::put_product_event_ids(&env, &product_id, &ids);
 
         // Index by type (single write)
-        storage::index_event_by_type(&env, &product_id, &event_type, event_id);
+        storage::index_event_by_type(&env, &product_id, &event_type, event_id)?;
 
         // Emit event (no storage cost)
         env.events().publish(
