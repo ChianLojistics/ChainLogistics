@@ -50,6 +50,7 @@ services:
       HOST: 0.0.0.0
       PORT: 3001
       RUST_LOG: info
+      LOG_FORMAT: json
     ports:
       - "3001:3001"
     depends_on:
@@ -66,6 +67,31 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: chainlogistics-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - chainlogistics-network
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: chainlogistics-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    networks:
+      - chainlogistics-network
 
   # Nginx Reverse Proxy
   nginx:
@@ -115,12 +141,14 @@ services:
       - chainlogistics-network
     depends_on:
       - prometheus
+      - loki
 
 volumes:
   postgres_data:
   redis_data:
   prometheus_data:
   grafana_data:
+  loki_data:
 
 networks:
   chainlogistics-network:

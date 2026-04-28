@@ -27,8 +27,12 @@ i18n
     },
     lng: getInitialLanguage(), // default language
     fallbackLng: 'en',
+    supportedLngs: ['en', 'es', 'fr', 'ar'],
     interpolation: {
       escapeValue: false, // React already does escaping
+    },
+    react: {
+      useSuspense: false,
     },
   });
 
@@ -55,6 +59,7 @@ if (typeof window !== 'undefined') {
   
   // Set initial direction
   document.documentElement.dir = i18n.dir(getInitialLanguage());
+  document.documentElement.lang = getInitialLanguage();
 }
 
 export { i18n };

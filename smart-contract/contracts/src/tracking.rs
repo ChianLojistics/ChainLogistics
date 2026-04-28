@@ -28,7 +28,7 @@ fn set_main_contract(env: &Env, address: &Address) {
 /// Ensure the main contract is not paused.
 /// Returns ContractPaused error if the main contract is paused.
 fn require_not_paused(env: &Env) -> Result<(), Error> {
-    let main_contract = get_main_contract(env).unwrap();
+    let main_contract = get_main_contract(env).ok_or(Error::NotInitialized)?;
     let main_client = ChainLogisticsContractClient::new(env, &main_contract);
     if main_client.is_paused() {
         return Err(Error::ContractPaused);

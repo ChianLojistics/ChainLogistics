@@ -45,8 +45,9 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             database: DatabaseConfig {
-                url: env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| "postgres://chainlogistics:password@localhost/chainlogistics".to_string()),
+                url: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                    "postgres://chainlogistics:password@localhost/chainlogistics".to_string()
+                }),
                 max_connections: 20,
                 min_connections: 5,
                 connect_timeout: 30,
@@ -66,8 +67,7 @@ impl Default for Config {
                 tls_key_path: env::var("TLS_KEY_PATH").ok(),
             },
             redis: RedisConfig {
-                url: env::var("REDIS_URL")
-                    .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+                url: env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
             },
             security: SecurityConfig {
                 enforce_https: env::var("ENFORCE_HTTPS")
@@ -94,11 +94,54 @@ impl Default for Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, config::ConfigError> {
+        let profile = env::var("CHAINLOGISTICS_ENV")
+            .or_else(|_| env::var("APP_ENV"))
+            .unwrap_or_else(|_| "development".to_string());
+
         let cfg = config::Config::builder()
             .add_source(config::Config::try_from(&Config::default())?)
-            .add_source(config::Environment::with_prefix("CHAINLOGISTICS"))
+            .add_source(config::File::with_name("config/default").required(false))
+            .add_source(config::File::with_name(&format!("config/{}", profile)).required(false))
+            .add_source(
+                config::Environment::with_prefix("CHAINLOGISTICS")
+                    .separator("__")
+                    .try_parsing(true),
+            )
             .build()?;
 
-        cfg.try_deserialize()
+        let config: Config = cfg.try_deserialize()?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    fn validate(&self) -> Result<(), config::ConfigError> {
+        if self.database.url.trim().is_empty() {
+            return Err(config::ConfigError::Message(
+                "database.url must not be empty".to_string(),
+            ));
+        }
+        if self.redis.url.trim().is_empty() {
+            return Err(config::ConfigError::Message(
+                "redis.url must not be empty".to_string(),
+            ));
+        }
+        if self.jwt_secret.trim().len() < 16 {
+            return Err(config::ConfigError::Message(
+                "jwt_secret must be at least 16 characters".to_string(),
+            ));
+        }
+        if self.encryption_key.trim().len() != 32 {
+            return Err(config::ConfigError::Message(
+                "encryption_key must be exactly 32 characters (AES-256 key)".to_string(),
+            ));
+        }
+        if self.server.tls_enabled
+            && (self.server.tls_cert_path.is_none() || self.server.tls_key_path.is_none())
+        {
+            return Err(config::ConfigError::Message(
+                "tls_cert_path and tls_key_path are required when tls_enabled=true".to_string(),
+            ));
+        }
+        Ok(())
     }
 }
