@@ -69,7 +69,6 @@
     "follow-redirects": "^1.15.6",
     "lodash-es": "^4.17.21",
     "picomatch": "^4.0.2",
-    "postcss": "^8.5.10",
-    "vite": "^7.4.0"
+    "postcss": "^8.5.10"
   }
 }
