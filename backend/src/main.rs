@@ -28,12 +28,7 @@ mod websocket;
 use config::Config;
 use database::Database;
 use error::AppError;
-use monitoring::ErrorMonitor;
-use services::{
-    AnalyticsService, ApiKeyService, CarbonService, EventService, FinancialService, ProductService,
-    SyncService, UserService,
-};
-use utils::CronService;
+use monitoring::MonitoringSystem;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -48,7 +43,7 @@ pub struct AppState {
     pub carbon_service: Arc<CarbonService>,
     pub redis_client: redis::Client,
     pub config: Config,
-    pub error_monitor: ErrorMonitor,
+    pub monitoring_system: MonitoringSystem,
 }
 
 impl AppState {
@@ -80,10 +75,10 @@ impl AppState {
             config.redis.url.clone(),
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
-
-        // Initialize error monitoring
-        let error_monitor = ErrorMonitor::new();
-
+        
+        // Initialize comprehensive monitoring system
+        let monitoring_system = MonitoringSystem::new();
+        
         Ok(Self {
             db,
             product_service,
@@ -96,7 +91,7 @@ impl AppState {
             carbon_service,
             redis_client,
             config,
-            error_monitor,
+            monitoring_system,
         })
     }
 }
