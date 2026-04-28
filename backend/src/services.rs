@@ -21,6 +21,10 @@ pub use carbon::CarbonService;
 pub mod digital_twin_service;
 pub use digital_twin_service::DigitalTwinService;
 
+pub mod collaboration;
+pub use collaboration::CollaborationService;
+
+
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {

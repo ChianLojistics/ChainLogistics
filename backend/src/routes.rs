@@ -13,7 +13,9 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/carbon", carbon_routes())
         .nest("/api/v1/keys", key_management_routes())
         .nest("/api/v1/monitoring", monitoring_routes())
+        .nest("/api/v1/collaboration", collaboration_routes())
 }
+
 
 fn public_api_routes() -> Router<AppState> {
     Router::new()
@@ -104,7 +106,11 @@ fn carbon_routes() -> Router<AppState> {
         .route("/verify/:credit_id", get(crate::handlers::carbon::list_verifications))
         // Reports
         .route("/reports", get(crate::handlers::carbon::list_reports).post(crate::handlers::carbon::generate_report))
+        // Dashboard and Supplier Scoring
+        .route("/dashboard", get(crate::handlers::carbon::get_sustainability_dashboard))
+        .route("/supplier-score/:supplier_address", get(crate::handlers::carbon::get_supplier_score))
         .layer(middleware::from_fn(jwt_auth))
+
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
 
@@ -120,3 +126,15 @@ fn monitoring_routes() -> Router<AppState> {
         .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }
+
+fn collaboration_routes() -> Router<AppState> {
+    Router::new()
+        .route("/share", post(crate::handlers::collaboration::share_product))
+        .route("/shares/:product_id", get(crate::handlers::collaboration::list_shares))
+        .route("/requests", post(crate::handlers::collaboration::create_collaboration_request))
+        .route("/requests/:id", put(crate::handlers::collaboration::update_collaboration_request))
+        .route("/audit/:entity_type/:entity_id", get(crate::handlers::collaboration::list_audit_trail))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+

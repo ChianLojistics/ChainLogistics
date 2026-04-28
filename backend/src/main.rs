@@ -41,6 +41,7 @@ pub struct AppState {
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
+    pub collaboration_service: Arc<CollaborationService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -49,6 +50,7 @@ pub struct AppState {
 impl AppState {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let config = Config::from_env()?;
+
 
         // Initialize database
         let db = Database::new(&config.database).await?;
@@ -75,6 +77,7 @@ impl AppState {
             config.redis.url.clone(),
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
+        let collaboration_service = Arc::new(CollaborationService::new(db.pool().clone()));
         
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
@@ -89,10 +92,12 @@ impl AppState {
             financial_service,
             analytics_service,
             carbon_service,
+            collaboration_service,
             redis_client,
             config,
             monitoring_system,
         })
+
     }
 }
 

@@ -7,6 +7,8 @@ use utoipa::ToSchema;
 pub mod analytics;
 pub mod carbon;
 pub mod digital_twin;
+pub mod collaboration;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Product {
