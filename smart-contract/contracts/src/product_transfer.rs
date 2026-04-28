@@ -2,7 +2,8 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 
 use crate::error::Error;
 use crate::events::ProductTransferred;
-use crate::types::DataKey;
+use crate::types::{BatchProgress, DataKey, GasEstimate, GasPolicy};
+use crate::{storage, validation_contract::ValidationContract};
 use crate::{AuthorizationContractClient, ProductRegistryContractClient};
 
 const MAX_BATCH_SIZE: u32 = 100;
@@ -53,10 +54,15 @@ fn estimate_batch(item_count: u32) -> GasEstimate {
         item_count.div_ceil(policy.recommended_chunk_size)
     };
 
+    let estimated_cost_units = policy
+        .per_item_cost_units
+        .checked_mul(item_count as u64)
+        .and_then(|x| x.checked_add(policy.base_cost_units))
+        .unwrap_or(u64::MAX);
+
     GasEstimate {
         item_count,
-        estimated_cost_units: policy.base_cost_units
-            + (policy.per_item_cost_units * item_count as u64),
+        estimated_cost_units,
         recommended_chunk_size: policy.recommended_chunk_size,
         recommended_chunk_count: chunk_count,
         fits_single_transaction: item_count <= policy.max_batch_size,
@@ -71,6 +77,8 @@ fn transfer_batch_chunk(
     cursor: u32,
     chunk_size: u32,
 ) -> Result<BatchProgress, Error> {
+    ValidationContract::validate_distinct_addresses(owner, new_owner)?;
+
     if product_ids.is_empty() {
         return Err(Error::EmptyBatch);
     }
@@ -104,8 +112,14 @@ fn transfer_batch_chunk(
         });
     }
 
-    let end = (cursor + chunk_size).min(product_ids.len());
+    let end = cursor
+        .checked_add(chunk_size)
+        .ok_or(Error::ArithmeticOverflow)?
+        .min(product_ids.len());
     let mut transferred_count: u32 = 0;
+
+    let transfer_scope = Symbol::new(env, "batch_transfer");
+    storage::acquire_reentrancy_lock(env, &transfer_scope)?;
 
     for i in cursor..end {
         if let Some(product_id) = product_ids.get(i) {
@@ -126,9 +140,13 @@ fn transfer_batch_chunk(
                 (owner.clone(), new_owner.clone()),
             );
 
-            transferred_count += 1;
+            transferred_count = transferred_count
+                .checked_add(1)
+                .ok_or(Error::ArithmeticOverflow)?;
         }
     }
+
+    storage::release_reentrancy_lock(env, &transfer_scope);
 
     Ok(BatchProgress {
         requested: product_ids.len(),
@@ -162,6 +180,8 @@ impl ProductTransferContract {
         if get_auth_contract(&env).is_some() || get_main_contract(&env).is_some() {
             return Err(Error::AlreadyInitialized);
         }
+        ValidationContract::validate_contract_address(&env, &main_contract)?;
+        ValidationContract::validate_contract_address(&env, &auth_contract)?;
         set_main_contract(&env, &main_contract);
         set_auth_contract(&env, &auth_contract);
 
@@ -197,6 +217,9 @@ impl ProductTransferContract {
         // Require authentication from both parties
         owner.require_auth();
         new_owner.require_auth();
+        ValidationContract::validate_distinct_addresses(&owner, &new_owner)?;
+        ValidationContract::non_empty(&product_id)?;
+        ValidationContract::max_len(&product_id, ValidationContract::MAX_PRODUCT_ID_LEN)?;
 
         // Get contract addresses
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
@@ -223,11 +246,15 @@ impl ProductTransferContract {
 
         // Update authorization mappings via AuthorizationContract
         let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
+
+        let transfer_scope = Symbol::new(&env, "transfer_product");
+        storage::acquire_reentrancy_lock(&env, &transfer_scope)?;
         auth_client.update_product_owner(&owner, &product_id, &new_owner);
 
         // Update registry product record ownership
         let self_address = env.current_contract_address();
         pr_client.transfer_owner(&self_address, &product_id, &new_owner);
+        storage::release_reentrancy_lock(&env, &transfer_scope);
 
         ProductTransferred {
             product_id,
@@ -251,6 +278,7 @@ impl ProductTransferContract {
     /// * `NotInitialized` - If the contract is not initialized
     /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_owner(env: Env, product_id: String) -> Result<Address, Error> {
+        ValidationContract::non_empty(&product_id)?;
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
         let product = match pr_client.try_get_product(&product_id) {
@@ -274,6 +302,7 @@ impl ProductTransferContract {
     /// * `NotInitialized` - If the contract is not initialized
     /// * `ProductNotFound` - If the product does not exist
     pub fn is_product_owner(env: Env, product_id: String, address: Address) -> Result<bool, Error> {
+        ValidationContract::non_empty(&product_id)?;
         let main_contract = get_main_contract(&env).ok_or(Error::NotInitialized)?;
         let pr_client = ProductRegistryContractClient::new(&env, &main_contract);
         let product = match pr_client.try_get_product(&product_id) {

@@ -170,16 +170,23 @@ impl ProductRegistryContract {
         // Index product for search
         index_product(&env, &product);
 
+        let register_scope = Symbol::new(&env, "register_product");
+        storage::acquire_reentrancy_lock(&env, &register_scope)?;
         let auth_contract = get_auth_contract(&env).ok_or(Error::NotInitialized)?;
         let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
         let self_address = env.current_contract_address();
         auth_client.init_product_owner(&self_address, &config.id, &owner);
+        storage::release_reentrancy_lock(&env, &register_scope);
 
         // Update global counters
-        let total = storage::get_total_products(&env) + 1;
+        let total = storage::get_total_products(&env)
+            .checked_add(1)
+            .ok_or(Error::ArithmeticOverflow)?;
         storage::set_total_products(&env, total);
 
-        let active = storage::get_active_products(&env) + 1;
+        let active = storage::get_active_products(&env)
+            .checked_add(1)
+            .ok_or(Error::ArithmeticOverflow)?;
         storage::set_active_products(&env, active);
 
         ProductRegistered {
@@ -203,6 +210,7 @@ impl ProductRegistryContract {
     /// # Errors
     /// * `AlreadyInitialized` - If already initialized with a different address
     pub fn configure_auth_contract(env: Env, auth_contract: Address) -> Result<(), Error> {
+        ValidationContract::validate_contract_address(&env, &auth_contract)?;
         match get_auth_contract(&env) {
             None => {
                 set_auth_contract(&env, &auth_contract);
@@ -219,6 +227,7 @@ impl ProductRegistryContract {
     /// address) to avoid ownership transfers being callable by arbitrary
     /// contracts.
     pub fn configure_transfer_contract(env: Env, transfer_contract: Address) -> Result<(), Error> {
+        ValidationContract::validate_contract_address(&env, &transfer_contract)?;
         match get_transfer_contract(&env) {
             None => {
                 set_transfer_contract(&env, &transfer_contract);
@@ -239,11 +248,13 @@ impl ProductRegistryContract {
         new_owner: Address,
     ) -> Result<Product, Error> {
         require_transfer_contract(&env, &caller)?;
+        ValidationContract::non_empty(&product_id)?;
 
         let mut product = read_product(&env, &product_id)?;
         if !product.active {
             return Err(Error::ProductDeactivated);
         }
+        ValidationContract::validate_distinct_addresses(&product.owner, &new_owner)?;
         product.owner = new_owner;
         write_product(&env, &product);
 
@@ -323,7 +334,9 @@ impl ProductRegistryContract {
         index_product(&env, &product);
 
         // Increment active counter
-        let active = storage::get_active_products(&env) + 1;
+        let active = storage::get_active_products(&env)
+            .checked_add(1)
+            .ok_or(Error::ArithmeticOverflow)?;
         storage::set_active_products(&env, active);
 
         ProductReactivated {

@@ -3,7 +3,8 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, TimeZone, Utc};
+use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
@@ -17,20 +18,58 @@ use crate::{
 pub struct ListEventsQuery {
     pub offset: Option<i64>,
     pub limit: Option<i64>,
+    #[serde(alias = "productId")]
     pub product_id: Option<String>,
+    #[serde(alias = "eventType")]
     pub event_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
+    #[serde(alias = "productId")]
     pub product_id: String,
+    #[serde(alias = "actorAddress")]
     pub actor_address: String,
+    #[serde(deserialize_with = "deserialize_flexible_timestamp")]
     pub timestamp: chrono::DateTime<chrono::Utc>,
+    #[serde(alias = "eventType")]
     pub event_type: String,
     pub location: String,
+    #[serde(alias = "dataHash")]
     pub data_hash: String,
+    #[serde(default)]
     pub note: String,
+    #[serde(default = "default_metadata")]
     pub metadata: serde_json::Value,
+}
+
+fn default_metadata() -> serde_json::Value {
+    serde_json::json!({})
+}
+
+fn deserialize_flexible_timestamp<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+
+    match value {
+        serde_json::Value::Number(n) => {
+            let raw = n
+                .as_i64()
+                .ok_or_else(|| serde::de::Error::custom("timestamp must be an integer"))?;
+            let seconds = if raw > 10_000_000_000 { raw / 1000 } else { raw };
+            Utc.timestamp_opt(seconds, 0)
+                .single()
+                .ok_or_else(|| serde::de::Error::custom("invalid timestamp"))
+        }
+        serde_json::Value::String(s) => DateTime::parse_from_rfc3339(&s)
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|_| serde::de::Error::custom("timestamp must be RFC3339 or unix time")),
+        _ => Err(serde::de::Error::custom(
+            "timestamp must be RFC3339 string or unix number",
+        )),
+    }
 }
 
 #[derive(Debug, Serialize, ToSchema)]

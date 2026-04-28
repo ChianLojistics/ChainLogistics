@@ -1,5 +1,6 @@
 use soroban_sdk::{Address, Env, String, Symbol, Vec};
 
+use crate::error::Error;
 use crate::types::{DataKey, Product, TrackingEvent};
 
 pub struct StorageContract;
@@ -169,28 +170,51 @@ impl StorageContract {
         env.storage().persistent().get(&Self::event_key(event_id))
     }
 
-    pub fn next_event_id(env: &Env) -> u64 {
-        let mut seq: u64 = env
+    pub fn next_event_id(env: &Env) -> Result<u64, Error> {
+        let seq: u64 = env
             .storage()
             .persistent()
             .get(&Self::event_seq_key())
             .unwrap_or(0);
-        seq += 1;
-        env.storage().persistent().set(&Self::event_seq_key(), &seq);
-        seq
+        let next = seq.checked_add(1).ok_or(Error::ArithmeticOverflow)?;
+        env.storage()
+            .persistent()
+            .set(&Self::event_seq_key(), &next);
+        Ok(next)
     }
 
-    pub fn index_event_by_type(env: &Env, product_id: &String, event_type: &Symbol, event_id: u64) {
+    pub fn index_event_by_type(
+        env: &Env,
+        product_id: &String,
+        event_type: &Symbol,
+        event_id: u64,
+    ) -> Result<(), Error> {
         let count_key = Self::event_type_count_key(product_id, event_type);
-        let mut count: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        let count: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
 
         // Store at 0-based index (count represents next available index)
         let index_key = Self::event_type_index_key(product_id, event_type, count);
         env.storage().persistent().set(&index_key, &event_id);
 
         // Increment count after storing
-        count += 1;
-        env.storage().persistent().set(&count_key, &count);
+        let next = count.checked_add(1).ok_or(Error::ArithmeticOverflow)?;
+        env.storage().persistent().set(&count_key, &next);
+        Ok(())
+    }
+
+    pub fn acquire_reentrancy_lock(env: &Env, scope: &Symbol) -> Result<(), Error> {
+        let key = DataKey::ReentrancyLock(scope.clone());
+        let locked: bool = env.storage().instance().get(&key).unwrap_or(false);
+        if locked {
+            return Err(Error::ReentrancyDetected);
+        }
+        env.storage().instance().set(&key, &true);
+        Ok(())
+    }
+
+    pub fn release_reentrancy_lock(env: &Env, scope: &Symbol) {
+        let key = DataKey::ReentrancyLock(scope.clone());
+        env.storage().instance().set(&key, &false);
     }
 
     pub fn get_event_ids_by_type(
@@ -418,9 +442,9 @@ mod test_storage_contract {
 
         env.as_contract(&contract_id, || {
             // Index first event at position 0
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100);
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101);
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100).unwrap();
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101).unwrap();
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102).unwrap();
 
             // Test offset=0, limit=1 returns first event ID
             let result =
@@ -483,21 +507,21 @@ mod test_storage_contract {
             );
 
             // Add first event
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100).unwrap();
             assert_eq!(
                 StorageContract::get_event_count_by_type(&env, &product_id, &event_type),
                 1
             );
 
             // Add second event
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101).unwrap();
             assert_eq!(
                 StorageContract::get_event_count_by_type(&env, &product_id, &event_type),
                 2
             );
 
             // Add third event
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102).unwrap();
             assert_eq!(
                 StorageContract::get_event_count_by_type(&env, &product_id, &event_type),
                 3
@@ -514,9 +538,9 @@ mod test_storage_contract {
 
         env.as_contract(&contract_id, || {
             // Index 3 events
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100);
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101);
-            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102);
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 100).unwrap();
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 101).unwrap();
+            StorageContract::index_event_by_type(&env, &product_id, &event_type, 102).unwrap();
 
             // Get all events in different pages
             let page1 =
@@ -579,8 +603,8 @@ mod test_storage_contract {
         let contract_id = env.register_contract(None, ChainLogisticsContract);
 
         env.as_contract(&contract_id, || {
-            assert_eq!(StorageContract::next_event_id(&env), 1);
-            assert_eq!(StorageContract::next_event_id(&env), 2);
+            assert_eq!(StorageContract::next_event_id(&env).unwrap(), 1);
+            assert_eq!(StorageContract::next_event_id(&env).unwrap(), 2);
         });
     }
 

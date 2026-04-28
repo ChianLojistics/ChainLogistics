@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, Package, CalendarPlus, ChevronRight, Tag, User } from 'lucide-react';
 import Link from 'next/link';
 import type { Product } from "@/lib/types/product";
+import { normalizeUnixSeconds } from "@/lib/types/product";
 import { shortenPublicKey } from "@/lib/utils/format";
 
 interface ProductCardProps {
@@ -15,12 +16,16 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString("en-US", {
+    const seconds = normalizeUnixSeconds(timestamp);
+    return new Date(seconds * 1000).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
   };
+
+  const owner = product.owner || product.owner_address || "";
+  const isActive = product.active ?? product.is_active ?? product.isActive ?? false;
 
   return (
     <Card className="block group relative overflow-hidden bg-white hover:border-zinc-300 transition-all duration-200 hover:shadow-lg">
@@ -38,10 +43,10 @@ export function ProductCard({ product }: ProductCardProps) {
             <CardDescription className="text-sm font-mono">ID: {product.id}</CardDescription>
           </div>
           <Badge
-            variant={product.active ? 'default' : 'secondary'}
-            className={product.active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}
+            variant={isActive ? 'default' : 'secondary'}
+            className={isActive ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}
           >
-            {product.active ? 'Active' : 'Inactive'}
+            {isActive ? 'Active' : 'Inactive'}
           </Badge>
         </div>
       </CardHeader>
@@ -51,7 +56,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Origin:</span>
-            <span>{product.origin.location}</span>
+            <span>{product.origin?.location || product.origin_location || "N/A"}</span>
           </div>
           <div className="flex items-center gap-2">
             <Tag className="h-4 w-4" aria-hidden="true" />
@@ -61,12 +66,12 @@ export function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center gap-2">
             <User className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Owner:</span>
-            <span className="font-mono">{shortenPublicKey(product.owner)}</span>
+            <span className="font-mono">{shortenPublicKey(owner)}</span>
           </div>
           <div className="flex items-center gap-2">
             <CalendarPlus className="h-4 w-4" aria-hidden="true" />
             <span className="font-medium">Created:</span>
-            <span>{formatDate(product.created_at)}</span>
+            <span>{formatDate(product.created_at ?? product.createdAt ?? 0)}</span>
           </div>
         </div>
       </CardContent>

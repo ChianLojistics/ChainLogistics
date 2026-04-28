@@ -3,6 +3,9 @@ export type ErrorCategory =
   | "contract"
   | "wallet"
   | "validation"
+  | "authentication"
+  | "business_logic"
+  | "system"
   | "user"
   | "unknown";
 
@@ -76,6 +79,39 @@ const VALIDATION_PATTERNS = [
   "empty",
 ] as const;
 
+const AUTHENTICATION_PATTERNS = [
+  "unauthorized",
+  "forbidden",
+  "login",
+  "authentication",
+  "session",
+  "permission",
+  "credentials",
+  "401",
+  "403",
+] as const;
+
+const BUSINESS_LOGIC_PATTERNS = [
+  "workflow",
+  "conflict",
+  "already exists",
+  "not allowed",
+  "business rule",
+  "constraint",
+] as const;
+
+const SYSTEM_PATTERNS = [
+  "system",
+  "browser",
+  "performance",
+  "resource",
+  "memory",
+  "out of memory",
+  "compatibility",
+  "internal server error",
+  "500",
+] as const;
+
 function extractMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -108,6 +144,15 @@ function classifyCategory(error: unknown): ErrorCategory {
   }
   if (matchesAny(combined, VALIDATION_PATTERNS)) {
     return "validation";
+  }
+  if (matchesAny(combined, AUTHENTICATION_PATTERNS)) {
+    return "authentication";
+  }
+  if (matchesAny(combined, BUSINESS_LOGIC_PATTERNS)) {
+    return "business_logic";
+  }
+  if (matchesAny(combined, SYSTEM_PATTERNS)) {
+    return "system";
   }
 
   return "unknown";
@@ -155,6 +200,34 @@ const CATEGORY_META: Record<
       "Ensure all required fields are filled in.",
     ],
     retryable: false,
+  },
+  authentication: {
+    title: "Authentication Error",
+    defaultMessage: "There was a problem with your session or permissions.",
+    recoverySteps: [
+      "Please log in again.",
+      "Ensure you have the correct permissions for this action.",
+    ],
+    retryable: false,
+  },
+  business_logic: {
+    title: "Operation Failed",
+    defaultMessage: "The requested operation cannot be completed due to a business rule conflict.",
+    recoverySteps: [
+      "Review the action you are trying to perform.",
+      "Ensure the data you are submitting does not conflict with existing records.",
+    ],
+    retryable: false,
+  },
+  system: {
+    title: "System Error",
+    defaultMessage: "A system or platform error occurred.",
+    recoverySteps: [
+      "Refresh the page and try again.",
+      "Check if your browser is up to date.",
+      "Contact support if the issue persists.",
+    ],
+    retryable: true,
   },
   user: {
     title: "Action Required",
