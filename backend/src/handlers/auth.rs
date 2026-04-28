@@ -1,9 +1,11 @@
-use axum::{extract::State, Json};
+use axum::{extract::State, http::HeaderMap, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use crate::{AppState, error::AppError, models::{UserRole, NewUser, User}, middleware::auth::Claims, validation::{validate_email, validate_string}};
+use crate::{AppState, database::UserRepository, error::AppError, models::{UserRole, NewUser, User}, middleware::{audit::{client_ip_from_headers, correlation_id_from_headers, user_agent_from_headers}, auth::Claims}, services::audit_service::{AuditEventCategory, AuditSeverity, NewAuditEvent}, validation::{validate_email, validate_string}};
 use bcrypt::verify;
 use jsonwebtoken::{encode, Header, EncodingKey};
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
@@ -38,14 +40,21 @@ pub struct RegisterRequest {
 )]
 pub async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<AuthResponse>, AppError> {
     validate_email(&req.email)?;
 
-    let user = state.user_service.get_user_by_email(&req.email).await?
-        .ok_or_else(|| AppError::Unauthorized)?;
+    let user = match state.user_service.get_user_by_email(&req.email).await? {
+        Some(user) => user,
+        None => {
+            spawn_login_audit(state, headers, None, req.email, false);
+            return Err(AppError::Unauthorized);
+        }
+    };
 
     if !user.is_active {
+        spawn_login_audit(state, headers, Some(user.id), req.email, false);
         return Err(AppError::Unauthorized);
     }
 
@@ -53,6 +62,7 @@ pub async fn login(
         .map_err(|_| AppError::Internal("Password verification failed".to_string()))?;
 
     if !is_valid {
+        spawn_login_audit(state, headers, Some(user.id), req.email, false);
         return Err(AppError::Unauthorized);
     }
 
@@ -77,6 +87,8 @@ pub async fn login(
         &EncodingKey::from_secret(state.config.jwt_secret.as_bytes()),
     )
     .map_err(|_| AppError::Internal("Token issuance failed".to_string()))?;
+
+    spawn_login_audit(state, headers, Some(user.id), req.email, true);
 
     Ok(Json(AuthResponse { token, user }))
 }
@@ -111,4 +123,51 @@ pub async fn register(
 
     let user = state.user_service.create_user(new_user).await?;
     Ok(Json(user))
+}
+
+fn spawn_login_audit(
+    state: AppState,
+    headers: HeaderMap,
+    user_id: Option<Uuid>,
+    email: String,
+    success: bool,
+) {
+    let event = NewAuditEvent {
+        correlation_id: correlation_id_from_headers(&headers),
+        user_id,
+        actor_api_key_id: None,
+        event_category: if success { AuditEventCategory::AuthEvent } else { AuditEventCategory::SecurityEvent },
+        event_type: "login".to_string(),
+        severity: if success { AuditSeverity::Info } else { AuditSeverity::Warn },
+        action: "admin_login".to_string(),
+        resource_type: Some("auth".to_string()),
+        target_resource_id: user_id.map(|id| id.to_string()),
+        http_method: Some("POST".to_string()),
+        http_path: Some("/api/v1/admin/auth/login".to_string()),
+        http_status: Some(if success { 200 } else { 401 }),
+        success,
+        error_code: if success { None } else { Some("UNAUTHORIZED".to_string()) },
+        business_context: None,
+        changes: serde_json::json!({ "email_hash": hash_audit_email(&email) }),
+        ip_address: client_ip_from_headers(&headers),
+        user_agent: user_agent_from_headers(&headers),
+    };
+
+    tokio::spawn(async move {
+        let correlation_id = event.correlation_id.clone();
+        if let Err(err) = state.audit_service.log(event).await {
+            tracing::warn!(
+                correlation_id = correlation_id.as_deref().unwrap_or("unknown"),
+                error = ?err,
+                "Failed to persist login audit event"
+            );
+        }
+    });
+}
+
+fn hash_audit_email(email: &str) -> String {
+    let normalized = email.trim().to_ascii_lowercase();
+    let mut hasher = Sha256::new();
+    hasher.update(normalized.as_bytes());
+    hex::encode(hasher.finalize())
 }

@@ -1,13 +1,14 @@
 use axum::{
     body::Body,
     extract::Request,
-    http::StatusCode,
+    http::{header::HeaderName, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     Json,
 };
 use uuid::Uuid;
 
+use crate::middleware::audit::{correlation_id_from_headers, CORRELATION_ID_HEADER};
 use crate::error::{ErrorCode, ErrorResponse};
 
 /// Global error handler middleware
@@ -16,7 +17,12 @@ pub async fn global_error_handler(
     request: Request,
     next: Next,
 ) -> Result<Response, Response> {
-    let correlation_id = Uuid::new_v4().to_string();
+    let correlation_id = request
+        .extensions()
+        .get::<String>()
+        .cloned()
+        .or_else(|| correlation_id_from_headers(request.headers()))
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
     
     // Add correlation ID to request extensions for tracking
     let mut request = request;
@@ -85,11 +91,14 @@ pub async fn request_logger(
         .extensions()
         .get::<String>()
         .cloned()
+        .or_else(|| correlation_id_from_headers(request.headers()))
         .unwrap_or_else(|| Uuid::new_v4().to_string());
     
     let method = request.method().clone();
     let uri = request.uri().clone();
     let start = std::time::Instant::now();
+    let mut request = request;
+    request.extensions_mut().insert(correlation_id.clone());
     
     tracing::info!(
         correlation_id = %correlation_id,
@@ -98,7 +107,7 @@ pub async fn request_logger(
         "Request started"
     );
     
-    let response = next.run(request).await;
+    let mut response = next.run(request).await;
     
     let duration = start.elapsed();
     let status = response.status();
@@ -120,6 +129,13 @@ pub async fn request_logger(
         duration_ms = %duration.as_millis(),
         "Request completed"
     );
+
+    if let Ok(header_value) = HeaderValue::from_str(&correlation_id) {
+        response.headers_mut().insert(
+            HeaderName::from_static(CORRELATION_ID_HEADER),
+            header_value,
+        );
+    }
     
     response
 }
