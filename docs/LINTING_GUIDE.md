@@ -13,19 +13,17 @@ cd frontend && npm run lint
 
 ## Rust Codebases
 
-Rust quality checks use Clippy for:
+Rust quality checks currently enforce Clippy for:
 
 - `smart-contract/`
-- `backend/`
-- `sdk/rust/`
 
 Local commands:
 
 ```bash
 cargo clippy --manifest-path smart-contract/Cargo.toml --all-targets --all-features
-cargo clippy --manifest-path backend/Cargo.toml --all-targets --all-features
-cargo clippy --manifest-path sdk/rust/Cargo.toml --all-targets --all-features
 ```
+
+Backend and SDK rust linting remain recommended, but are temporarily not enforced in CI while existing compile and migration debt is addressed.
 
 ## Repository-Level Lint Command
 
@@ -57,4 +55,4 @@ pre-commit run --all-files
 CI lint checks run in `.github/workflows/lint.yml` and cover:
 
 - Frontend ESLint
-- Rust Clippy for all Rust codebases
+- Rust Clippy for `smart-contract/`

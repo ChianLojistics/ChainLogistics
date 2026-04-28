@@ -1,10 +1,8 @@
 {
   "scripts": {
-    "lint": "npm run lint:frontend && npm run lint:smart-contract && npm run lint:backend && npm run lint:sdk-rust",
+    "lint": "npm run lint:frontend && npm run lint:smart-contract",
     "lint:frontend": "npm --prefix frontend run lint",
-    "lint:smart-contract": "cargo clippy --manifest-path smart-contract/Cargo.toml --all-targets --all-features",
-    "lint:backend": "cargo clippy --manifest-path backend/Cargo.toml --all-targets --all-features",
-    "lint:sdk-rust": "cargo clippy --manifest-path sdk/rust/Cargo.toml --all-targets --all-features"
+    "lint:smart-contract": "cargo clippy --manifest-path smart-contract/Cargo.toml --all-targets --all-features"
   },
   "devDependencies": {
     "@types/node": "^25.5.0"

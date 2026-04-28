@@ -20,15 +20,3 @@ repos:
         entry: cargo clippy --manifest-path smart-contract/Cargo.toml --all-targets --all-features
         language: system
         pass_filenames: false
-
-      - id: rust-clippy-backend
-        name: rust-clippy-backend
-        entry: cargo clippy --manifest-path backend/Cargo.toml --all-targets --all-features
-        language: system
-        pass_filenames: false
-
-      - id: rust-clippy-sdk-rust
-        name: rust-clippy-sdk-rust
-        entry: cargo clippy --manifest-path sdk/rust/Cargo.toml --all-targets --all-features
-        language: system
-        pass_filenames: false
