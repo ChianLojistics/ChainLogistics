@@ -18,6 +18,8 @@ import { fetchProductEvents } from "@/lib/contract/events";
 import { ContractClientError } from "@/lib/stellar/contractClient";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_REFRESH_INTERVAL_MS, DASHBOARD_RECENT_EVENTS_LIMIT } from "@/lib/constants";
+import { formatNumber, formatTime } from "@/lib/i18n/format";
+import { useTranslation } from "react-i18next";
 
 import { StatCard } from "@/components/analytics/StatCard";
 
@@ -85,6 +87,7 @@ function formatDay(tsSeconds: number) {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { publicKey, status } = useWalletStore();
 
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -137,15 +140,15 @@ export default function DashboardPage() {
       const rejectedCount = settled.filter((r) => r.status === "rejected").length;
       if (rejectedCount > 0 && all.length === 0) {
         const reason = firstRejected?.reason;
-        const normalizedTitle = "Events unavailable";
+        const normalizedTitle = t("events_unavailable");
         const isContractNotConfigured =
           reason instanceof ContractClientError && reason.code === "CONTRACT_NOT_CONFIGURED";
 
         setError({
           title: normalizedTitle,
           message: isContractNotConfigured
-            ? "Contract is not configured. Dashboard will show product-only insights."
-            : "We couldn't load tracking events. Dashboard will show product-only insights.",
+            ? t("contract_not_configured_warning")
+            : t("events_load_warning"),
           detail: reason instanceof Error ? reason.message : undefined,
           variant: "warning",
           canRetry: true,
@@ -156,10 +159,10 @@ export default function DashboardPage() {
       const isContractNotConfigured =
         e instanceof ContractClientError && e.code === "CONTRACT_NOT_CONFIGURED";
       setError({
-        title: "Failed to load dashboard",
+        title: t("failed_to_load_dashboard"),
         message: isContractNotConfigured
-          ? "Contract is not configured. Add NEXT_PUBLIC_CONTRACT_ID and reload."
-          : "Unable to load dashboard data. Please check your connection and try again.",
+          ? t("contract_not_configured_error")
+          : t("unable_to_load_dashboard"),
         detail: e instanceof Error ? e.message : undefined,
         variant: "error",
         canRetry: true,
@@ -168,7 +171,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [publicKey]);
+  }, [publicKey, t]);
 
   React.useEffect(() => {
     if (status !== "connected" || !publicKey) return;
@@ -257,9 +260,9 @@ export default function DashboardPage() {
   const topOriginDescription = React.useMemo(() => {
     if (isLoading) return undefined;
     const first = topOrigins[0];
-    if (!first) return "No products yet.";
-    return `${first.count} product${first.count === 1 ? "" : "s"}`;
-  }, [isLoading, topOrigins]);
+    if (!first) return t("no_products_yet");
+    return t("products_count", { count: first.count });
+  }, [isLoading, topOrigins, t]);
 
   const canLoad = status === "connected" && Boolean(publicKey);
 
@@ -267,9 +270,9 @@ export default function DashboardPage() {
     <main className="mx-auto max-w-6xl px-6 py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">{t("dashboard_title")}</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Supply chain analytics for your registered products.
+            {t("dashboard_subtitle")}
           </p>
         </div>
 
@@ -287,16 +290,16 @@ export default function DashboardPage() {
             )}
           >
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-            Refresh
+            {t("refresh")}
           </button>
         </div>
       </div>
 
       {!canLoad ? (
         <div className="mt-8 rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-900">Connect your wallet</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">{t("connect_your_wallet")}</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Connect a wallet to load products and events for analytics.
+            {t("connect_wallet_to_load")}
           </p>
         </div>
       ) : null}
@@ -329,7 +332,7 @@ export default function DashboardPage() {
                     : "bg-red-600 text-white hover:bg-red-700"
                 )}
               >
-                Retry
+                {t("retry")}
               </button>
             ) : null}
 
@@ -344,27 +347,27 @@ export default function DashboardPage() {
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Total products"
-          value={isLoading ? "—" : totalProducts}
-          description="Products currently visible to your wallet."
+          label={t("total_products")}
+          value={isLoading ? "—" : formatNumber(totalProducts)}
+          description={t("products_visible_to_wallet")}
           icon={<Boxes className="h-6 w-6" />}
         />
         <StatCard
-          label="Total events"
-          value={isLoading ? "—" : totalEvents}
-          description="All loaded tracking events."
+          label={t("total_events")}
+          value={isLoading ? "—" : formatNumber(totalEvents)}
+          description={t("all_loaded_events")}
           icon={<Activity className="h-6 w-6" />}
         />
         <StatCard
-          label="Top origin"
+          label={t("top_origin")}
           value={isLoading ? "—" : (topOrigins[0]?.origin ?? "—")}
           description={topOriginDescription}
           icon={<MapPinned className="h-6 w-6" />}
         />
         <StatCard
-          label="Last updated"
-          value={lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : "—"}
-          description="Auto-refreshes while tab is visible."
+          label={t("last_updated")}
+          value={lastUpdatedAt ? formatTime(lastUpdatedAt) : "—"}
+          description={t("auto_refreshes")}
           icon={<TrendingUp className="h-6 w-6" />}
         />
       </div>
@@ -374,9 +377,9 @@ export default function DashboardPage() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-900">Activity over time</h2>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("activity_over_time")}</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Events grouped by day.
+              {t("events_grouped_by_day")}
             </p>
           </div>
           <div className="mt-4 h-72">
@@ -384,7 +387,7 @@ export default function DashboardPage() {
               <div className="h-full rounded-lg bg-zinc-100 animate-pulse" aria-hidden="true" />
             ) : activityOverTime.length === 0 ? (
               <div className="h-full rounded-lg border border-dashed border-zinc-200 bg-zinc-50 flex items-center justify-center text-sm text-zinc-500">
-                No activity yet.
+                {t("no_activity_yet")}
               </div>
             ) : (
               <DynamicLineChart data={activityOverTime} />
@@ -396,8 +399,8 @@ export default function DashboardPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm lg:col-span-1">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-900">Top origins</h2>
-            <p className="mt-1 text-sm text-zinc-500">Most common product origins.</p>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("top_origins")}</h2>
+            <p className="mt-1 text-sm text-zinc-500">{t("most_common_origins")}</p>
           </div>
 
           <div className="mt-4">
@@ -409,14 +412,14 @@ export default function DashboardPage() {
               </div>
             ) : topOrigins.length === 0 ? (
               <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 p-6 text-sm text-zinc-500">
-                No products yet.
+                {t("no_products_yet")}
               </div>
             ) : (
               <ul className="space-y-3">
                 {topOrigins.map((o) => (
                   <li key={o.origin} className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-zinc-900 truncate">{o.origin}</span>
-                    <span className="text-sm text-zinc-600">{o.count}</span>
+                    <span className="text-sm text-zinc-600">{formatNumber(o.count)}</span>
                   </li>
                 ))}
               </ul>
