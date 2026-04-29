@@ -31,6 +31,7 @@ use services::{ProductService, EventService, UserService, ApiKeyService, SyncSer
 use utils::CronService;
 use error::AppError;
 use monitoring::MonitoringSystem;
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, RegulatoryService, IoTService, QualityService, SupplierService};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -43,6 +44,10 @@ pub struct AppState {
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
+    pub regulatory_service: Arc<RegulatoryService>,
+    pub iot_service: Arc<IoTService>,
+    pub quality_service: Arc<QualityService>,
+    pub supplier_service: Arc<SupplierService>,
     pub audit_service: Arc<AuditService>,
     pub redis_client: redis::Client,
     pub config: Config,
@@ -78,6 +83,11 @@ impl AppState {
             config.redis.url.clone(),
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
+        let regulatory_service = Arc::new(RegulatoryService::new(db.pool().clone()));
+        let iot_service = Arc::new(IoTService::new(db.pool().clone()));
+        let quality_service = Arc::new(QualityService::new(db.pool().clone()));
+        let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
+
         let audit_service = Arc::new(AuditService::new(
             db.pool().clone(),
             config.audit.enabled,
@@ -98,6 +108,10 @@ impl AppState {
             financial_service,
             analytics_service,
             carbon_service,
+            regulatory_service,
+            iot_service,
+            quality_service,
+            supplier_service,
             audit_service,
             redis_client,
             config,
