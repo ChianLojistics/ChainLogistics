@@ -28,6 +28,7 @@ hex = "0.4"
 rand = { version = "0.8", features = ["std"] }
 regex = "1.10"
 lazy_static = "1.4"
+rust_decimal = "1.35"
 # Stellar/Soroban dependencies
 soroban-sdk = "21.0"
 # OpenAPI documentation

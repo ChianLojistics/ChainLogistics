@@ -5,6 +5,7 @@ use uuid::Uuid;
 use utoipa::ToSchema;
 
 pub mod analytics;
+pub mod batch;
 pub mod carbon;
 pub mod digital_twin;
 pub mod regulatory;
