@@ -7,7 +7,8 @@ use axum::{
 use std::sync::Arc;
 use tower::ServiceExt;
 
-use crate::{AppState, error::AppError, models::UserRole};
+use crate::{AppState, database::{ApiKeyRepository, UserRepository}, error::AppError, models::UserRole};
+use crate::middleware::audit::{correlation_id_from_headers, spawn_http_audit};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,15 @@ pub async fn jwt_auth(
     mut request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    let headers = request.headers().clone();
+    let correlation_id = request
+        .extensions()
+        .get::<String>()
+        .cloned()
+        .or_else(|| correlation_id_from_headers(&headers));
+
     let auth_header = request
         .headers()
         .get(header::AUTHORIZATION)
@@ -63,8 +73,20 @@ pub async fn jwt_auth(
         role: user.role,
     };
 
-    request.extensions_mut().insert(auth_context);
-    Ok(next.run(request).await)
+    request.extensions_mut().insert(auth_context.clone());
+    let response = next.run(request).await;
+
+    spawn_http_audit(
+        state,
+        Some(auth_context),
+        method,
+        uri,
+        response.status(),
+        headers,
+        correlation_id,
+    );
+
+    Ok(response)
 }
 
 pub async fn api_key_auth(
@@ -72,6 +94,15 @@ pub async fn api_key_auth(
     mut request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    let headers = request.headers().clone();
+    let correlation_id = request
+        .extensions()
+        .get::<String>()
+        .cloned()
+        .or_else(|| correlation_id_from_headers(&headers));
+
     let auth_header = request
         .headers()
         .get(header::AUTHORIZATION)
@@ -117,8 +148,20 @@ pub async fn api_key_auth(
         role: user.role,
     };
 
-    request.extensions_mut().insert(auth_context);
-    Ok(next.run(request).await)
+    request.extensions_mut().insert(auth_context.clone());
+    let response = next.run(request).await;
+
+    spawn_http_audit(
+        state,
+        Some(auth_context),
+        method,
+        uri,
+        response.status(),
+        headers,
+        correlation_id,
+    );
+
+    Ok(response)
 }
 
 pub fn require_role(roles: Vec<UserRole>) -> impl Fn(Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, AppError>> + Send>> + Clone {

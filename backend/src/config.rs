@@ -7,6 +7,7 @@ pub struct Config {
     pub server: ServerConfig,
     pub redis: RedisConfig,
     pub security: SecurityConfig,
+    pub audit: AuditConfig,
     pub encryption_key: String,
     pub jwt_secret: String,
 }
@@ -39,6 +40,13 @@ pub struct SecurityConfig {
     pub enforce_https: bool,
     pub hsts_max_age: u64,
     pub allowed_origins: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditConfig {
+    pub enabled: bool,
+    pub hmac_key: String,
+    pub retention_days: i64,
 }
 
 impl Default for Config {
@@ -84,6 +92,18 @@ impl Default for Config {
                     .map(|s| s.trim().to_string())
                     .collect(),
             },
+            audit: AuditConfig {
+                enabled: env::var("AUDIT_LOGGING_ENABLED")
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
+                hmac_key: env::var("AUDIT_HMAC_KEY")
+                    .unwrap_or_else(|_| "default_audit_hmac_key_change_me_in_production".to_string()),
+                retention_days: env::var("AUDIT_RETENTION_DAYS")
+                    .unwrap_or_else(|_| "365".to_string())
+                    .parse()
+                    .unwrap_or(365),
+            },
             encryption_key: env::var("ENCRYPTION_KEY")
                 .unwrap_or_else(|_| "0123456789abcdef0123456789abcdef".to_string()), // 32 chars for AES-256
             jwt_secret: env::var("JWT_SECRET")
@@ -113,7 +133,6 @@ impl Config {
         config.validate()?;
         Ok(config)
     }
-
     fn validate(&self) -> Result<(), config::ConfigError> {
         if self.database.url.trim().is_empty() {
             return Err(config::ConfigError::Message(
