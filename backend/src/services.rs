@@ -36,6 +36,9 @@ pub use quality_service::QualityService;
 pub mod supplier_service;
 pub use supplier_service::SupplierService;
 
+pub mod batch_service;
+pub use batch_service::{BatchService, BatchRepository};
+
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {

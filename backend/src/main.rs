@@ -27,7 +27,7 @@ mod websocket;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, AuditService};
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, AuditService, BatchService};
 use utils::CronService;
 use error::AppError;
 use monitoring::MonitoringSystem;
@@ -49,6 +49,7 @@ pub struct AppState {
     pub quality_service: Arc<QualityService>,
     pub supplier_service: Arc<SupplierService>,
     pub audit_service: Arc<AuditService>,
+    pub batch_service: Arc<BatchService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -87,6 +88,7 @@ impl AppState {
         let iot_service = Arc::new(IoTService::new(db.pool().clone()));
         let quality_service = Arc::new(QualityService::new(db.pool().clone()));
         let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
+        let batch_service = Arc::new(BatchService::new(db.pool().clone(), redis_client.clone()));
 
         let audit_service = Arc::new(AuditService::new(
             db.pool().clone(),
@@ -113,6 +115,7 @@ impl AppState {
             quality_service,
             supplier_service,
             audit_service,
+            batch_service,
             redis_client,
             config,
             monitoring_system,

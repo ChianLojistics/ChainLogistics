@@ -15,3 +15,4 @@ pub mod regulatory;
 pub mod iot;
 pub mod quality;
 pub mod supplier;
+pub mod batch;

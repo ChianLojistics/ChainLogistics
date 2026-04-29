@@ -17,6 +17,7 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/iot", iot_routes())
         .nest("/api/quality", quality_routes())
         .nest("/api/suppliers", supplier_routes())
+        .nest("/api/v1/batches", batch_routes())
 }
 
 fn public_api_routes() -> Router<AppState> {
@@ -214,6 +215,31 @@ fn supplier_routes() -> Router<AppState> {
         // Audit Trail
         .route("/:supplier_id/audit", get(crate::handlers::supplier::get_audit_trail))
         .layer(middleware::from_fn(require_role(vec![UserRole::Administrator, UserRole::Auditor])))
+        .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
+}
+
+fn batch_routes() -> Router<AppState> {
+    Router::new()
+        // Batch CRUD
+        .route("/", get(crate::handlers::batch::list_batches).post(crate::handlers::batch::create_batch))
+        .route("/:id", get(crate::handlers::batch::get_batch).put(crate::handlers::batch::update_batch).delete(crate::handlers::batch::delete_batch))
+        .route("/number/:batch_number", get(crate::handlers::batch::get_batch_by_number))
+        // Genealogy
+        .route("/genealogy", post(crate::handlers::batch::create_genealogy))
+        .route("/:id/genealogy", get(crate::handlers::batch::get_genealogy_tree))
+        // Quality attributes
+        .route("/quality-attributes", post(crate::handlers::batch::create_quality_attribute))
+        .route("/:id/quality-attributes", get(crate::handlers::batch::get_quality_attributes))
+        // Recalls
+        .route("/recalls", post(crate::handlers::batch::create_recall))
+        .route("/recalls/active", get(crate::handlers::batch::list_active_recalls))
+        .route("/recalls/:id", get(crate::handlers::batch::get_recall).put(crate::handlers::batch::update_recall))
+        .route("/:id/recalls", get(crate::handlers::batch::get_batch_recalls))
+        // Inventory
+        .route("/inventory", post(crate::handlers::batch::create_inventory_transaction))
+        .route("/:id/inventory", get(crate::handlers::batch::get_batch_inventory))
+        .layer(middleware::from_fn(require_role(vec![UserRole::Inspector, UserRole::Administrator, UserRole::Auditor, UserRole::Supplier])))
         .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(crate::middleware::rate_limit::rate_limit_middleware))
 }

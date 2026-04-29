@@ -1,19 +1,22 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (Primary)
   postgres:
     image: postgres:15-alpine
-    container_name: chainlogistics-postgres
+    container_name: chainlogistics-postgres-primary
     environment:
       POSTGRES_DB: chainlogistics
       POSTGRES_USER: chainlogistics
       POSTGRES_PASSWORD: password
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: replication_password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d
+      - ./docker/postgres/primary.conf:/etc/postgresql/postgresql.conf
     networks:
       - chainlogistics-network
     healthcheck:
@@ -21,6 +24,81 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=1310kB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+
+  # PostgreSQL Read Replica 1
+  postgres-replica-1:
+    image: postgres:15-alpine
+    container_name: chainlogistics-postgres-replica-1
+    environment:
+      POSTGRES_DB: chainlogistics
+      POSTGRES_USER: chainlogistics
+      POSTGRES_PASSWORD: password
+      PGUSER: chainlogistics
+      PGPASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_replica_1_data:/var/lib/postgresql/data
+      - ./docker/postgres/replica.conf:/etc/postgresql/postgresql.conf
+    networks:
+      - chainlogistics-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chainlogistics -d chainlogistics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c hot_standby=on
+
+  # PostgreSQL Read Replica 2
+  postgres-replica-2:
+    image: postgres:15-alpine
+    container_name: chainlogistics-postgres-replica-2
+    environment:
+      POSTGRES_DB: chainlogistics
+      POSTGRES_USER: chainlogistics
+      POSTGRES_PASSWORD: password
+      PGUSER: chainlogistics
+      PGPASSWORD: password
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_replica_2_data:/var/lib/postgresql/data
+      - ./docker/postgres/replica.conf:/etc/postgresql/postgresql.conf
+    networks:
+      - chainlogistics-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chainlogistics -d chainlogistics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c hot_standby=on
 
   # Redis for caching and rate limiting
   redis:
@@ -38,23 +116,29 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend API Service
-  backend:
+  # Backend API Service - Instance 1
+  backend-1:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: chainlogistics-backend
+    container_name: chainlogistics-backend-1
     environment:
       DATABASE_URL: postgres://chainlogistics:password@postgres:5432/chainlogistics
+      DATABASE_READ_REPLICA_URLS: postgres://chainlogistics:password@postgres-replica-1:5432/chainlogistics,postgres://chainlogistics:password@postgres-replica-2:5432/chainlogistics
       REDIS_URL: redis://redis:6379
       HOST: 0.0.0.0
       PORT: 3001
       RUST_LOG: info
       LOG_FORMAT: json
+      INSTANCE_ID: backend-1
     ports:
       - "3001:3001"
     depends_on:
       postgres:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -67,6 +151,102 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Backend API Service - Instance 2
+  backend-2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chainlogistics-backend-2
+    environment:
+      DATABASE_URL: postgres://chainlogistics:password@postgres:5432/chainlogistics
+      DATABASE_READ_REPLICA_URLS: postgres://chainlogistics:password@postgres-replica-1:5432/chainlogistics,postgres://chainlogistics:password@postgres-replica-2:5432/chainlogistics
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 3001
+      RUST_LOG: info
+      LOG_FORMAT: json
+      INSTANCE_ID: backend-2
+    ports:
+      - "3002:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chainlogistics-network
+    volumes:
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Backend API Service - Instance 3
+  backend-3:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chainlogistics-backend-3
+    environment:
+      DATABASE_URL: postgres://chainlogistics:password@postgres:5432/chainlogistics
+      DATABASE_READ_REPLICA_URLS: postgres://chainlogistics:password@postgres-replica-1:5432/chainlogistics,postgres://chainlogistics:password@postgres-replica-2:5432/chainlogistics
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 3001
+      RUST_LOG: info
+      LOG_FORMAT: json
+      INSTANCE_ID: backend-3
+    ports:
+      - "3003:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chainlogistics-network
+    volumes:
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   loki:
     image: grafana/loki:2.9.8
@@ -145,6 +325,8 @@ services:
 
 volumes:
   postgres_data:
+  postgres_replica_1_data:
+  postgres_replica_2_data:
   redis_data:
   prometheus_data:
   grafana_data:
