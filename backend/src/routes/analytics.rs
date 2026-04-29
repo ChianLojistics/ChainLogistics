@@ -13,9 +13,7 @@ use crate::{
 };
 
 /// GET /api/v1/analytics/dashboard
-pub async fn dashboard(
-    State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>, AppError> {
+pub async fn dashboard(State(state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
     let metrics = state.analytics_service.get_dashboard_metrics().await?;
     Ok(Json(json!(metrics)))
 }
@@ -38,7 +36,9 @@ pub async fn event_analytics(
     Query(params): Query<TimeSeriesQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let end = params.end_date.unwrap_or_else(Utc::now);
-    let start = params.start_date.unwrap_or_else(|| end - Duration::days(30));
+    let start = params
+        .start_date
+        .unwrap_or_else(|| end - Duration::days(30));
 
     let analytics = state
         .analytics_service
@@ -61,7 +61,9 @@ pub async fn export(
     Query(params): Query<ExportQuery>,
 ) -> Result<Response, AppError> {
     let end = params.end_date.unwrap_or_else(Utc::now);
-    let start = params.start_date.unwrap_or_else(|| end - Duration::days(30));
+    let start = params
+        .start_date
+        .unwrap_or_else(|| end - Duration::days(30));
     let limit = params.limit.unwrap_or(10_000).min(50_000);
     let format = params.format.as_deref().unwrap_or("json");
 
@@ -94,4 +96,18 @@ pub async fn export(
             Ok(Json(json!(analytics)).into_response())
         }
     }
+}
+
+/// GET /api/v1/analytics/resilience
+pub async fn resilience(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let analytics = state.analytics_service.get_resilience_analytics().await?;
+    Ok(Json(json!(analytics)))
+}
+
+/// GET /api/v1/analytics/fraud
+pub async fn fraud(State(state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
+    let analytics = state.analytics_service.get_fraud_analytics().await?;
+    Ok(Json(json!(analytics)))
 }

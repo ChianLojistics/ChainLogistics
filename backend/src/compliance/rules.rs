@@ -26,13 +26,13 @@ impl ComplianceType {
 
     pub fn retention_days(&self) -> u32 {
         match self {
-            ComplianceType::GDPR => 2555, // 7 years
-            ComplianceType::FDA21CFR11 => 3650, // 10 years
-            ComplianceType::FSMA => 9125, // 25 years
-            ComplianceType::ConflictMinerals => 1825, // 5 years
+            ComplianceType::GDPR => 2555,                 // 7 years
+            ComplianceType::FDA21CFR11 => 3650,           // 10 years
+            ComplianceType::FSMA => 9125,                 // 25 years
+            ComplianceType::ConflictMinerals => 1825,     // 5 years
             ComplianceType::OrganicCertification => 1095, // 3 years
-            ComplianceType::SOC2 => 1095, // 3 years
-            ComplianceType::ISO27001 => 1095, // 3 years
+            ComplianceType::SOC2 => 1095,                 // 3 years
+            ComplianceType::ISO27001 => 1095,             // 3 years
         }
     }
 }

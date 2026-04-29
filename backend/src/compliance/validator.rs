@@ -95,7 +95,11 @@ impl ComplianceValidator {
         }
     }
 
-    fn validate_conflict_minerals(data: &Value, violations: &mut Vec<String>, warnings: &mut Vec<String>) {
+    fn validate_conflict_minerals(
+        data: &Value,
+        violations: &mut Vec<String>,
+        warnings: &mut Vec<String>,
+    ) {
         if data.get("mineral_source").is_none() {
             violations.push("Conflict Minerals: Source information required".to_string());
         }

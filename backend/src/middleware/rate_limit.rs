@@ -1,6 +1,6 @@
 use axum::{
     extract::{Request, State},
-    http::{StatusCode},
+    http::StatusCode,
     middleware::Next,
     response::Response,
 };
@@ -12,7 +12,7 @@ use std::{
 use tokio::sync::RwLock;
 use tower::Layer;
 
-use crate::{AppState, error::AppError, models::ApiKeyTier};
+use crate::{error::AppError, models::ApiKeyTier, AppState};
 
 #[derive(Debug, Clone)]
 struct RateLimitEntry {
@@ -118,7 +118,7 @@ pub async fn rate_limit_middleware(
 
     // Add rate limit headers to response
     let response = next.run(request).await;
-    
+
     let (mut parts, body) = response.into_parts();
     parts.headers.insert(
         "X-RateLimit-Limit",
@@ -126,7 +126,10 @@ pub async fn rate_limit_middleware(
     );
     parts.headers.insert(
         "X-RateLimit-Remaining",
-        (effective_limit.saturating_sub(1)).to_string().parse().unwrap(),
+        (effective_limit.saturating_sub(1))
+            .to_string()
+            .parse()
+            .unwrap(),
     );
     parts.headers.insert(
         "X-RateLimit-Reset",

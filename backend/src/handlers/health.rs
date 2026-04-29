@@ -1,7 +1,7 @@
 use axum::{extract::State, response::Json};
 use serde_json::json;
 
-use crate::{AppState, error::AppError};
+use crate::{error::AppError, AppState};
 
 pub async fn health_check() -> Json<serde_json::Value> {
     Json(json!({
@@ -11,9 +11,11 @@ pub async fn health_check() -> Json<serde_json::Value> {
     }))
 }
 
-pub async fn db_health_check(State(state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
+pub async fn db_health_check(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, AppError> {
     state.db.health_check().await?;
-    
+
     Ok(Json(json!({
         "status": "healthy",
         "database": "connected",

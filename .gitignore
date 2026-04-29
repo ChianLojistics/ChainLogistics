@@ -4,3 +4,6 @@ issue.md
 checks.md
 task.md
 GITHUB_ISSUES.md
+target/
+backend/target/
+smart-contract/target/

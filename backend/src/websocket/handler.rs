@@ -1,7 +1,7 @@
-use crate::websocket::{ConnectionManager, WebSocketMessage, MessageType};
-use tokio::sync::mpsc;
+use crate::websocket::{ConnectionManager, MessageType, WebSocketMessage};
 use futures::{SinkExt, StreamExt};
-use warp::ws::{WebSocket, Message};
+use tokio::sync::mpsc;
+use warp::ws::{Message, WebSocket};
 
 pub struct WebSocketHandler {
     manager: ConnectionManager,
@@ -37,7 +37,10 @@ impl WebSocketHandler {
                                     MessageType::Ping => {
                                         let pong = WebSocketMessage::pong();
                                         let _ = manager
-                                            .send_to_connection(&conn_id, serde_json::to_string(&pong).unwrap())
+                                            .send_to_connection(
+                                                &conn_id,
+                                                serde_json::to_string(&pong).unwrap(),
+                                            )
                                             .await;
                                     }
                                     _ => {}

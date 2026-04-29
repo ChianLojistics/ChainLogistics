@@ -39,7 +39,11 @@ impl AuditLogger {
         }
     }
 
-    pub fn log_data_access(user_id: String, resource_id: String, ip_address: Option<String>) -> AuditLogEntry {
+    pub fn log_data_access(
+        user_id: String,
+        resource_id: String,
+        ip_address: Option<String>,
+    ) -> AuditLogEntry {
         Self::log_action(
             Some(user_id),
             "data_access".to_string(),

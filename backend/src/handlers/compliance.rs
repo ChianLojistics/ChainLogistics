@@ -1,12 +1,12 @@
+use crate::compliance::{ComplianceRule, ComplianceType, ComplianceValidator};
+use crate::AppState;
 use axum::{
-    extract::{Path, State, Json},
+    extract::{Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::AppState;
-use crate::compliance::{ComplianceValidator, ComplianceRule, ComplianceType};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComplianceCheckRequest {
@@ -31,7 +31,13 @@ pub async fn check_compliance(
         "fsma" => ComplianceType::FSMA,
         "conflict_minerals" => ComplianceType::ConflictMinerals,
         "organic_certification" => ComplianceType::OrganicCertification,
-        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Unknown compliance type"}))).into_response(),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "Unknown compliance type"})),
+            )
+                .into_response()
+        }
     };
 
     let rule = match compliance_type {
@@ -40,17 +46,27 @@ pub async fn check_compliance(
         ComplianceType::FSMA => ComplianceRule::fsma_traceability(),
         ComplianceType::ConflictMinerals => ComplianceRule::conflict_minerals_due_diligence(),
         ComplianceType::OrganicCertification => ComplianceRule::organic_certification(),
-        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Unknown compliance type"}))).into_response(),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "Unknown compliance type"})),
+            )
+                .into_response()
+        }
     };
 
     let result = ComplianceValidator::validate(&rule, &req.data);
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "is_compliant": result.is_compliant,
-        "compliance_type": result.compliance_type.as_str(),
-        "violations": result.violations,
-        "warnings": result.warnings,
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "is_compliant": result.is_compliant,
+            "compliance_type": result.compliance_type.as_str(),
+            "violations": result.violations,
+            "warnings": result.warnings,
+        })),
+    )
+        .into_response()
 }
 
 pub async fn get_compliance_report(
@@ -67,9 +83,7 @@ pub async fn get_compliance_report(
     (StatusCode::OK, Json(report)).into_response()
 }
 
-pub async fn generate_audit_report(
-    State(_state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn generate_audit_report(State(_state): State<AppState>) -> impl IntoResponse {
     // TODO: Generate comprehensive audit report from audit_logs table
     let report = serde_json::json!({
         "report_type": "audit",

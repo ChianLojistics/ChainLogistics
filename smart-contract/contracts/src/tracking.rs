@@ -71,6 +71,33 @@ impl TrackingContract {
         ValidationContract::validate_event_note(&note)?;
         ValidationContract::validate_metadata(&metadata)?;
 
+        // --- Fraud Detection ---
+        let current_timestamp = env.ledger().timestamp();
+        let event_ids = storage::get_product_event_ids(&env, &product_id);
+        if !event_ids.is_empty() {
+            let last_event_id = event_ids.get(event_ids.len() - 1).unwrap();
+            if let Some(last_event) = storage::get_event(&env, last_event_id) {
+                // Check location transition (speed violation)
+                ValidationContract::validate_location_transition(
+                    &env,
+                    &last_event.location,
+                    last_event.timestamp,
+                    &location,
+                    current_timestamp,
+                )?;
+
+                // Check behavioral anomaly for the actor
+                if last_event.actor == actor {
+                    ValidationContract::check_behavioral_anomaly(
+                        &env,
+                        &actor,
+                        last_event.timestamp,
+                        current_timestamp,
+                    )?;
+                }
+            }
+        }
+
         // Generate unique event ID
         let event_id = storage::next_event_id(&env);
 

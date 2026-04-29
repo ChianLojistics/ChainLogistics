@@ -1,16 +1,16 @@
 use axum::{
-    extract::{State, Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
 };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::{
-    AppState,
     error::AppError,
-    models::{Product, NewProduct, ProductFilters},
+    models::{NewProduct, Product, ProductFilters},
+    AppState,
 };
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -120,7 +120,8 @@ pub async fn list_products(
     let limit = query.limit.unwrap_or(20).min(100); // Cap at 100
 
     let products = if let Some(search_query) = query.search {
-        state.product_service
+        state
+            .product_service
             .search_products(&search_query, limit)
             .await?
             .into_iter()
@@ -135,7 +136,8 @@ pub async fn list_products(
             created_before: None,
         };
 
-        state.product_service
+        state
+            .product_service
             .list_products(offset, limit, Some(filters))
             .await?
             .into_iter()
@@ -154,9 +156,7 @@ pub async fn list_products(
             created_after: None,
             created_before: None,
         };
-        state.product_service
-            .count_products(Some(filters))
-            .await?
+        state.product_service.count_products(Some(filters)).await?
     };
 
     Ok(Json(PaginatedProductsResponse {
@@ -188,8 +188,10 @@ pub async fn create_product(
     Json(request): Json<CreateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
     // Get auth context
-    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
-    
+    let auth_context = crate::middleware::auth::get_auth_context(
+        &axum::extract::Request::builder().uri("/").body(()).unwrap(),
+    )?;
+
     let new_product = NewProduct {
         id: request.id,
         name: request.name,
@@ -263,8 +265,10 @@ pub async fn update_product(
     Path(id): Path<String>,
     Json(request): Json<UpdateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
-    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
-    
+    let auth_context = crate::middleware::auth::get_auth_context(
+        &axum::extract::Request::builder().uri("/").body(()).unwrap(),
+    )?;
+
     let mut product = state
         .product_service
         .get_product(&id)

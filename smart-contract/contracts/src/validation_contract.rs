@@ -1,5 +1,5 @@
 #![allow(clippy::len_zero)]
-use soroban_sdk::{Address, Map, String, Symbol};
+use soroban_sdk::{Address, Env, Map, String, Symbol};
 
 use crate::error::Error;
 use crate::types::ProductConfig;
@@ -154,6 +154,49 @@ impl ValidationContract {
         if note.len() > Self::MAX_NOTE_LEN {
             return Err(Error::InvalidInput);
         }
+        Ok(())
+    }
+
+    // --- Fraud Detection Logic ---
+
+    /// Detect speed violations (impossible transit times between locations)
+    pub fn validate_location_transition(
+        _env: &Env,
+        prev_location: &String,
+        prev_timestamp: u64,
+        curr_location: &String,
+        curr_timestamp: u64,
+    ) -> Result<(), Error> {
+        if prev_location == curr_location {
+            return Ok(());
+        }
+
+        // Simplistic model: If locations are different, they must be at least 30 mins apart
+        // In a real system, this would use a distance matrix or coordinates
+        let time_diff = curr_timestamp.saturating_sub(prev_timestamp);
+        let min_transit_time = 1800; // 30 minutes in seconds
+
+        if time_diff < min_transit_time {
+            return Err(Error::FraudDetected);
+        }
+
+        Ok(())
+    }
+
+    /// Check for suspicious activity patterns
+    pub fn check_behavioral_anomaly(
+        _env: &Env,
+        _actor: &Address,
+        last_event_timestamp: u64,
+        curr_timestamp: u64,
+    ) -> Result<(), Error> {
+        let time_diff = curr_timestamp.saturating_sub(last_event_timestamp);
+
+        // Prevent "event spamming" - no more than 1 event per 5 seconds from same actor
+        if time_diff < 5 {
+            return Err(Error::SuspiciousActivity);
+        }
+
         Ok(())
     }
 }

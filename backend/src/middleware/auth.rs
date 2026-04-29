@@ -7,7 +7,7 @@ use axum::{
 use std::sync::Arc;
 use tower::ServiceExt;
 
-use crate::{AppState, error::AppError};
+use crate::{error::AppError, AppState};
 
 #[derive(Debug, Clone)]
 pub struct AuthContext {
@@ -81,10 +81,7 @@ pub async fn api_key_auth(
     Ok(next.run(request).await)
 }
 
-pub async fn require_admin(
-    request: Request,
-    next: Next,
-) -> Result<Response, AppError> {
+pub async fn require_admin(request: Request, next: Next) -> Result<Response, AppError> {
     let auth_context = request
         .extensions()
         .get::<AuthContext>()
@@ -92,10 +89,10 @@ pub async fn require_admin(
 
     // Check if user is admin (you might want to add this to the User model)
     let user_id = auth_context.user_id;
-    
+
     // For now, we'll skip the admin check since it's not in the User model
     // In a real implementation, you'd check user.is_admin
-    
+
     Ok(next.run(request).await)
 }
 

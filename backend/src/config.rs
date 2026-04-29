@@ -32,8 +32,9 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             database: DatabaseConfig {
-                url: env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| "postgres://chainlogistics:password@localhost/chainlogistics".to_string()),
+                url: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                    "postgres://chainlogistics:password@localhost/chainlogistics".to_string()
+                }),
                 max_connections: 20,
                 min_connections: 5,
                 connect_timeout: 30,
@@ -47,8 +48,7 @@ impl Default for Config {
                     .unwrap_or(3001),
             },
             redis: RedisConfig {
-                url: env::var("REDIS_URL")
-                    .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+                url: env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
             },
         }
     }

@@ -116,6 +116,131 @@ pub struct ApiKeyTierCount {
     pub count: i64,
 }
 
+// --- Resilience Analytics ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResilienceAnalytics {
+    pub risk_score: f64, // 0.0 to 1.0
+    pub disruption_predictions: Vec<DisruptionPrediction>,
+    pub risk_assessment: RiskAssessment,
+    pub alternative_sources: Vec<AlternativeSource>,
+    pub safety_stock_recommendations: Vec<InventoryRecommendation>,
+    pub scenarios: Vec<DisruptionScenario>,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisruptionPrediction {
+    pub factor: String, // e.g., "Weather", "Geopolitical", "Supplier"
+    pub probability: f64,
+    pub severity: String, // "Low", "Medium", "High", "Critical"
+    pub description: String,
+    pub estimated_impact_days: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RiskAssessment {
+    pub supplier_risk: f64,
+    pub geographic_risk: f64,
+    pub logistics_risk: f64,
+    pub overall_score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlternativeSource {
+    pub original_supplier_id: String,
+    pub backup_supplier_id: String,
+    pub backup_supplier_name: String,
+    pub reliability_score: f64,
+    pub cost_difference_pct: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InventoryRecommendation {
+    pub product_id: String,
+    pub product_name: String,
+    pub current_safety_stock: i32,
+    pub recommended_safety_stock: i32,
+    pub reasoning: String,
+}
+
+// --- Fraud Analytics ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FraudAnalytics {
+    pub overall_fraud_score: f64,
+    pub anomaly_reports: Vec<AnomalyReport>,
+    pub behavioral_analysis: BehavioralAnalysis,
+    pub supplier_graph: SupplierGraph,
+    pub recent_alerts: Vec<FraudAlert>,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnomalyReport {
+    pub product_id: String,
+    pub anomaly_type: String, // "Location Spoofing", "Speed Violation", "Duplicate Registration"
+    pub confidence_score: f64,
+    pub details: String,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehavioralAnalysis {
+    pub actor_reputation_scores: Vec<ActorScore>,
+    pub unusual_activity_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActorScore {
+    pub actor_address: String,
+    pub score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FraudAlert {
+    pub severity: String,
+    pub message: String,
+    pub timestamp: DateTime<Utc>,
+}
+
+// --- Scenario Modeling ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisruptionScenario {
+    pub name: String,
+    pub description: String,
+    pub probability: f64,
+    pub impacted_products_count: i32,
+    pub estimated_revenue_loss: f64,
+    pub recovery_time_days: i32,
+    pub mitigation_strategies: Vec<String>,
+}
+
+// --- Relationship Graph ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupplierGraph {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphNode {
+    pub id: String,
+    pub label: String,
+    pub node_type: String, // "Supplier", "Product", "Hub"
+    pub risk_level: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphEdge {
+    pub from: String,
+    pub to: String,
+    pub relationship: String, // "Supplies", "Transports", "OwnedBy"
+    pub criticality: f64,
+}
+
 // --- Time Series Query Params ---
 
 #[derive(Debug, Clone, Deserialize)]
@@ -160,5 +285,13 @@ impl CacheKey {
 
     pub fn product_analytics(product_id: &str) -> String {
         format!("analytics:product:{}", product_id)
+    }
+
+    pub fn resilience_analytics() -> &'static str {
+        "analytics:resilience"
+    }
+
+    pub fn fraud_analytics() -> &'static str {
+        "analytics:fraud"
     }
 }

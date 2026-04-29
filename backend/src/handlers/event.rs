@@ -1,14 +1,14 @@
 use axum::{
-    extract::{State, Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AppState,
     error::AppError,
-    models::{TrackingEvent, NewTrackingEvent},
+    models::{NewTrackingEvent, TrackingEvent},
+    AppState,
 };
 
 #[derive(Debug, Deserialize)]
@@ -79,11 +79,13 @@ pub async fn list_events(
 
     let (events, total) = if let Some(product_id) = query.product_id {
         let events = if let Some(event_type) = query.event_type {
-            state.event_service
+            state
+                .event_service
                 .list_events_by_type(&product_id, &event_type, offset, limit)
                 .await?
         } else {
-            state.event_service
+            state
+                .event_service
                 .list_events_by_product(&product_id, offset, limit)
                 .await?
         };
@@ -92,7 +94,8 @@ pub async fn list_events(
             // For type-filtered events, we don't have an efficient count
             events.len() as i64
         } else {
-            state.event_service
+            state
+                .event_service
                 .count_events_by_product(&product_id)
                 .await?
         };

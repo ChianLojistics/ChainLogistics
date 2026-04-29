@@ -1,28 +1,35 @@
-use axum::{Router, routing::{get, post}, middleware};
-use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use axum::{
+    middleware as axum_middleware,
+    routing::{get, post},
+    Router,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tower::ServiceBuilder;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
-mod config;
-mod middleware;
-mod routes;
-mod handlers;
-mod services;
-mod models;
-mod database;
-mod utils;
-mod error;
-mod docs;
 mod blockchain;
-mod websocket;
 mod compliance;
+mod config;
+mod database;
+mod docs;
+mod error;
+mod handlers;
+mod middleware;
+mod models;
+mod routes;
+mod services;
+mod utils;
+mod websocket;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService};
-use utils::CronService;
 use error::AppError;
+use services::{
+    AnalyticsService, ApiKeyService, EventService, FinancialService, ProductService, SyncService,
+    UserService,
+};
+use utils::CronService;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -40,13 +47,13 @@ pub struct AppState {
 impl AppState {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let config = Config::from_env()?;
-        
+
         // Initialize database
         let db = Database::new(&config.database).await?;
-        
+
         // Run migrations
         db.migrate().await?;
-        
+
         // Create services
         let product_service = Arc::new(ProductService::new(db.pool().clone()));
         let event_service = Arc::new(EventService::new(db.pool().clone()));
@@ -79,14 +86,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
-    
+
     // Create application state
     let app_state = AppState::new().await?;
-    
+
     // Start cron scheduler
     let cron_service = CronService::new(app_state.db.pool().clone());
     cron_service.start_scheduler().await;
-    
+
     // Build router
     let app = Router::new()
         .merge(crate::routes::health_routes())
@@ -96,19 +103,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(CorsLayer::permissive())
+                .layer(axum::middleware::from_fn(
+                    crate::middleware::security::security_headers,
+                )),
         )
         .with_state(app_state);
-    
+
     // Run server
     let config = Config::from_env()?;
     let addr = SocketAddr::from((
         config.server.host.parse::<std::net::IpAddr>()?,
-        config.server.port
+        config.server.port,
     ));
-    
+
     tracing::info!("Server listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
-    
+
     Ok(())
 }

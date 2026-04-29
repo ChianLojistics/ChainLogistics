@@ -2,8 +2,10 @@ use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::handlers::{
-    product::{ProductResponse, PaginatedProductsResponse, CreateProductRequest, UpdateProductRequest},
-    event::{EventResponse, PaginatedEventsResponse, CreateEventRequest},
+    event::{CreateEventRequest, EventResponse, PaginatedEventsResponse},
+    product::{
+        CreateProductRequest, PaginatedProductsResponse, ProductResponse, UpdateProductRequest,
+    },
 };
 
 #[derive(OpenApi)]
@@ -64,8 +66,7 @@ use crate::handlers::{
 pub struct ApiDoc;
 
 pub fn create_swagger_ui() -> SwaggerUi {
-    SwaggerUi::new("/swagger-ui")
-        .url("/api-docs/openapi.json", ApiDoc::openapi())
+    SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi())
 }
 
 // API Key security scheme
