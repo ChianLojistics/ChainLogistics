@@ -15,6 +15,7 @@ pub struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub url: String,
+    pub read_replica_urls: Vec<String>,
     pub max_connections: u32,
     pub min_connections: u32,
     pub connect_timeout: u64,
@@ -56,6 +57,12 @@ impl Default for Config {
                 url: env::var("DATABASE_URL").unwrap_or_else(|_| {
                     "postgres://chainlogistics:password@localhost/chainlogistics".to_string()
                 }),
+                read_replica_urls: env::var("DATABASE_READ_REPLICA_URLS")
+                    .unwrap_or_else(|_| "".to_string())
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.trim().to_string())
+                    .collect(),
                 max_connections: 20,
                 min_connections: 5,
                 connect_timeout: 30,
