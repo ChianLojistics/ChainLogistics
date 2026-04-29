@@ -2,6 +2,7 @@ use sqlx::{PgPool, Pool, Postgres};
 use std::time::Duration;
 use crate::config::DatabaseConfig;
 use crate::models::*;
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone)]
 pub struct Database {

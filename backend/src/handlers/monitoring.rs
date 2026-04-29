@@ -6,18 +6,38 @@ use axum::{
 };
 
 use crate::{AppState, error::AppError, middleware::auth::AuthContext};
+use crate::monitoring::{MonitoringSystem, PerformanceMonitor, InfrastructureMonitor};
+
+/// Get comprehensive monitoring dashboard
+/// 
+/// Returns error stats, performance metrics, infrastructure metrics, and health status.
+/// Requires auditor or admin authentication.
+pub async fn get_dashboard(
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    // Only auditors and admins can view dashboard
+    if !matches!(auth.role, crate::models::UserRole::Auditor | crate::models::UserRole::Administrator) {
+        return Err(AppError::Forbidden("Auditor or admin access required".to_string()));
+    }
+    
+    let monitoring_system = MonitoringSystem::new();
+    let dashboard = monitoring_system.get_dashboard().await;
+    
+    Ok(Json(dashboard))
+}
 
 /// Get error statistics
 /// 
 /// Returns current error metrics including error counts, rates, and top errors.
-/// Requires admin authentication.
+/// Requires auditor or admin authentication.
 pub async fn get_error_stats(
     State(state): State<AppState>,
     auth: AuthContext,
 ) -> Result<impl IntoResponse, AppError> {
-    // Only admins can view error stats
-    if !matches!(auth.role, crate::models::UserRole::Administrator) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+    // Only auditors and admins can view error stats
+    if !matches!(auth.role, crate::models::UserRole::Auditor | crate::models::UserRole::Administrator) {
+        return Err(AppError::Forbidden("Auditor or admin access required".to_string()));
     }
     
     let stats = state.error_monitor.get_stats().await;
@@ -28,19 +48,79 @@ pub async fn get_error_stats(
 /// Get recent errors
 /// 
 /// Returns the most recent error events with correlation IDs for debugging.
-/// Requires admin authentication.
+/// Requires auditor or admin authentication.
 pub async fn get_recent_errors(
     State(state): State<AppState>,
     auth: AuthContext,
 ) -> Result<impl IntoResponse, AppError> {
-    // Only admins can view error details
-    if !matches!(auth.role, crate::models::UserRole::Administrator) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+    // Only auditors and admins can view error details
+    if !matches!(auth.role, crate::models::UserRole::Auditor | crate::models::UserRole::Administrator) {
+        return Err(AppError::Forbidden("Auditor or admin access required".to_string()));
     }
     
     let errors = state.error_monitor.get_recent_errors(50).await;
     
     Ok(Json(errors))
+}
+
+/// Get performance metrics
+/// 
+/// Returns request counts, response times, and percentiles by endpoint.
+/// Requires auditor or admin authentication.
+pub async fn get_performance_metrics(
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    // Only auditors and admins can view performance metrics
+    if !matches!(auth.role, crate::models::UserRole::Auditor | crate::models::UserRole::Administrator) {
+        return Err(AppError::Forbidden("Auditor or admin access required".to_string()));
+    }
+    
+    let perf_monitor = PerformanceMonitor::new();
+    let metrics = perf_monitor.get_metrics().await;
+    
+    Ok(Json(metrics))
+}
+
+/// Get infrastructure metrics
+/// 
+/// Returns database pool usage, Redis status, memory, CPU, and connection metrics.
+/// Requires auditor or admin authentication.
+pub async fn get_infrastructure_metrics(
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    // Only auditors and admins can view infrastructure metrics
+    if !matches!(auth.role, crate::models::UserRole::Auditor | crate::models::UserRole::Administrator) {
+        return Err(AppError::Forbidden("Auditor or admin access required".to_string()));
+    }
+    
+    let infra_monitor = InfrastructureMonitor::new();
+    let metrics = infra_monitor.get_metrics().await;
+    
+    Ok(Json(metrics))
+}
+
+/// Check and trigger alerts
+/// 
+/// Manually checks for alert conditions and triggers alerts if thresholds are exceeded.
+/// Requires auditor or admin authentication.
+pub async fn check_alerts(
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    // Only auditors and admins can trigger alert checks
+    if !matches!(auth.role, crate::models::UserRole::Auditor | crate::models::UserRole::Administrator) {
+        return Err(AppError::Forbidden("Auditor or admin access required".to_string()));
+    }
+    
+    let monitoring_system = MonitoringSystem::new();
+    monitoring_system.check_alerts().await;
+    
+    Ok(Json(serde_json::json!({
+        "status": "alert_check_completed",
+        "timestamp": chrono::Utc::now()
+    })))
 }
 
 /// Health check endpoint with error rate monitoring

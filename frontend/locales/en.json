@@ -8,5 +8,43 @@
   "status": "Status",
   "date": "Date",
   "owner": "Owner",
-  "category": "Category"
+  "category": "Category",
+
+  "skip_to_main": "Skip to main content",
+
+  "dashboard_title": "Dashboard",
+  "dashboard_subtitle": "Supply chain analytics for your registered products.",
+  "refresh": "Refresh",
+
+  "connect_your_wallet": "Connect your wallet",
+  "connect_wallet_to_load": "Connect a wallet to load products and events for analytics.",
+
+  "events_unavailable": "Events unavailable",
+  "contract_not_configured_warning": "Contract is not configured. Dashboard will show product-only insights.",
+  "events_load_warning": "We couldn't load tracking events. Dashboard will show product-only insights.",
+  "failed_to_load_dashboard": "Failed to load dashboard",
+  "contract_not_configured_error": "Contract is not configured. Add NEXT_PUBLIC_CONTRACT_ID and reload.",
+  "unable_to_load_dashboard": "Unable to load dashboard data. Please check your connection and try again.",
+  "retry": "Retry",
+  "auto_refreshes": "Auto-refreshes while tab is visible.",
+
+  "total_products": "Total products",
+  "total_events": "Total events",
+  "top_origin": "Top origin",
+  "last_updated": "Last updated",
+
+  "products_visible_to_wallet": "Products currently visible to your wallet.",
+  "all_loaded_events": "All loaded tracking events.",
+
+  "no_products_yet": "No products yet.",
+
+  "activity_over_time": "Activity over time",
+  "events_grouped_by_day": "Events grouped by day.",
+  "no_activity_yet": "No activity yet.",
+
+  "top_origins": "Top origins",
+  "most_common_origins": "Most common product origins.",
+
+  "products_count_one": "{{count}} product",
+  "products_count_other": "{{count}} products"
 }

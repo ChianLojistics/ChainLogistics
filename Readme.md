@@ -285,6 +285,44 @@ Consumer → Scans QR code, sees entire journey
 - Enterprise features
 - Mainnet launch
 
+## 🚀 Project Startup
+
+If you're a new contributor looking to run the project locally, follow these steps to get started:
+
+### Prerequisites
+
+- **Rust 1.70+**: Required for both smart contracts and backend. `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- **Soroban CLI**: `cargo install --locked soroban-cli --features opt`
+- **WASM Target**: `rustup target add wasm32-unknown-unknown`
+- **Node.js 18+ & npm/yarn**: For the frontend.
+- **PostgreSQL 14+ & Redis 6+**: For the backend database and caching.
+
+### Quick Start Guide
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/ChainLojistics/ChainLogistics.git
+cd ChainLogistics
+
+# 2. Build Smart Contracts
+cd contracts
+cargo build --target wasm32-unknown-unknown --release
+cargo test
+
+# 3. Start Frontend
+cd ../frontend
+npm install
+npm run dev  # Runs on http://localhost:3000
+
+# 4. Start Backend Server
+cd ../backend
+cp .env.example .env
+cargo build
+cargo run  # Runs on http://localhost:3001
+```
+
+For more comprehensive guidelines on contributing to this project, including detailed workflows and issue labels, see our [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## 🤝 Contributing
 
 We welcome contributors of all skill levels! This project offers opportunities to:

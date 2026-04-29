@@ -6,6 +6,14 @@ import { initMonitoring, startWebVitalsTracking, trackError } from "@/lib/analyt
 export function MonitoringBootstrap() {
   useEffect(() => {
     initMonitoring();
+    const connection = (navigator as unknown as { connection?: { saveData?: boolean; effectiveType?: string } })
+      .connection;
+    const saveData = connection?.saveData;
+    const effectiveType = connection?.effectiveType;
+    const slowConnection = effectiveType === "slow-2g" || effectiveType === "2g";
+
+    if (saveData || slowConnection) return;
+
     startWebVitalsTracking().catch((error) => {
       trackError(error, {
         source: "monitoring.startWebVitalsTracking",
@@ -15,4 +23,3 @@ export function MonitoringBootstrap() {
 
   return null;
 }
-
