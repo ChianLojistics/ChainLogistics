@@ -10,16 +10,17 @@ export function LanguageSelector() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
-  const toggleLanguage = async () => {
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+  };
+
+  const toggleLanguage = () => {
     const newLang = i18n.language === "en" ? "es" : "en";
-    if (newLang !== "en" && !i18n.hasResourceBundle(newLang, "translation")) {
-      const locale = (await import(`../locales/${newLang}.json`)).default;
-      i18n.addResourceBundle(newLang, "translation", locale, true, true);
-    }
-    await i18n.changeLanguage(newLang);
+    changeLanguage(newLang);
   };
 
   if (!mounted) return null;
