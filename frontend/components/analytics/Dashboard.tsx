@@ -12,14 +12,13 @@ export interface DashboardWidget {
   title: string;
   position: { x: number; y: number };
   size: { w: number; h: number };
-  data: any;
-  config?: Record<string, any>;
+  data: unknown;
+  config?: Record<string, unknown>;
 }
 
 export interface AnalyticsDashboardProps {
   className?: string;
   widgets?: DashboardWidget[];
-  onWidgetUpdate?: (widgetId: string, updates: Partial<DashboardWidget>) => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
 }
@@ -27,11 +26,9 @@ export interface AnalyticsDashboardProps {
 export function AnalyticsDashboard({
   className,
   widgets = [],
-  onWidgetUpdate,
   onRefresh,
   isRefreshing = false,
 }: Readonly<AnalyticsDashboardProps>) {
-  const [selectedWidget, setSelectedWidget] = React.useState<string | null>(null);
   const [isEditMode, setIsEditMode] = React.useState(false);
 
   const defaultWidgets: DashboardWidget[] = [
@@ -75,8 +72,8 @@ export function AnalyticsDashboard({
           <StatCard
             key={widget.id}
             label={widget.title}
-            value={widget.data.value}
-            description={widget.data.description}
+            value={(widget.data as { value: number; description: string }).value}
+            description={(widget.data as { value: number; description: string }).description}
           />
         );
       case "chart":
@@ -84,7 +81,7 @@ export function AnalyticsDashboard({
           <EventsChart
             key={widget.id}
             title={widget.title}
-            data={widget.data}
+            data={widget.data as Array<{ type: string; count: number }>}
             className="col-span-2"
           />
         );

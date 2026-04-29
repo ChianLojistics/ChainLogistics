@@ -11,21 +11,19 @@ export interface TimelineEvent {
   title: string;
   description: string;
   location?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface TimelineViewProps {
   events: TimelineEvent[];
   className?: string;
   onEventClick?: (event: TimelineEvent) => void;
-  onFilterChange?: (filters: Record<string, any>) => void;
 }
 
 export function TimelineView({
   events,
   className,
   onEventClick,
-  onFilterChange,
 }: Readonly<TimelineViewProps>) {
   const [zoom, setZoom] = React.useState(1);
   const [selectedType, setSelectedType] = React.useState<string | null>(null);
