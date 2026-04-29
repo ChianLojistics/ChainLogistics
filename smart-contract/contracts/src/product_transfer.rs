@@ -342,14 +342,6 @@ impl ProductTransferContract {
 
         Ok(progress.succeeded)
     }
-
-                ProductTransferred {
-                    product_id,
-                    from: owner.clone(),
-                    to: new_owner.clone(),
-                }
-                .publish(&env);
-
     pub fn estimate_batch_transfer(_env: Env, item_count: u32) -> GasEstimate {
         estimate_batch(item_count)
     }
