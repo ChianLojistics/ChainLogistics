@@ -31,10 +31,14 @@ export function withCustomRule<T>(schema: z.ZodType<T>, predicate: (value: T) =>
   return schema.refine(predicate, { message });
 }
 
+export const LOCATION_REGEX = /^[\w\s,.\-']+$/;
+
 export const productRegistrationSchema = z.object({
   id: productIdSchema,
   name: requiredString("Name").max(128, VALIDATION_MESSAGES.maxLength("Name", 128)),
-  origin: requiredString("Origin").max(256, VALIDATION_MESSAGES.maxLength("Origin", 256)),
+  origin: requiredString("Origin")
+    .max(256, VALIDATION_MESSAGES.maxLength("Origin", 256))
+    .regex(LOCATION_REGEX, "Origin contains invalid characters"),
   description: z.string().max(2048, VALIDATION_MESSAGES.maxLength("Description", 2048)).optional(),
   category: requiredString("Category").max(64, VALIDATION_MESSAGES.maxLength("Category", 64)),
 });
@@ -73,9 +77,41 @@ export const eventTimestampSchema = z
 export const eventTrackingSchema = z.object({
   productId: productIdSchema,
   eventType: eventTypeSchema,
-  location: requiredString("Location"),
+  location: requiredString("Location")
+    .max(256, VALIDATION_MESSAGES.maxLength("Location", 256))
+    .regex(LOCATION_REGEX, "Location contains invalid characters"),
   note: z.string().max(EVENT_NOTE_MAX_LEN, VALIDATION_MESSAGES.maxLength("Note", EVENT_NOTE_MAX_LEN)).optional(),
   timestamp: eventTimestampSchema.optional(),
 });
 
 export type EventTrackingValues = z.infer<typeof eventTrackingSchema>;
+
+// ─── Transfer Product Schema ──────────────────────────────────────────────────
+
+export const transferProductSchema = z.object({
+  productId: productIdSchema,
+  recipientAddress: stellarPublicKeySchema,
+});
+
+export type TransferProductValues = z.infer<typeof transferProductSchema>;
+
+// ─── Product Search Schema ────────────────────────────────────────────────────
+
+export const PRODUCT_SEARCH_MIN_LEN = 1;
+export const PRODUCT_SEARCH_MAX_LEN = 128;
+
+export const productSearchSchema = z.object({
+  query: z
+    .string()
+    .min(PRODUCT_SEARCH_MIN_LEN, VALIDATION_MESSAGES.required("Search query"))
+    .max(
+      PRODUCT_SEARCH_MAX_LEN,
+      VALIDATION_MESSAGES.maxLength("Search query", PRODUCT_SEARCH_MAX_LEN)
+    )
+    .regex(
+      /^[a-zA-Z0-9 \-_.,]+$/,
+      "Search query contains invalid characters"
+    ),
+});
+
+export type ProductSearchValues = z.infer<typeof productSearchSchema>;

@@ -7,6 +7,8 @@ use crate::{storage, AuthorizationContractClient};
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
+/// Ensures the contract is not paused.
+/// Returns ContractPaused error if the contract is currently paused.
 fn require_not_paused(env: &Env) -> Result<(), Error> {
     if storage::is_paused(env) {
         return Err(Error::ContractPaused);
@@ -14,6 +16,9 @@ fn require_not_paused(env: &Env) -> Result<(), Error> {
     Ok(())
 }
 
+/// Ensures the caller is the admin or the configured multi-sig contract.
+/// Returns NotInitialized if admin is not set.
+/// Returns Unauthorized if caller is not admin or multi-sig contract.
 fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
     let admin = storage::get_admin(env).ok_or(Error::NotInitialized)?;
     if &admin == caller {
@@ -22,7 +27,19 @@ fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
     }
 
     if let Some(multisig) = storage::get_multisig_contract(env) {
-        if &multisig == caller && env.current_contract_address() == multisig {
+        if &multisig == caller {
+            if env.current_contract_address() != multisig {
+                caller.require_auth();
+            }
+            return Ok(());
+        }
+    }
+
+    if let Some(timelock) = storage::get_timelock_contract(env) {
+        if &timelock == caller {
+            if env.current_contract_address() != timelock {
+                caller.require_auth();
+            }
             return Ok(());
         }
     }
@@ -30,14 +47,26 @@ fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
     Err(Error::Unauthorized)
 }
 
+/// Reads a product from storage.
+/// Returns ProductNotFound if the product does not exist.
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
 }
 
+/// Writes a product to storage.
 fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
 
+fn calc_has_more(offset: u64, current_len: u64, total_count: u64) -> Result<bool, Error> {
+    let consumed = offset
+        .checked_add(current_len)
+        .ok_or(Error::ArithmeticOverflow)?;
+    Ok(consumed < total_count)
+}
+
+/// Ensures the caller is the product owner.
+/// Returns Unauthorized if caller is not the owner.
 fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     caller.require_auth();
     if &product.owner != caller {
@@ -46,6 +75,11 @@ fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
+/// Ensures the caller is authorized to add events to the product.
+/// Checks that the product is active and the caller is authorized.
+/// Returns ProductDeactivated if product is not active.
+/// Returns NotInitialized if auth contract is not configured.
+/// Returns Unauthorized if caller is not authorized.
 fn require_can_add_event(
     env: &Env,
     product_id: &String,
@@ -71,6 +105,8 @@ fn require_can_add_event(
 
 // ─── Contract ────────────────────────────────────────────────────────────────
 
+/// The main ChainLogistics contract.
+/// This contract handles product tracking, event management, and administrative functions.
 #[contract]
 pub struct ChainLogisticsContract;
 
@@ -78,21 +114,49 @@ pub struct ChainLogisticsContract;
 impl ChainLogisticsContract {
     const MAX_EVENT_ID_PAGE_LIMIT: u32 = 100;
 
+    /// Initialize the contract with an admin address and authorization contract.
+    ///
+    /// # Arguments
+    /// * `admin` - The admin address who will have control over the contract
+    /// * `auth_contract` - The address of the authorization contract
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if already initialized
+    ///
+    /// # Errors
+    /// * `AlreadyInitialized` - If the contract has already been initialized
     pub fn init(env: Env, admin: Address, auth_contract: Address) -> Result<(), Error> {
         if storage::has_admin(&env) {
             return Err(Error::AlreadyInitialized);
         }
         admin.require_auth();
+        ValidationContract::validate_contract_address(&env, &auth_contract)?;
         storage::set_admin(&env, &admin);
         storage::set_paused(&env, false);
         storage::set_auth_contract(&env, &auth_contract);
         Ok(())
     }
 
+    /// Check if the contract is currently paused.
+    ///
+    /// # Returns
+    /// * `bool` - True if paused, false otherwise
     pub fn is_paused(env: Env) -> bool {
         storage::is_paused(&env)
     }
 
+    /// Pause the contract, preventing most operations.
+    /// Only the admin can call this function.
+    ///
+    /// # Arguments
+    /// * `caller` - The address calling the function (must be admin)
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if already paused or not authorized
+    ///
+    /// # Errors
+    /// * `Unauthorized` - If caller is not the admin
+    /// * `ContractPaused` - If the contract is already paused
     pub fn pause(env: Env, caller: Address) -> Result<(), Error> {
         require_admin(&env, &caller)?;
         if storage::is_paused(&env) {
@@ -102,6 +166,18 @@ impl ChainLogisticsContract {
         Ok(())
     }
 
+    /// Unpause the contract, resuming normal operations.
+    /// Only the admin can call this function.
+    ///
+    /// # Arguments
+    /// * `caller` - The address calling the function (must be admin)
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if not paused or not authorized
+    ///
+    /// # Errors
+    /// * `Unauthorized` - If caller is not the admin
+    /// * `ContractNotPaused` - If the contract is not paused
     pub fn unpause(env: Env, caller: Address) -> Result<(), Error> {
         require_admin(&env, &caller)?;
         if !storage::is_paused(&env) {
@@ -111,24 +187,61 @@ impl ChainLogisticsContract {
         Ok(())
     }
 
+    /// Transfer admin rights to a new address.
+    /// Both the current admin and new admin must authenticate.
+    ///
+    /// # Arguments
+    /// * `current_admin` - The current admin address
+    /// * `new_admin` - The new admin address to transfer to
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if not authorized
+    ///
+    /// # Errors
+    /// * `Unauthorized` - If current_admin is not the actual admin
     pub fn transfer_admin(
         env: Env,
         current_admin: Address,
         new_admin: Address,
     ) -> Result<(), Error> {
         require_admin(&env, &current_admin)?;
+        ValidationContract::validate_distinct_addresses(&current_admin, &new_admin)?;
         new_admin.require_auth();
         storage::set_admin(&env, &new_admin);
         Ok(())
     }
 
+    /// Set the multi-signature contract address.
+    /// Only the admin can call this function.
+    ///
+    /// # Arguments
+    /// * `caller` - The address calling the function (must be admin)
+    /// * `multisig_contract` - The address of the multi-signature contract
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if not authorized
+    ///
+    /// # Errors
+    /// * `Unauthorized` - If caller is not the admin
     pub fn set_multisig_contract(
         env: Env,
         caller: Address,
         multisig_contract: Address,
     ) -> Result<(), Error> {
         require_admin(&env, &caller)?;
+        ValidationContract::validate_contract_address(&env, &multisig_contract)?;
         storage::set_multisig_contract(&env, &multisig_contract);
+        Ok(())
+    }
+
+    pub fn set_timelock_contract(
+        env: Env,
+        caller: Address,
+        timelock_contract: Address,
+    ) -> Result<(), Error> {
+        require_admin(&env, &caller)?;
+        ValidationContract::validate_contract_address(&env, &timelock_contract)?;
+        storage::set_timelock_contract(&env, &timelock_contract);
         Ok(())
     }
 
@@ -139,6 +252,26 @@ impl ChainLogisticsContract {
     // Note: transfer_product is now in ProductTransferContract
     // get_product_event_ids, get_event_count are now in ProductQueryContract
 
+    /// Add a tracking event to a product.
+    ///
+    /// # Arguments
+    /// * `actor` - The address adding the event (must be authorized)
+    /// * `product_id` - The ID of the product
+    /// * `event_type` - The type of event (e.g., "shipped", "received")
+    /// * `location` - The location where the event occurred
+    /// * `data_hash` - Hash of the event data
+    /// * `note` - Optional note about the event
+    /// * `metadata` - Additional metadata as key-value pairs
+    ///
+    /// # Returns
+    /// * `Result<u64, Error>` - The ID of the newly created event
+    ///
+    /// # Errors
+    /// * `ContractPaused` - If the contract is paused
+    /// * `ProductNotFound` - If the product does not exist
+    /// * `ProductDeactivated` - If the product is deactivated
+    /// * `Unauthorized` - If the actor is not authorized
+    /// * Various validation errors for invalid inputs
     pub fn add_tracking_event(
         env: Env,
         actor: Address,
@@ -150,6 +283,9 @@ impl ChainLogisticsContract {
         metadata: Map<Symbol, String>,
     ) -> Result<u64, Error> {
         require_not_paused(&env)?;
+        ValidationContract::non_empty(&product_id)?;
+        ValidationContract::max_len(&product_id, ValidationContract::MAX_PRODUCT_ID_LEN)?;
+        ValidationContract::validate_event_type(&env, &event_type)?;
         let product = read_product(&env, &product_id)?;
         require_can_add_event(&env, &product_id, &product, &actor)?;
 
@@ -157,7 +293,7 @@ impl ChainLogisticsContract {
         ValidationContract::validate_event_note(&note)?;
         ValidationContract::validate_metadata(&metadata)?;
 
-        let event_id = storage::next_event_id(&env);
+        let event_id = storage::next_event_id(&env)?;
         let event = TrackingEvent {
             event_id,
             product_id: product_id.clone(),
@@ -176,7 +312,7 @@ impl ChainLogisticsContract {
         ids.push_back(event_id);
         storage::put_product_event_ids(&env, &product_id, &ids);
 
-        storage::index_event_by_type(&env, &product_id, &event_type, event_id);
+        storage::index_event_by_type(&env, &product_id, &event_type, event_id)?;
 
         env.events().publish(
             (
@@ -190,10 +326,32 @@ impl ChainLogisticsContract {
         Ok(event_id)
     }
 
+    /// Get a tracking event by its ID.
+    ///
+    /// # Arguments
+    /// * `event_id` - The ID of the event to retrieve
+    ///
+    /// # Returns
+    /// * `Result<TrackingEvent, Error>` - The tracking event
+    ///
+    /// # Errors
+    /// * `EventNotFound` - If the event does not exist
     pub fn get_event(env: Env, event_id: u64) -> Result<TrackingEvent, Error> {
         storage::get_event(&env, event_id).ok_or(Error::EventNotFound)
     }
 
+    /// Get paginated tracking events for a product.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `offset` - The offset to start from (for pagination)
+    /// * `limit` - The maximum number of events to return
+    ///
+    /// # Returns
+    /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_events(
         env: Env,
         product_id: String,
@@ -201,6 +359,7 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
 
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let total_count = all_ids.len() as u64;
@@ -215,7 +374,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (event_ids.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, event_ids.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,
@@ -224,6 +383,19 @@ impl ChainLogisticsContract {
         })
     }
 
+    /// Get tracking events for a product filtered by event type.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `event_type` - The type of events to filter by
+    /// * `offset` - The offset to start from (for pagination)
+    /// * `limit` - The maximum number of events to return
+    ///
+    /// # Returns
+    /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_events_by_type(
         env: Env,
         product_id: String,
@@ -232,6 +404,8 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_event_type(&env, &event_type)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
 
         let total_count = storage::get_event_count_by_type(&env, &product_id, &event_type);
         let event_ids =
@@ -245,7 +419,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (event_ids.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, event_ids.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,
@@ -254,6 +428,20 @@ impl ChainLogisticsContract {
         })
     }
 
+    /// Get tracking events for a product filtered by time range.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `start_time` - The start timestamp (inclusive)
+    /// * `end_time` - The end timestamp (inclusive)
+    /// * `offset` - The offset to start from (for pagination)
+    /// * `limit` - The maximum number of events to return
+    ///
+    /// # Returns
+    /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_events_by_time_range(
         env: Env,
         product_id: String,
@@ -263,6 +451,8 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_time_range(&env, start_time, end_time)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
 
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let mut matching_ids = Vec::new(&env);
@@ -280,7 +470,9 @@ impl ChainLogisticsContract {
 
         let mut events = Vec::new(&env);
         let start = offset as u32;
-        let end = ((offset + limit) as u32).min(matching_ids.len());
+        let end_u64 = offset.checked_add(limit).ok_or(Error::ArithmeticOverflow)?;
+        let capped_end = end_u64.min(u32::MAX as u64) as u32;
+        let end = capped_end.min(matching_ids.len());
 
         for i in start..end {
             let eid = matching_ids.get_unchecked(i);
@@ -289,7 +481,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, events.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,
@@ -298,6 +490,19 @@ impl ChainLogisticsContract {
         })
     }
 
+    /// Get tracking events for a product with advanced filtering.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `filter` - The filter criteria (event type, time range, location)
+    /// * `offset` - The offset to start from (for pagination)
+    /// * `limit` - The maximum number of events to return
+    ///
+    /// # Returns
+    /// * `Result<TrackingEventPage, Error>` - A page of tracking events with pagination metadata
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_filtered_events(
         env: Env,
         product_id: String,
@@ -306,6 +511,10 @@ impl ChainLogisticsContract {
         limit: u64,
     ) -> Result<TrackingEventPage, Error> {
         let _ = read_product(&env, &product_id)?;
+        ValidationContract::validate_pagination_limit(limit, ValidationContract::MAX_PAGE_LIMIT)?;
+        if filter.start_time > 0 || filter.end_time < u64::MAX {
+            ValidationContract::validate_time_range(&env, filter.start_time, filter.end_time)?;
+        }
 
         let all_ids = storage::get_product_event_ids(&env, &product_id);
         let mut matching_ids = Vec::new(&env);
@@ -341,7 +550,9 @@ impl ChainLogisticsContract {
 
         let mut events = Vec::new(&env);
         let start = offset as u32;
-        let end = ((offset + limit) as u32).min(matching_ids.len());
+        let end_u64 = offset.checked_add(limit).ok_or(Error::ArithmeticOverflow)?;
+        let capped_end = end_u64.min(u32::MAX as u64) as u32;
+        let end = capped_end.min(matching_ids.len());
 
         for i in start..end {
             let eid = matching_ids.get_unchecked(i);
@@ -350,7 +561,7 @@ impl ChainLogisticsContract {
             }
         }
 
-        let has_more = offset + (events.len() as u64) < total_count;
+        let has_more = calc_has_more(offset, events.len() as u64, total_count)?;
 
         Ok(TrackingEventPage {
             events,
@@ -359,11 +570,33 @@ impl ChainLogisticsContract {
         })
     }
 
+    /// Get all event IDs for a product.
+    ///
+    /// # Arguments
+    /// * `id` - The ID of the product
+    ///
+    /// # Returns
+    /// * `Result<Vec<u64>, Error>` - A vector of event IDs
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_event_ids(env: Env, id: String) -> Result<Vec<u64>, Error> {
         let _ = read_product(&env, &id)?;
         Ok(storage::get_product_event_ids(&env, &id))
     }
 
+    /// Get paginated event IDs for a product.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `offset` - The offset to start from (for pagination)
+    /// * `limit` - The maximum number of event IDs to return (max 100)
+    ///
+    /// # Returns
+    /// * `Result<Vec<u64>, Error>` - A vector of event IDs
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_event_ids_paginated(
         env: Env,
         product_id: String,
@@ -384,17 +617,48 @@ impl ChainLogisticsContract {
         ))
     }
 
+    /// Get the total number of events for a product.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    ///
+    /// # Returns
+    /// * `Result<u32, Error>` - The number of events
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_product_event_count(env: Env, product_id: String) -> Result<u32, Error> {
         let _ = read_product(&env, &product_id)?;
         Ok(storage::get_product_event_ids(&env, &product_id).len())
     }
 
+    /// Get the total number of events for a product (as u64).
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    ///
+    /// # Returns
+    /// * `Result<u64, Error>` - The number of events
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_event_count(env: Env, product_id: String) -> Result<u64, Error> {
         let _ = read_product(&env, &product_id)?;
         let ids = storage::get_product_event_ids(&env, &product_id);
         Ok(ids.len() as u64)
     }
 
+    /// Get the number of events for a product filtered by type.
+    ///
+    /// # Arguments
+    /// * `product_id` - The ID of the product
+    /// * `event_type` - The type of events to count
+    ///
+    /// # Returns
+    /// * `Result<u64, Error>` - The number of events of the specified type
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_event_count_by_type(
         env: Env,
         product_id: String,
@@ -408,7 +672,14 @@ impl ChainLogisticsContract {
         ))
     }
 
-    // Helper to simulate a multisig contract invoking pause via as_contract
+    /// Helper function to simulate multi-sig contract invoking pause.
+    /// Used for testing purposes only.
+    ///
+    /// # Arguments
+    /// * `caller` - The address calling the function
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if pause fails
     pub fn __simulate_multisig_pause(env: Env, caller: Address) -> Result<(), Error> {
         Self::pause(env, caller)
     }

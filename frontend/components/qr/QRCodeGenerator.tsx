@@ -1,7 +1,7 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { generateProductQR, generateProductQRSVG, getVerificationUrl } from '@/lib/qr';
 import { COPY_FEEDBACK_DURATION_MS } from '@/lib/constants';
 
@@ -97,7 +97,14 @@ export default function QRCodeGenerator({ productId }: QRCodeGeneratorProps) {
 
             <div className="bg-gray-50 p-6 rounded-xl mb-6 shadow-inner border border-gray-200" ref={printRef}>
                 {qrCodeUrl ? (
-                    <img src={qrCodeUrl} alt={`QR Code for ${productId}`} className="w-56 h-56 object-contain block mx-auto mix-blend-multiply" />
+                    <Image 
+                        src={qrCodeUrl} 
+                        alt={`QR Code for ${productId}`} 
+                        width={224} 
+                        height={224} 
+                        className="object-contain block mx-auto mix-blend-multiply"
+                        priority={false}
+                    />
                 ) : (
                     <div className="w-56 h-56 flex items-center justify-center text-gray-400 font-medium">
                         <span className="animate-pulse">Generating...</span>

@@ -12,6 +12,13 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1", public_api_routes())
         .nest("/api/v1/admin", admin_api_routes())
         .nest("/api/v1/analytics", analytics_routes())
+        .nest("/api/v1/carbon", carbon_routes())
+        .nest("/api/v1/keys", key_management_routes())
+        .nest("/api/v1/monitoring", monitoring_routes())
+        .nest("/api/regulatory", regulatory_routes())
+        .nest("/api/iot", iot_routes())
+        .nest("/api/quality", quality_routes())
+        .nest("/api/suppliers", supplier_routes())
 }
 
 fn public_api_routes() -> Router<AppState> {

@@ -1,7 +1,15 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import en from '../../locales/en.json';
-import es from '../../locales/es.json';
+
+const loadLocale = async (lng: string) => {
+  switch (lng) {
+    case 'es':
+      return (await import('../../locales/es.json')).default;
+    default:
+      return en;
+  }
+};
 
 const getInitialLanguage = (): string => {
   if (typeof window !== 'undefined') {
@@ -16,24 +24,42 @@ i18n
   .init({
     resources: {
       en: { translation: en },
-      es: { translation: es },
     },
     lng: getInitialLanguage(), // default language
     fallbackLng: 'en',
+    supportedLngs: ['en', 'es', 'fr', 'ar'],
     interpolation: {
       escapeValue: false, // React already does escaping
+    },
+    react: {
+      useSuspense: false,
     },
   });
 
 // Setup RTL logic when language changes
 if (typeof window !== 'undefined') {
+  void (async () => {
+    const lng = getInitialLanguage();
+    if (lng !== 'en' && !i18n.hasResourceBundle(lng, 'translation')) {
+      const locale = await loadLocale(lng);
+      i18n.addResourceBundle(lng, 'translation', locale, true, true);
+    }
+  })();
+
   i18n.on('languageChanged', (lng: string) => {
     localStorage.setItem('i18nextLng', lng);
     document.documentElement.dir = i18n.dir(lng);
+
+    if (!i18n.hasResourceBundle(lng, 'translation')) {
+      void loadLocale(lng).then((locale) => {
+        i18n.addResourceBundle(lng, 'translation', locale, true, true);
+      });
+    }
   });
   
   // Set initial direction
   document.documentElement.dir = i18n.dir(getInitialLanguage());
+  document.documentElement.lang = getInitialLanguage();
 }
 
 export { i18n };

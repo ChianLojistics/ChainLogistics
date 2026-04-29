@@ -1,3 +1,9 @@
+/// Product Registry contract for managing product lifecycle.
+/// This contract handles:
+/// - Product registration
+/// - Product deactivation and reactivation
+/// - Product queries and search
+/// - Product statistics
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
@@ -8,30 +14,37 @@ use crate::AuthorizationContractClient;
 
 // ─── Storage helpers for trusted transfer contract ───────────────────────────
 
+/// Get the trusted transfer contract address.
 fn get_transfer_contract(env: &Env) -> Option<Address> {
     env.storage()
         .persistent()
         .get(&crate::types::DataKey::TransferContract)
 }
 
+/// Set the trusted transfer contract address.
 fn set_transfer_contract(env: &Env, address: &Address) {
     env.storage()
         .persistent()
         .set(&crate::types::DataKey::TransferContract, address);
 }
 
+/// Get the authorization contract address.
 fn get_auth_contract(env: &Env) -> Option<Address> {
     env.storage()
         .persistent()
         .get(&crate::types::DataKey::AuthContract)
 }
 
+/// Set the authorization contract address.
 fn set_auth_contract(env: &Env, address: &Address) {
     env.storage()
         .persistent()
         .set(&crate::types::DataKey::AuthContract, address);
 }
 
+/// Ensure the caller is the trusted transfer contract.
+/// Returns NotInitialized if transfer contract is not set.
+/// Returns Unauthorized if caller is not the transfer contract.
 fn require_transfer_contract(env: &Env, caller: &Address) -> Result<(), Error> {
     let trusted = get_transfer_contract(env).ok_or(Error::NotInitialized)?;
     caller.require_auth();
@@ -43,14 +56,19 @@ fn require_transfer_contract(env: &Env, caller: &Address) -> Result<(), Error> {
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
+/// Read a product from storage.
+/// Returns ProductNotFound if the product does not exist.
 fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
     storage::get_product(env, product_id).ok_or(Error::ProductNotFound)
 }
 
+/// Write a product to storage.
 fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
 
+/// Ensure the caller is the product owner.
+/// Returns Unauthorized if caller is not the owner.
 fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     caller.require_auth();
     if &product.owner != caller {
@@ -59,72 +77,51 @@ fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
-// ─── Search helpers ───────────────────────────────────────────────────────────
+// ─── Search helpers (Gas-optimized) ───────────────────────────────────────────
 
+// Gas-optimized: Batch indexing reduces storage operations
 fn index_product(env: &Env, product: &Product) {
-    // Index individual words from name, origin, and category
-    // This allows for partial matching
+    // Index only meaningful fields to reduce gas costs
+    // Use full text as single keyword for efficient lookups
 
-    // Index name words
-    let name_words = split_into_words(env, &product.name);
-    for i in 0..name_words.len() {
-        let word = name_words.get(i).unwrap();
-        storage::add_to_search_index(env, word.clone(), &product.id);
+    // Index name (most common search field)
+    if product.name.len() > 2 {
+        storage::add_to_search_index(env, product.name.clone(), &product.id);
     }
 
-    // Index origin words
-    let origin_words = split_into_words(env, &product.origin.location);
-    for i in 0..origin_words.len() {
-        let word = origin_words.get(i).unwrap();
-        storage::add_to_search_index(env, word.clone(), &product.id);
+    // Index origin location
+    if product.origin.location.len() > 2 {
+        storage::add_to_search_index(env, product.origin.location.clone(), &product.id);
     }
 
-    // Index category words
-    let category_words = split_into_words(env, &product.category);
-    for i in 0..category_words.len() {
-        let word = category_words.get(i).unwrap();
-        storage::add_to_search_index(env, word.clone(), &product.id);
+    // Index category
+    if product.category.len() > 2 {
+        storage::add_to_search_index(env, product.category.clone(), &product.id);
     }
 }
 
-fn split_into_words(env: &Env, text: &String) -> Vec<String> {
-    let mut words = Vec::new(env);
+// Gas-optimized: Removed unnecessary split_into_words function
+// Using full text reduces complexity and gas costs
 
-    // For now, just use the full text as a single "word"
-    // This avoids the to_string() conversion issues
-    // In a real implementation, we'd want to split into individual words
-    if text.len() > 2 {
-        words.push_back(text.clone());
-    }
-
-    words
-}
-
+// Gas-optimized: Batch deindexing
 fn deindex_product(env: &Env, product: &Product) {
-    // Remove from name index (using the same logic as indexing)
-    let name_words = split_into_words(env, &product.name);
-    for i in 0..name_words.len() {
-        let word = name_words.get(i).unwrap();
-        storage::remove_from_search_index(env, word.clone(), &product.id);
+    // Remove from indexes - only if they were indexed
+    if product.name.len() > 2 {
+        storage::remove_from_search_index(env, product.name.clone(), &product.id);
     }
 
-    // Remove from origin index
-    let origin_words = split_into_words(env, &product.origin.location);
-    for i in 0..origin_words.len() {
-        let word = origin_words.get(i).unwrap();
-        storage::remove_from_search_index(env, word.clone(), &product.id);
+    if product.origin.location.len() > 2 {
+        storage::remove_from_search_index(env, product.origin.location.clone(), &product.id);
     }
 
-    // Remove from category index
-    let category_words = split_into_words(env, &product.category);
-    for i in 0..category_words.len() {
-        let word = category_words.get(i).unwrap();
-        storage::remove_from_search_index(env, word.clone(), &product.id);
+    if product.category.len() > 2 {
+        storage::remove_from_search_index(env, product.category.clone(), &product.id);
     }
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
 
+/// The Product Registry contract manages product lifecycle.
 #[contract]
 pub struct ProductRegistryContract;
 
@@ -178,16 +175,23 @@ impl ProductRegistryContract {
         // Index product for search
         index_product(&env, &product);
 
+        let register_scope = Symbol::new(&env, "register_product");
+        storage::acquire_reentrancy_lock(&env, &register_scope)?;
         let auth_contract = get_auth_contract(&env).ok_or(Error::NotInitialized)?;
         let auth_client = AuthorizationContractClient::new(&env, &auth_contract);
         let self_address = env.current_contract_address();
         auth_client.init_product_owner(&self_address, &config.id, &owner);
+        storage::release_reentrancy_lock(&env, &register_scope);
 
         // Update global counters
-        let total = storage::get_total_products(&env) + 1;
+        let total = storage::get_total_products(&env)
+            .checked_add(1)
+            .ok_or(Error::ArithmeticOverflow)?;
         storage::set_total_products(&env, total);
 
-        let active = storage::get_active_products(&env) + 1;
+        let active = storage::get_active_products(&env)
+            .checked_add(1)
+            .ok_or(Error::ArithmeticOverflow)?;
         storage::set_active_products(&env, active);
 
         env.events().publish(
@@ -198,7 +202,19 @@ impl ProductRegistryContract {
         Ok(product)
     }
 
+    /// Configure the authorization contract address.
+    /// This can only be called once.
+    ///
+    /// # Arguments
+    /// * `auth_contract` - The address of the authorization contract
+    ///
+    /// # Returns
+    /// * `Result<(), Error>` - Returns error if already initialized with different address
+    ///
+    /// # Errors
+    /// * `AlreadyInitialized` - If already initialized with a different address
     pub fn configure_auth_contract(env: Env, auth_contract: Address) -> Result<(), Error> {
+        ValidationContract::validate_contract_address(&env, &auth_contract)?;
         match get_auth_contract(&env) {
             None => {
                 set_auth_contract(&env, &auth_contract);
@@ -215,6 +231,7 @@ impl ProductRegistryContract {
     /// address) to avoid ownership transfers being callable by arbitrary
     /// contracts.
     pub fn configure_transfer_contract(env: Env, transfer_contract: Address) -> Result<(), Error> {
+        ValidationContract::validate_contract_address(&env, &transfer_contract)?;
         match get_transfer_contract(&env) {
             None => {
                 set_transfer_contract(&env, &transfer_contract);
@@ -235,11 +252,13 @@ impl ProductRegistryContract {
         new_owner: Address,
     ) -> Result<Product, Error> {
         require_transfer_contract(&env, &caller)?;
+        ValidationContract::non_empty(&product_id)?;
 
         let mut product = read_product(&env, &product_id)?;
         if !product.active {
             return Err(Error::ProductDeactivated);
         }
+        ValidationContract::validate_distinct_addresses(&product.owner, &new_owner)?;
         product.owner = new_owner;
         write_product(&env, &product);
 
@@ -317,7 +336,9 @@ impl ProductRegistryContract {
         index_product(&env, &product);
 
         // Increment active counter
-        let active = storage::get_active_products(&env) + 1;
+        let active = storage::get_active_products(&env)
+            .checked_add(1)
+            .ok_or(Error::ArithmeticOverflow)?;
         storage::set_active_products(&env, active);
 
         env.events().publish(
@@ -333,11 +354,23 @@ impl ProductRegistryContract {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Get a product by its string ID.
+    ///
+    /// # Arguments
+    /// * `id` - The ID of the product to retrieve
+    ///
+    /// # Returns
+    /// * `Result<Product, Error>` - The product information
+    ///
+    /// # Errors
+    /// * `ProductNotFound` - If the product does not exist
     pub fn get_product(env: Env, id: String) -> Result<Product, Error> {
         read_product(&env, &id)
     }
 
     /// Get global product statistics.
+    ///
+    /// # Returns
+    /// * `ProductStats` - Global statistics including total and active product counts
     pub fn get_stats(env: Env) -> ProductStats {
         ProductStats {
             total_products: storage::get_total_products(&env),
@@ -350,9 +383,15 @@ impl ProductRegistryContract {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Search products by name, origin, or category.
-    ///
-    /// Returns matching product IDs with case insensitive matching.
+    /// Returns matching product IDs with exact matching.
     /// Results are limited for gas efficiency.
+    ///
+    /// # Arguments
+    /// * `query` - The search query string
+    /// * `limit` - Maximum number of results to return
+    ///
+    /// # Returns
+    /// * `Vec<String>` - A vector of matching product IDs
     pub fn search_products(env: Env, query: String, limit: u32) -> Vec<String> {
         let mut results = Vec::new(&env);
 

@@ -1,14 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import dynamic from "next/dynamic";
 import {
   Activity,
   Boxes,
@@ -22,12 +15,65 @@ import type { TimelineEvent } from "@/lib/types/tracking";
 import { useWalletStore } from "@/lib/state/wallet.store";
 import { getProductsByOwner } from "@/lib/contract/products";
 import { fetchProductEvents } from "@/lib/contract/events";
+import { ContractClientError } from "@/lib/stellar/contractClient";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_REFRESH_INTERVAL_MS, DASHBOARD_RECENT_EVENTS_LIMIT } from "@/lib/constants";
+import { formatNumber, formatTime } from "@/lib/i18n/format";
+import { useTranslation } from "react-i18next";
 
 import { StatCard } from "@/components/analytics/StatCard";
-import { EventsChart } from "@/components/analytics/EventsChart";
-import { ActivityFeed } from "@/components/analytics/ActivityFeed";
+
+// ─── Lazy-loaded heavy components (recharts, etc.) ───────────────────────────
+// These are large chart/feed components that are only needed after the initial
+// page paint, so they are split into separate JS chunks via next/dynamic.
+const EventsChart = dynamic(
+  () => import("@/components/analytics/EventsChart").then((m) => ({ default: m.EventsChart })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-72 w-full animate-pulse rounded-xl bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
+
+const ActivityFeed = dynamic(
+  () => import("@/components/analytics/ActivityFeed").then((m) => ({ default: m.ActivityFeed })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-40 w-full animate-pulse rounded-xl bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
+
+// recharts components are only imported inside the lazy chunk above — the main
+// bundle no longer carries them. The inline LineChart below is kept here
+// because it is co-located with the dashboard-specific activityOverTime state.
+// We defer the recharts import itself to avoid the initial bundle bloat.
+const DynamicLineChart = dynamic(
+  () =>
+    import("recharts").then(({ LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer }) => {
+      function ActivityLineChart({ data }: { data: { date: string; count: number }[] }) {
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      }
+      return { default: ActivityLineChart };
+    }),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full animate-pulse rounded-lg bg-zinc-100" aria-hidden="true" />
+    ),
+  }
+);
 
 type EventsByTypeDatum = { type: string; count: number };
 type ActivityDatum = { date: string; count: number };
@@ -41,12 +87,23 @@ function formatDay(tsSeconds: number) {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { publicKey, status } = useWalletStore();
 
   const [products, setProducts] = React.useState<Product[]>([]);
   const [events, setEvents] = React.useState<TimelineEvent[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<
+    | null
+    | {
+        title: string;
+        message: string;
+        detail?: string;
+        variant: "warning" | "error";
+        canRetry: boolean;
+        showConfigHint: boolean;
+      }
+  >(null);
   const [lastUpdatedAt, setLastUpdatedAt] = React.useState<number | null>(null);
 
   const load = React.useCallback(async () => {
@@ -72,22 +129,49 @@ export default function DashboardPage() {
         .filter((r): r is PromiseFulfilledResult<TimelineEvent[]> => r.status === "fulfilled")
         .flatMap((r) => r.value);
 
+      const firstRejected = settled.find(
+        (r): r is PromiseRejectedResult => r.status === "rejected"
+      );
+
       all.sort((a, b) => b.timestamp - a.timestamp);
       setEvents(all);
       setLastUpdatedAt(Date.now());
 
       const rejectedCount = settled.filter((r) => r.status === "rejected").length;
       if (rejectedCount > 0 && all.length === 0) {
-        setError(
-          "Events could not be loaded (contract not configured or unavailable). Showing product-only insights."
-        );
+        const reason = firstRejected?.reason;
+        const normalizedTitle = t("events_unavailable");
+        const isContractNotConfigured =
+          reason instanceof ContractClientError && reason.code === "CONTRACT_NOT_CONFIGURED";
+
+        setError({
+          title: normalizedTitle,
+          message: isContractNotConfigured
+            ? t("contract_not_configured_warning")
+            : t("events_load_warning"),
+          detail: reason instanceof Error ? reason.message : undefined,
+          variant: "warning",
+          canRetry: true,
+          showConfigHint: isContractNotConfigured,
+        });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard data");
+      const isContractNotConfigured =
+        e instanceof ContractClientError && e.code === "CONTRACT_NOT_CONFIGURED";
+      setError({
+        title: t("failed_to_load_dashboard"),
+        message: isContractNotConfigured
+          ? t("contract_not_configured_error")
+          : t("unable_to_load_dashboard"),
+        detail: e instanceof Error ? e.message : undefined,
+        variant: "error",
+        canRetry: true,
+        showConfigHint: isContractNotConfigured,
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [publicKey]);
+  }, [publicKey, t]);
 
   React.useEffect(() => {
     if (status !== "connected" || !publicKey) return;
@@ -176,9 +260,9 @@ export default function DashboardPage() {
   const topOriginDescription = React.useMemo(() => {
     if (isLoading) return undefined;
     const first = topOrigins[0];
-    if (!first) return "No products yet.";
-    return `${first.count} product${first.count === 1 ? "" : "s"}`;
-  }, [isLoading, topOrigins]);
+    if (!first) return t("no_products_yet");
+    return t("products_count", { count: first.count });
+  }, [isLoading, topOrigins, t]);
 
   const canLoad = status === "connected" && Boolean(publicKey);
 
@@ -186,9 +270,9 @@ export default function DashboardPage() {
     <main className="mx-auto max-w-6xl px-6 py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">{t("dashboard_title")}</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Supply chain analytics for your registered products.
+            {t("dashboard_subtitle")}
           </p>
         </div>
 
@@ -206,49 +290,84 @@ export default function DashboardPage() {
             )}
           >
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-            Refresh
+            {t("refresh")}
           </button>
         </div>
       </div>
 
       {!canLoad ? (
         <div className="mt-8 rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-900">Connect your wallet</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">{t("connect_your_wallet")}</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Connect a wallet to load products and events for analytics.
+            {t("connect_wallet_to_load")}
           </p>
         </div>
       ) : null}
 
       {error ? (
-        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {error}
+        <div
+          className={cn(
+            "mt-6 rounded-xl border p-4 text-sm",
+            error.variant === "warning"
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-red-200 bg-red-50 text-red-900"
+          )}
+        >
+          <div className="font-semibold">{error.title}</div>
+          <div className="mt-1">{error.message}</div>
+          {error.detail ? (
+            <div className="mt-1 text-xs opacity-80">{error.detail}</div>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {error.canRetry ? (
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={!canLoad || isLoading}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50",
+                  error.variant === "warning"
+                    ? "bg-amber-900 text-amber-50 hover:bg-amber-950"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                )}
+              >
+                {t("retry")}
+              </button>
+            ) : null}
+
+            {error.showConfigHint ? (
+              <div className="text-xs opacity-80">
+                Set `NEXT_PUBLIC_CONTRACT_ID` in `.env.local`, restart the dev server, then refresh.
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Total products"
-          value={isLoading ? "—" : totalProducts}
-          description="Products currently visible to your wallet."
+          label={t("total_products")}
+          value={isLoading ? "—" : formatNumber(totalProducts)}
+          description={t("products_visible_to_wallet")}
           icon={<Boxes className="h-6 w-6" />}
         />
         <StatCard
-          label="Total events"
-          value={isLoading ? "—" : totalEvents}
-          description="All loaded tracking events."
+          label={t("total_events")}
+          value={isLoading ? "—" : formatNumber(totalEvents)}
+          description={t("all_loaded_events")}
           icon={<Activity className="h-6 w-6" />}
         />
         <StatCard
-          label="Top origin"
+          label={t("top_origin")}
           value={isLoading ? "—" : (topOrigins[0]?.origin ?? "—")}
           description={topOriginDescription}
           icon={<MapPinned className="h-6 w-6" />}
         />
         <StatCard
-          label="Last updated"
-          value={lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : "—"}
-          description="Auto-refreshes while tab is visible."
+          label={t("last_updated")}
+          value={lastUpdatedAt ? formatTime(lastUpdatedAt) : "—"}
+          description={t("auto_refreshes")}
           icon={<TrendingUp className="h-6 w-6" />}
         />
       </div>
@@ -258,9 +377,9 @@ export default function DashboardPage() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-900">Activity over time</h2>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("activity_over_time")}</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Events grouped by day.
+              {t("events_grouped_by_day")}
             </p>
           </div>
           <div className="mt-4 h-72">
@@ -268,17 +387,10 @@ export default function DashboardPage() {
               <div className="h-full rounded-lg bg-zinc-100 animate-pulse" aria-hidden="true" />
             ) : activityOverTime.length === 0 ? (
               <div className="h-full rounded-lg border border-dashed border-zinc-200 bg-zinc-50 flex items-center justify-center text-sm text-zinc-500">
-                No activity yet.
+                {t("no_activity_yet")}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={activityOverTime} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <DynamicLineChart data={activityOverTime} />
             )}
           </div>
         </div>
@@ -287,8 +399,8 @@ export default function DashboardPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm lg:col-span-1">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-900">Top origins</h2>
-            <p className="mt-1 text-sm text-zinc-500">Most common product origins.</p>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("top_origins")}</h2>
+            <p className="mt-1 text-sm text-zinc-500">{t("most_common_origins")}</p>
           </div>
 
           <div className="mt-4">
@@ -300,14 +412,14 @@ export default function DashboardPage() {
               </div>
             ) : topOrigins.length === 0 ? (
               <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 p-6 text-sm text-zinc-500">
-                No products yet.
+                {t("no_products_yet")}
               </div>
             ) : (
               <ul className="space-y-3">
                 {topOrigins.map((o) => (
                   <li key={o.origin} className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-zinc-900 truncate">{o.origin}</span>
-                    <span className="text-sm text-zinc-600">{o.count}</span>
+                    <span className="text-sm text-zinc-600">{formatNumber(o.count)}</span>
                   </li>
                 ))}
               </ul>

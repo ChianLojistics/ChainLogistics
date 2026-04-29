@@ -112,6 +112,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       contract: "border-orange-200 bg-orange-50",
       wallet: "border-blue-200 bg-blue-50",
       validation: "border-amber-200 bg-amber-50",
+      authentication: "border-purple-200 bg-purple-50",
+      business_logic: "border-indigo-200 bg-indigo-50",
+      system: "border-red-200 bg-red-50",
       user: "border-gray-200 bg-gray-50",
       unknown: "border-red-200 bg-red-50",
     };
@@ -121,6 +124,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       contract: "text-orange-900",
       wallet: "text-blue-900",
       validation: "text-amber-900",
+      authentication: "text-purple-900",
+      business_logic: "text-indigo-900",
+      system: "text-red-900",
       user: "text-gray-900",
       unknown: "text-red-900",
     };
