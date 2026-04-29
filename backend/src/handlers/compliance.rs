@@ -1,13 +1,14 @@
 use axum::{
-    extract::{Path, State, Json},
+    extract::{Path, Query, State, Json},
     http::StatusCode,
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
-use crate::AppState;
+use crate::{AppState, error::AppError};
 use crate::compliance::{ComplianceValidator, ComplianceRule, ComplianceType};
+use crate::services::audit_service::AuditLogQuery;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ComplianceCheckRequest {
@@ -117,15 +118,21 @@ pub async fn get_compliance_report(
     )
 )]
 pub async fn generate_audit_report(
-    State(_state): State<AppState>,
-) -> impl IntoResponse {
-    // Audit log persistence/export is not implemented yet.
+    State(state): State<AppState>,
+    Query(filters): Query<AuditLogQuery>,
+) -> Result<Json<Value>, AppError> {
+    let limit = filters.limit.unwrap_or(100).clamp(1, 500);
+    let offset = filters.offset.unwrap_or(0).max(0);
+    let events = state.audit_service.query(filters).await?;
+
     let report = serde_json::json!({
         "report_type": "audit",
         "generated_at": chrono::Utc::now().to_rfc3339(),
-        "total_events": 0,
-        "events": []
+        "limit": limit,
+        "offset": offset,
+        "returned_events": events.len(),
+        "events": events
     });
 
-    (StatusCode::NOT_IMPLEMENTED, Json(report)).into_response()
+    Ok(Json(report))
 }

@@ -1,5 +1,5 @@
 use axum::{
-    middleware,
+    middleware as axum_middleware,
     routing::{get, post},
     Router,
 };
@@ -27,6 +27,8 @@ mod websocket;
 
 use config::Config;
 use database::Database;
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, AuditService};
+use utils::CronService;
 use error::AppError;
 use monitoring::MonitoringSystem;
 use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, RegulatoryService, IoTService, QualityService, SupplierService};
@@ -46,6 +48,7 @@ pub struct AppState {
     pub iot_service: Arc<IoTService>,
     pub quality_service: Arc<QualityService>,
     pub supplier_service: Arc<SupplierService>,
+    pub audit_service: Arc<AuditService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -85,6 +88,13 @@ impl AppState {
         let quality_service = Arc::new(QualityService::new(db.pool().clone()));
         let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
 
+        let audit_service = Arc::new(AuditService::new(
+            db.pool().clone(),
+            config.audit.enabled,
+            config.audit.hmac_key.clone(),
+            config.audit.retention_days,
+        ));
+        
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
         
@@ -102,6 +112,7 @@ impl AppState {
             iot_service,
             quality_service,
             supplier_service,
+            audit_service,
             redis_client,
             config,
             monitoring_system,
@@ -140,22 +151,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(middleware::from_fn(
+                .layer(axum_middleware::from_fn(
                     middleware::error_handler::request_logger,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::error_handler::global_error_handler,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::security::enforce_https,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::security::security_headers,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::security::cors_policy,
                 )),

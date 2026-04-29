@@ -18,6 +18,9 @@ pub mod carbon_calculator;
 pub mod carbon;
 pub use carbon::CarbonService;
 
+pub mod audit_service;
+pub use audit_service::AuditService;
+
 pub mod digital_twin_service;
 pub use digital_twin_service::DigitalTwinService;
 
