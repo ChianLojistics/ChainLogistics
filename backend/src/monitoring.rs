@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use tokio::sync::RwLock;
 use chrono::{DateTime, Utc, Duration};
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 use crate::error::ErrorCode;
 
@@ -48,6 +49,76 @@ pub struct ErrorStats {
     
     /// Most common errors
     pub top_errors: Vec<(String, u64)>,
+}
+
+/// Performance metrics for application monitoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceMetrics {
+    /// Request count by endpoint
+    pub request_counts: HashMap<String, u64>,
+    
+    /// Response times in milliseconds by endpoint
+    pub response_times: HashMap<String, Vec<f64>>,
+    
+    /// Average response time by endpoint
+    pub avg_response_times: HashMap<String, f64>,
+    
+    /// P95 response time by endpoint
+    pub p95_response_times: HashMap<String, f64>,
+    
+    /// P99 response time by endpoint
+    pub p99_response_times: HashMap<String, f64>,
+    
+    /// Last updated timestamp
+    pub last_updated: DateTime<Utc>,
+}
+
+/// Infrastructure metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InfrastructureMetrics {
+    /// Database connection pool usage
+    pub db_pool_usage: f64,
+    
+    /// Redis connection status
+    pub redis_connected: bool,
+    
+    /// Memory usage in MB
+    pub memory_usage_mb: u64,
+    
+    /// CPU usage percentage
+    pub cpu_usage_percent: f64,
+    
+    /// Active connections
+    pub active_connections: u64,
+    
+    /// Last updated timestamp
+    pub last_updated: DateTime<Utc>,
+}
+
+/// Comprehensive monitoring dashboard data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitoringDashboard {
+    /// Error statistics
+    pub error_stats: ErrorStats,
+    
+    /// Performance metrics
+    pub performance: PerformanceMetrics,
+    
+    /// Infrastructure metrics
+    pub infrastructure: InfrastructureMetrics,
+    
+    /// System health status
+    pub health_status: HealthStatus,
+    
+    /// Last updated timestamp
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HealthStatus {
+    Healthy,
+    Degraded,
+    Unhealthy,
 }
 
 impl ErrorMonitor {
@@ -160,6 +231,245 @@ impl ErrorMonitor {
 }
 
 impl Default for ErrorMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Performance monitoring for request tracking
+#[derive(Clone)]
+pub struct PerformanceMonitor {
+    metrics: Arc<RwLock<PerformanceMetrics>>,
+}
+
+impl PerformanceMonitor {
+    pub fn new() -> Self {
+        Self {
+            metrics: Arc::new(RwLock::new(PerformanceMetrics {
+                request_counts: HashMap::new(),
+                response_times: HashMap::new(),
+                avg_response_times: HashMap::new(),
+                p95_response_times: HashMap::new(),
+                p99_response_times: HashMap::new(),
+                last_updated: Utc::now(),
+            })),
+        }
+    }
+
+    /// Record a request with its response time
+    pub async fn record_request(&self, endpoint: String, response_time_ms: f64) {
+        let mut metrics = self.metrics.write().await;
+        
+        // Update request count
+        *metrics.request_counts.entry(endpoint.clone()).or_insert(0) += 1;
+        
+        // Add response time
+        metrics.response_times
+            .entry(endpoint.clone())
+            .or_insert_with(Vec::new)
+            .push(response_time_ms);
+        
+        // Keep only last 1000 response times per endpoint to avoid memory bloat
+        if let Some(times) = metrics.response_times.get_mut(&endpoint) {
+            if times.len() > 1000 {
+                times.drain(0..times.len() - 1000);
+            }
+        }
+        
+        // Recalculate statistics
+        self.calculate_percentiles(&mut metrics, &endpoint);
+        
+        metrics.last_updated = Utc::now();
+    }
+
+    fn calculate_percentiles(&self, metrics: &mut PerformanceMetrics, endpoint: &str) {
+        if let Some(times) = metrics.response_times.get(endpoint) {
+            if !times.is_empty() {
+                let mut sorted_times = times.clone();
+                sorted_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                
+                let avg: f64 = sorted_times.iter().sum::<f64>() / sorted_times.len() as f64;
+                metrics.avg_response_times.insert(endpoint.to_string(), avg);
+                
+                let p95_idx = (sorted_times.len() as f64 * 0.95) as usize;
+                let p99_idx = (sorted_times.len() as f64 * 0.99) as usize;
+                
+                metrics.p95_response_times.insert(
+                    endpoint.to_string(),
+                    sorted_times.get(p95_idx.min(sorted_times.len() - 1)).copied().unwrap_or(0.0),
+                );
+                metrics.p99_response_times.insert(
+                    endpoint.to_string(),
+                    sorted_times.get(p99_idx.min(sorted_times.len() - 1)).copied().unwrap_or(0.0),
+                );
+            }
+        }
+    }
+
+    /// Get current performance metrics
+    pub async fn get_metrics(&self) -> PerformanceMetrics {
+        self.metrics.read().await.clone()
+    }
+
+    /// Reset metrics
+    pub async fn reset(&self) {
+        let mut metrics = self.metrics.write().await;
+        metrics.request_counts.clear();
+        metrics.response_times.clear();
+        metrics.avg_response_times.clear();
+        metrics.p95_response_times.clear();
+        metrics.p99_response_times.clear();
+        metrics.last_updated = Utc::now();
+    }
+}
+
+impl Default for PerformanceMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Infrastructure monitoring
+#[derive(Clone)]
+pub struct InfrastructureMonitor {
+    metrics: Arc<RwLock<InfrastructureMetrics>>,
+}
+
+impl InfrastructureMonitor {
+    pub fn new() -> Self {
+        Self {
+            metrics: Arc::new(RwLock::new(InfrastructureMetrics {
+                db_pool_usage: 0.0,
+                redis_connected: false,
+                memory_usage_mb: 0,
+                cpu_usage_percent: 0.0,
+                active_connections: 0,
+                last_updated: Utc::now(),
+            })),
+        }
+    }
+
+    /// Update database pool usage
+    pub async fn update_db_pool_usage(&self, usage: f64) {
+        let mut metrics = self.metrics.write().await;
+        metrics.db_pool_usage = usage;
+        metrics.last_updated = Utc::now();
+    }
+
+    /// Update Redis connection status
+    pub async fn update_redis_status(&self, connected: bool) {
+        let mut metrics = self.metrics.write().await;
+        metrics.redis_connected = connected;
+        metrics.last_updated = Utc::now();
+    }
+
+    /// Update memory usage
+    pub async fn update_memory_usage(&self, usage_mb: u64) {
+        let mut metrics = self.metrics.write().await;
+        metrics.memory_usage_mb = usage_mb;
+        metrics.last_updated = Utc::now();
+    }
+
+    /// Update CPU usage
+    pub async fn update_cpu_usage(&self, usage_percent: f64) {
+        let mut metrics = self.metrics.write().await;
+        metrics.cpu_usage_percent = usage_percent;
+        metrics.last_updated = Utc::now();
+    }
+
+    /// Update active connections
+    pub async fn update_active_connections(&self, count: u64) {
+        let mut metrics = self.metrics.write().await;
+        metrics.active_connections = count;
+        metrics.last_updated = Utc::now();
+    }
+
+    /// Get current infrastructure metrics
+    pub async fn get_metrics(&self) -> InfrastructureMetrics {
+        self.metrics.read().await.clone()
+    }
+}
+
+impl Default for InfrastructureMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comprehensive monitoring system
+#[derive(Clone)]
+pub struct MonitoringSystem {
+    pub error_monitor: ErrorMonitor,
+    pub performance_monitor: PerformanceMonitor,
+    pub infrastructure_monitor: InfrastructureMonitor,
+    pub alerter: ErrorAlerter,
+}
+
+impl MonitoringSystem {
+    pub fn new() -> Self {
+        Self {
+            error_monitor: ErrorMonitor::new(),
+            performance_monitor: PerformanceMonitor::new(),
+            infrastructure_monitor: InfrastructureMonitor::new(),
+            alerter: ErrorAlerter::new(AlertConfig::default()),
+        }
+    }
+
+    /// Get comprehensive dashboard data
+    pub async fn get_dashboard(&self) -> MonitoringDashboard {
+        let error_stats = self.error_monitor.get_stats().await;
+        let performance = self.performance_monitor.get_metrics().await;
+        let infrastructure = self.infrastructure_monitor.get_metrics().await;
+        
+        // Determine health status based on metrics
+        let health_status = if infrastructure.redis_connected 
+            && infrastructure.db_pool_usage < 0.9 
+            && error_stats.error_rate < 5.0 {
+            HealthStatus::Healthy
+        } else if infrastructure.redis_connected 
+            && infrastructure.db_pool_usage < 0.95 
+            && error_stats.error_rate < 20.0 {
+            HealthStatus::Degraded
+        } else {
+            HealthStatus::Unhealthy
+        };
+
+        MonitoringDashboard {
+            error_stats,
+            performance,
+            infrastructure,
+            health_status,
+            last_updated: Utc::now(),
+        }
+    }
+
+    /// Check for alerts and trigger if needed
+    pub async fn check_alerts(&self) {
+        let error_stats = self.error_monitor.get_stats().await;
+        let infrastructure = self.infrastructure_monitor.get_metrics().await;
+        
+        // Check error rate
+        if self.alerter.should_alert(ErrorCode::InternalServerError, error_stats.error_rate).await {
+            self.alerter.trigger_alert(
+                format!("High error rate detected: {:.2} errors/min", error_stats.error_rate)
+            ).await;
+        }
+        
+        // Check database pool usage
+        if infrastructure.db_pool_usage > 0.9 {
+            self.alerter.trigger_alert(
+                format!("High database pool usage: {:.1}%", infrastructure.db_pool_usage * 100.0)
+            ).await;
+        }
+        
+        // Check Redis connection
+        if !infrastructure.redis_connected {
+            self.alerter.trigger_alert("Redis connection lost".to_string()).await;
+        }
+    }
+}
+
+impl Default for MonitoringSystem {
     fn default() -> Self {
         Self::new()
     }

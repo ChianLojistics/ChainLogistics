@@ -140,7 +140,42 @@ pub async fn cors_policy(
         .get(header::ORIGIN)
         .and_then(|v| v.to_str().ok());
 
-    // Check if origin is allowed
+    // Handle pre-flight OPTIONS requests
+    if request.method() == axum::http::Method::OPTIONS {
+        if let Some(origin_value) = origin {
+            let is_allowed = state.config.security.allowed_origins.iter().any(|allowed| {
+                // Support wildcard subdomains
+                if allowed.starts_with("*.") {
+                    let domain = &allowed[2..];
+                    origin_value.ends_with(domain)
+                } else {
+                    origin_value == allowed
+                }
+            });
+
+            if is_allowed {
+                return Ok((
+                    StatusCode::OK,
+                    [
+                        (header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_str(origin_value).unwrap()),
+                        (header::ACCESS_CONTROL_ALLOW_CREDENTIALS, HeaderValue::from_static("true")),
+                        (header::ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, POST, PUT, DELETE, PATCH, OPTIONS")),
+                        (header::ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("Content-Type, Authorization, X-Requested-With, X-CSRF-Token")),
+                        (header::ACCESS_CONTROL_EXPOSE_HEADERS, HeaderValue::from_static("Content-Length, Content-Type")),
+                        (header::ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("86400")), // 24 hours
+                        (header::VARY, HeaderValue::from_static("Origin")),
+                    ]
+                ).into_response());
+            } else {
+                tracing::warn!("Blocked pre-flight request from unauthorized origin: {}", origin_value);
+                return Err(AppError::Forbidden);
+            }
+        }
+        // No origin header - allow OPTIONS without CORS headers
+        return Ok(StatusCode::OK.into_response());
+    }
+
+    // Check if origin is allowed for non-OPTIONS requests
     if let Some(origin_value) = origin {
         let is_allowed = state.config.security.allowed_origins.iter().any(|allowed| {
             // Support wildcard subdomains
@@ -173,15 +208,23 @@ pub async fn cors_policy(
         );
         headers.insert(
             header::ACCESS_CONTROL_ALLOW_METHODS,
-            HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"),
+            HeaderValue::from_static("GET, POST, PUT, DELETE, PATCH, OPTIONS"),
         );
         headers.insert(
             header::ACCESS_CONTROL_ALLOW_HEADERS,
-            HeaderValue::from_static("Content-Type, Authorization, X-Requested-With"),
+            HeaderValue::from_static("Content-Type, Authorization, X-Requested-With, X-CSRF-Token"),
+        );
+        headers.insert(
+            header::ACCESS_CONTROL_EXPOSE_HEADERS,
+            HeaderValue::from_static("Content-Length, Content-Type"),
         );
         headers.insert(
             header::ACCESS_CONTROL_MAX_AGE,
             HeaderValue::from_static("86400"), // 24 hours
+        );
+        headers.insert(
+            header::VARY,
+            HeaderValue::from_static("Origin"),
         );
     }
 

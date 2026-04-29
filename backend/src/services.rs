@@ -18,8 +18,23 @@ pub mod carbon_calculator;
 pub mod carbon;
 pub use carbon::CarbonService;
 
+pub mod audit_service;
+pub use audit_service::AuditService;
+
 pub mod digital_twin_service;
 pub use digital_twin_service::DigitalTwinService;
+
+pub mod regulatory_service;
+pub use regulatory_service::RegulatoryService;
+
+pub mod iot_service;
+pub use iot_service::IoTService;
+
+pub mod quality_service;
+pub use quality_service::QualityService;
+
+pub mod supplier_service;
+pub use supplier_service::SupplierService;
 
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.

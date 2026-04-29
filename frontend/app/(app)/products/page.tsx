@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@/lib/hooks/useWallet";
 import { getProductsByOwner } from "@/lib/contract/products";
 import type { Product } from "@/lib/types/product";
@@ -9,6 +10,9 @@ import { ProductFilters, type FilterState } from "@/components/products/ProductF
 
 export default function ProductsPage() {
   const { publicKey } = useWallet();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +24,41 @@ export default function ProductsPage() {
     dateFrom: "",
     dateTo: "",
   });
+
+  useEffect(() => {
+    const next: FilterState = {
+      search: searchParams.get("q") ?? "",
+      owner: searchParams.get("owner") ?? "",
+      category: searchParams.get("category") ?? "",
+      status: (searchParams.get("status") as FilterState["status"]) ?? "all",
+      dateFrom: searchParams.get("from") ?? "",
+      dateTo: searchParams.get("to") ?? "",
+    };
+
+    if (next.status !== "all" && next.status !== "active" && next.status !== "inactive") {
+      next.status = "all";
+    }
+
+    setFilters(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (filters.search.trim()) params.set("q", filters.search.trim());
+      if (filters.owner) params.set("owner", filters.owner);
+      if (filters.category) params.set("category", filters.category);
+      if (filters.status !== "all") params.set("status", filters.status);
+      if (filters.dateFrom) params.set("from", filters.dateFrom);
+      if (filters.dateTo) params.set("to", filters.dateTo);
+
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    }, 250);
+
+    return () => clearTimeout(t);
+  }, [filters, pathname, router]);
 
   const fetchProducts = useCallback(async () => {
     if (!publicKey) {
@@ -62,6 +101,17 @@ export default function ProductsPage() {
     return Array.from(owners).sort();
   }, [products]);
 
+  const suggestions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>();
+    for (const p of products) {
+      map.set(`name:${p.id}`, { id: `name:${p.id}`, label: p.name });
+      map.set(`id:${p.id}`, { id: `id:${p.id}`, label: p.id });
+      const origin = p.origin?.location;
+      if (origin) map.set(`origin:${origin}`, { id: `origin:${origin}`, label: origin });
+    }
+    return Array.from(map.values());
+  }, [products]);
+
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
       <div className="mb-8">
@@ -101,6 +151,7 @@ export default function ProductsPage() {
         onFiltersChange={setFilters}
         availableCategories={availableCategories}
         availableOwners={availableOwners}
+        suggestions={suggestions}
       />
 
       <ProductList products={products} filters={filters} isLoading={isLoading} />

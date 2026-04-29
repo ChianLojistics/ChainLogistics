@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { SearchInput, type SearchInputSuggestion } from "@/components/ui/SearchInput";
+import {
+  loadSavedSearches,
+  persistSavedSearches,
+  type SavedSearch,
+} from "@/lib/search/savedSearches";
 
 export type FilterState = {
   search: string;
@@ -11,11 +17,14 @@ export type FilterState = {
   dateTo: string;
 };
 
+ type SavedFilters = FilterState;
+
 type ProductFiltersProps = {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   availableCategories: string[];
   availableOwners: string[];
+  suggestions?: readonly SearchInputSuggestion[];
 };
 
 export function ProductFilters({
@@ -23,8 +32,13 @@ export function ProductFilters({
   onFiltersChange,
   availableCategories,
   availableOwners,
+  suggestions = [],
 }: ProductFiltersProps) {
   const [localSearch, setLocalSearch] = useState(filters.search);
+
+  const storageKey = "chainlogistics.products.savedSearches";
+  const [saved, setSaved] = useState<SavedSearch<SavedFilters>[]>([]);
+  const [saveName, setSaveName] = useState("");
 
   // Debounce search input
   useEffect(() => {
@@ -35,6 +49,10 @@ export function ProductFilters({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSearch]);
+
+  useEffect(() => {
+    setSaved(loadSavedSearches<SavedFilters>(storageKey));
+  }, []);
 
   const updateFilter = (key: keyof FilterState, value: string) => {
     onFiltersChange({ ...filters, [key]: value });
@@ -51,6 +69,40 @@ export function ProductFilters({
     };
     setLocalSearch("");
     onFiltersChange(cleared);
+  };
+
+  const canSave = useMemo(() => {
+    const name = saveName.trim();
+    if (!name) return false;
+    return true;
+  }, [saveName]);
+
+  const saveCurrent = () => {
+    const name = saveName.trim();
+    if (!name) return;
+
+    const next: SavedSearch<SavedFilters> = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name,
+      filters,
+      createdAt: Date.now(),
+    };
+
+    const nextSaved = [next, ...saved].slice(0, 20);
+    setSaved(nextSaved);
+    persistSavedSearches(storageKey, nextSaved);
+    setSaveName("");
+  };
+
+  const applySaved = (item: SavedSearch<SavedFilters>) => {
+    setLocalSearch(item.filters.search);
+    onFiltersChange(item.filters);
+  };
+
+  const deleteSaved = (id: string) => {
+    const nextSaved = saved.filter((s) => s.id !== id);
+    setSaved(nextSaved);
+    persistSavedSearches(storageKey, nextSaved);
   };
 
   const hasActiveFilters =
@@ -84,14 +136,71 @@ export function ProductFilters({
           >
             Search
           </label>
-          <input
+          <SearchInput
             id="search"
-            type="text"
             value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-            placeholder="Search by name, ID, or description..."
-            className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            onValueChange={setLocalSearch}
+            suggestions={suggestions}
+            placeholder="Search by name, ID, or origin..."
+            minQueryLength={1}
+            maxSuggestions={8}
+            emptyText="No suggestions"
           />
+        </div>
+
+        {/* Saved Searches */}
+        <div className="lg:col-span-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-zinc-700 mb-2" htmlFor="saveSearchName">
+                Saved searches
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="saveSearchName"
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="Name this search..."
+                  className="flex-1 px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={saveCurrent}
+                  disabled={!canSave}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {saved.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {saved.map((s) => (
+                <div key={s.id} className="inline-flex items-center overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
+                  <button
+                    type="button"
+                    onClick={() => applySaved(s)}
+                    className="px-3 py-1.5 text-sm text-zinc-900 hover:bg-zinc-100"
+                    title="Apply saved search"
+                  >
+                    {s.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteSaved(s.id)}
+                    className="px-2 py-1.5 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+                    aria-label={`Delete saved search ${s.name}`}
+                    title="Delete saved search"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {/* Owner Filter */}

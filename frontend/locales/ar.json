@@ -1,0 +1,50 @@
+{
+  "language": "اللغة",
+  "products": "المنتجات",
+  "search": "بحث",
+  "connect_wallet": "ربط المحفظة",
+  "disconnect": "قطع الاتصال",
+  "welcome": "مرحباً",
+  "status": "الحالة",
+  "date": "التاريخ",
+  "owner": "المالك",
+  "category": "الفئة",
+
+  "skip_to_main": "انتقل إلى المحتوى الرئيسي",
+
+  "dashboard_title": "لوحة التحكم",
+  "dashboard_subtitle": "تحليلات سلسلة التوريد لمنتجاتك المسجلة.",
+  "refresh": "تحديث",
+
+  "connect_your_wallet": "قم بربط محفظتك",
+  "connect_wallet_to_load": "اربط محفظة لتحميل المنتجات والأحداث للتحليلات.",
+
+  "events_unavailable": "الأحداث غير متاحة",
+  "contract_not_configured_warning": "العقد غير مُعد. ستعرض لوحة التحكم بيانات المنتجات فقط.",
+  "events_load_warning": "تعذر تحميل أحداث التتبع. ستعرض لوحة التحكم بيانات المنتجات فقط.",
+  "failed_to_load_dashboard": "تعذر تحميل لوحة التحكم",
+  "contract_not_configured_error": "العقد غير مُعد. أضف NEXT_PUBLIC_CONTRACT_ID ثم أعد التحميل.",
+  "unable_to_load_dashboard": "تعذر تحميل بيانات لوحة التحكم. تحقق من الاتصال ثم حاول مرة أخرى.",
+  "retry": "إعادة المحاولة",
+  "auto_refreshes": "يتم التحديث تلقائياً عندما تكون علامة التبويب مرئية.",
+
+  "total_products": "إجمالي المنتجات",
+  "total_events": "إجمالي الأحداث",
+  "top_origin": "أهم منشأ",
+  "last_updated": "آخر تحديث",
+
+  "products_visible_to_wallet": "المنتجات الظاهرة حالياً لمحفظتك.",
+  "all_loaded_events": "جميع أحداث التتبع المحمّلة.",
+
+  "no_products_yet": "لا توجد منتجات بعد.",
+
+  "activity_over_time": "النشاط عبر الزمن",
+  "events_grouped_by_day": "الأحداث مُجمّعة حسب اليوم.",
+  "no_activity_yet": "لا يوجد نشاط بعد.",
+
+  "top_origins": "أهم المناشئ",
+  "most_common_origins": "أكثر مناشئ المنتجات شيوعاً.",
+
+  "products_count_one": "{{count}} منتج",
+  "products_count_other": "{{count}} منتجات"
+}

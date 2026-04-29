@@ -331,6 +331,7 @@ dependencies = [
  "chrono",
  "config",
  "hex",
+ "hmac",
  "jsonwebtoken",
  "lazy_static",
  "rand",

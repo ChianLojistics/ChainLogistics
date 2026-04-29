@@ -1,0 +1,50 @@
+{
+  "language": "Langue",
+  "products": "Produits",
+  "search": "Rechercher",
+  "connect_wallet": "Connecter le portefeuille",
+  "disconnect": "Déconnecter",
+  "welcome": "Bienvenue",
+  "status": "Statut",
+  "date": "Date",
+  "owner": "Propriétaire",
+  "category": "Catégorie",
+
+  "skip_to_main": "Aller au contenu principal",
+
+  "dashboard_title": "Tableau de bord",
+  "dashboard_subtitle": "Analyses de la chaîne d'approvisionnement pour vos produits enregistrés.",
+  "refresh": "Actualiser",
+
+  "connect_your_wallet": "Connectez votre portefeuille",
+  "connect_wallet_to_load": "Connectez un portefeuille pour charger les produits et les événements pour l'analyse.",
+
+  "events_unavailable": "Événements indisponibles",
+  "contract_not_configured_warning": "Le contrat n'est pas configuré. Le tableau de bord affichera uniquement des informations sur les produits.",
+  "events_load_warning": "Nous n'avons pas pu charger les événements de suivi. Le tableau de bord affichera uniquement des informations sur les produits.",
+  "failed_to_load_dashboard": "Échec du chargement du tableau de bord",
+  "contract_not_configured_error": "Le contrat n'est pas configuré. Ajoutez NEXT_PUBLIC_CONTRACT_ID et rechargez.",
+  "unable_to_load_dashboard": "Impossible de charger les données du tableau de bord. Vérifiez votre connexion et réessayez.",
+  "retry": "Réessayer",
+  "auto_refreshes": "Actualisation automatique lorsque l'onglet est visible.",
+
+  "total_products": "Produits au total",
+  "total_events": "Événements au total",
+  "top_origin": "Origine principale",
+  "last_updated": "Dernière mise à jour",
+
+  "products_visible_to_wallet": "Produits actuellement visibles pour votre portefeuille.",
+  "all_loaded_events": "Tous les événements de suivi chargés.",
+
+  "no_products_yet": "Aucun produit pour le moment.",
+
+  "activity_over_time": "Activité dans le temps",
+  "events_grouped_by_day": "Événements regroupés par jour.",
+  "no_activity_yet": "Aucune activité pour le moment.",
+
+  "top_origins": "Principales origines",
+  "most_common_origins": "Origines de produits les plus courantes.",
+
+  "products_count_one": "{{count}} produit",
+  "products_count_other": "{{count}} produits"
+}

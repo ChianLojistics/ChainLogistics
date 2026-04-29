@@ -86,4 +86,12 @@ pub enum Error {
     InvalidTimestamp = 92,
     ArithmeticOverflow = 93,
     ReentrancyDetected = 94,
+
+    // --- Quality Control (100-110) ---
+    InvalidLimit = 100,
+    QualityControlNotEnabled = 101,
+    SensorNotAuthorized = 102,
+    CertificationNotFound = 103,
+    InvalidCertification = 104,
+    ReadingNotFound = 105,
 }

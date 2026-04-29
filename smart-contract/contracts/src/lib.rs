@@ -9,6 +9,7 @@ mod contract;
 mod error;
 mod events;
 mod multisig;
+mod quality_control;
 mod storage;
 mod storage_contract;
 mod types;
@@ -79,6 +80,7 @@ pub use authorization::*;
 pub use contract::*;
 pub use error::*;
 pub use multisig::*;
+pub use quality_control::*;
 pub use types::*;
 
 #[cfg(not(target_arch = "wasm32"))]

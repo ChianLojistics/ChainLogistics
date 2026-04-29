@@ -3,11 +3,12 @@
 import { useMemo, useState, useEffect } from "react";
 import type { Product } from "@/lib/types/product";
 import { normalizeUnixSeconds } from "@/lib/types/product";
+import { fuzzyScore } from "@/lib/search/fuzzy";
 import type { FilterState } from "./ProductFilters";
 import { ProductCard } from "./ProductCard";
 import { Skeleton } from "@/components/ui";
 
-export type SortOption = "newest" | "oldest" | "name";
+export type SortOption = "newest" | "oldest" | "name" | "relevance";
 
 type ProductListProps = {
   products: Product[];
@@ -27,74 +28,110 @@ export function ProductList({
 
   // Filter products
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      // Search filter
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const matchesSearch =
-          product.name.toLowerCase().includes(searchLower) ||
-          product.id.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower) ||
-          product.origin.location.toLowerCase().includes(searchLower);
-        if (!matchesSearch) return false;
-      }
+    const q = filters.search.trim();
 
-      // Owner filter
-      if (filters.owner && product.owner !== filters.owner) {
-        return false;
-      }
+    return products
+      .map((product) => {
+        if (!q) return { product, matchScore: 0 };
 
-      // Category filter
-      if (filters.category && product.category !== filters.category) {
-        return false;
-      }
+        const fields = [
+          product.name,
+          product.id,
+          product.description ?? "",
+          product.origin.location,
+        ];
 
-      // Status filter
-      if (filters.status !== "all") {
-        const isActive = filters.status === "active";
-        const productIsActive = product.active ?? product.is_active ?? product.isActive ?? false;
-        if (productIsActive !== isActive) return false;
-      }
+        let best = 0;
+        let matchedAny = false;
 
-      // Date range filter
-      const createdAt = normalizeUnixSeconds(product.created_at ?? product.createdAt ?? 0);
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom).getTime() / 1000;
-        if (createdAt < fromDate) return false;
-      }
-      if (filters.dateTo) {
-        const toDate = new Date(filters.dateTo).getTime() / 1000;
-        // Add one day to include the entire end date
-        const toDateEnd = toDate + 24 * 60 * 60;
-        if (createdAt > toDateEnd) return false;
-      }
+        for (const field of fields) {
+          const res = fuzzyScore(q, field);
+          if (res.matched) {
+            matchedAny = true;
+            best = Math.max(best, res.score);
+          }
+        }
 
-      return true;
-    });
+        return { product, matchScore: matchedAny ? best : -1 };
+      })
+      .filter(({ product, matchScore }) => {
+        if (q && matchScore < 0) return false;
+
+        // Owner filter
+        if (filters.owner && product.owner !== filters.owner) {
+          return false;
+        }
+
+        // Category filter
+        if (filters.category && product.category !== filters.category) {
+          return false;
+        }
+
+        // Status filter
+        if (filters.status !== "all") {
+          const isActive = filters.status === "active";
+          const productIsActive =
+            product.active ?? product.is_active ?? product.isActive ?? false;
+          if (productIsActive !== isActive) return false;
+        }
+
+        // Date range filter
+        const createdAt = normalizeUnixSeconds(product.created_at ?? product.createdAt ?? 0);
+        if (filters.dateFrom) {
+          const fromDate = new Date(filters.dateFrom).getTime() / 1000;
+          if (createdAt < fromDate) return false;
+        }
+        if (filters.dateTo) {
+          const toDate = new Date(filters.dateTo).getTime() / 1000;
+          // Add one day to include the entire end date
+          const toDateEnd = toDate + 24 * 60 * 60;
+          if (createdAt > toDateEnd) return false;
+        }
+
+        return true;
+      })
+      .map((x) => x);
   }, [products, filters]);
 
   // Sort products
   const sortedProducts = useMemo(() => {
     const sorted = [...filteredProducts];
     switch (sortBy) {
+      case "relevance":
+        return sorted
+          .sort((a, b) => b.matchScore - a.matchScore)
+          .map((x) => x.product);
       case "newest":
-        return sorted.sort(
-          (a, b) =>
-            normalizeUnixSeconds(b.created_at ?? b.createdAt ?? 0) -
-            normalizeUnixSeconds(a.created_at ?? a.createdAt ?? 0)
-        );
+        return sorted
+          .map((x) => x.product)
+          .sort(
+            (a, b) =>
+              normalizeUnixSeconds(b.created_at ?? b.createdAt ?? 0) -
+              normalizeUnixSeconds(a.created_at ?? a.createdAt ?? 0)
+          );
       case "oldest":
-        return sorted.sort(
-          (a, b) =>
-            normalizeUnixSeconds(a.created_at ?? a.createdAt ?? 0) -
-            normalizeUnixSeconds(b.created_at ?? b.createdAt ?? 0)
-        );
+        return sorted
+          .map((x) => x.product)
+          .sort(
+            (a, b) =>
+              normalizeUnixSeconds(a.created_at ?? a.createdAt ?? 0) -
+              normalizeUnixSeconds(b.created_at ?? b.createdAt ?? 0)
+          );
       case "name":
-        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+        return sorted
+          .map((x) => x.product)
+          .sort((a, b) => a.name.localeCompare(b.name));
       default:
-        return sorted;
+        return sorted.map((x) => x.product);
     }
   }, [filteredProducts, sortBy]);
+
+  useEffect(() => {
+    if (filters.search.trim() && sortBy === "newest") {
+      setSortBy("relevance");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search]);
 
   // Pagination
   const totalPages = Math.ceil(sortedProducts.length / ITEMS_PER_PAGE);
@@ -197,6 +234,7 @@ export function ProductList({
             onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-sm"
           >
+            {filters.search.trim() ? <option value="relevance">Relevance</option> : null}
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="name">Name (A-Z)</option>
