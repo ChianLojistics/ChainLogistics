@@ -46,6 +46,62 @@ pub struct TrackingEvent {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct Recall {
+    pub id: Uuid,
+    pub product_id: String,
+    pub batch_id: Option<String>,
+    pub title: String,
+    pub reason: String,
+    pub severity: String,
+    pub status: String,
+    pub trigger_type: String,
+    pub triggered_by: Option<String>,
+    pub triggered_event_id: Option<i64>,
+    pub started_at: DateTime<Utc>,
+    pub closed_at: Option<DateTime<Utc>>,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct RecallAffectedItem {
+    pub id: Uuid,
+    pub recall_id: Uuid,
+    pub product_id: String,
+    pub batch_id: Option<String>,
+    pub stakeholder_role: Option<String>,
+    pub stakeholder_address: Option<String>,
+    pub detected_via: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct RecallNotification {
+    pub id: Uuid,
+    pub recall_id: Uuid,
+    pub recipient: String,
+    pub channel: String,
+    pub status: String,
+    pub sent_at: Option<DateTime<Utc>>,
+    pub acknowledged_at: Option<DateTime<Utc>>,
+    pub payload: serde_json::Value,
+    pub error: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct RecallEffectiveness {
+    pub recall_id: Uuid,
+    pub affected_count: i32,
+    pub notified_count: i32,
+    pub acknowledged_count: i32,
+    pub recovered_count: i32,
+    pub disposed_count: i32,
+    pub last_updated_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "text", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]

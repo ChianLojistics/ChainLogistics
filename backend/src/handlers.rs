@@ -11,6 +11,7 @@ pub mod compliance;
 pub mod carbon;
 pub mod digital_twin;
 pub mod api_keys;
+pub mod recall;
 pub mod regulatory;
 pub mod iot;
 pub mod quality;
