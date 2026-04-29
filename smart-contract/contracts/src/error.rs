@@ -59,4 +59,20 @@ pub enum Error {
     InvalidThreshold = 66,
     TooManySigners = 67,
     DuplicateSigner = 68,
+
+    // --- Circuit Breaker (70-90) ---
+    CircuitBreakerNotInitialized = 70,
+    CircuitBreakerAlreadyInitialized = 71,
+    NotGuardian = 72,
+    TooManyGuardians = 73,
+    DuplicateGuardian = 74,
+    PauseRecordNotFound = 75,
+    ApprovalNotFound = 76,
+    ApprovalAlreadyExecuted = 77,
+    ApprovalAlreadyVoted = 78,
+    ApprovalExpired = 79,
+    ApprovalThresholdNotReached = 80,
+    PauseExpired = 81,
+    InvalidPauseDuration = 82,
+    PauseDescriptionTooLong = 83,
 }

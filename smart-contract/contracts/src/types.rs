@@ -104,6 +104,14 @@ pub enum DataKey {
     MultiSigConfig,        // Multi-signature configuration
     Proposal(u64),         // Proposal by ID
     NextProposalId,        // Next proposal ID counter
+    // ── Circuit Breaker ──────────────────────────────────────────────────
+    CircuitBreakerContract,       // Address of the circuit breaker contract
+    CircuitBreakerState,          // Global CircuitBreakerState struct
+    CircuitBreakerGuardians,      // Vec<Address> of authorised guardians
+    CircuitBreakerPauseRecord(u64), // PauseRecord by sequential ID
+    CircuitBreakerNextRecordId,   // u64 counter for pause records
+    CircuitBreakerPendingApproval(u64), // PauseApproval struct for multi-auth pauses
+    CircuitBreakerNextApprovalId, // u64 counter for pending approvals
 }
 
 #[contracttype]
@@ -176,4 +184,82 @@ pub struct Proposal {
     pub created_at: u64,
     pub executed: bool,
     pub approvals: Vec<Address>,
+}
+
+// ─── Circuit Breaker Types ────────────────────────────────────────────────────
+
+/// Severity level of a pause — controls which functions are blocked.
+///
+/// | Level      | Blocked operations                                      |
+/// |------------|---------------------------------------------------------|
+/// | Advisory   | None — informational only, no functions blocked         |
+/// | Partial    | Tracking event writes; product registration             |
+/// | Full       | All state-mutating operations                           |
+/// | Emergency  | All operations including reads (except status queries)  |
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PauseLevel {
+    /// Informational — no functions blocked.
+    Advisory,
+    /// Block write operations (add_tracking_event, register_product).
+    Partial,
+    /// Block all state-mutating operations.
+    Full,
+    /// Block everything including reads (maximum lockdown).
+    Emergency,
+}
+
+/// Reason category for a pause — used for off-chain monitoring and audit.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PauseReason {
+    SecurityBreach,
+    OracleFailure,
+    RegulatoryAction,
+    ContractBug,
+    MarketVolatility,
+    Maintenance,
+    Other,
+}
+
+/// Immutable record written to storage when a pause is activated or lifted.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PauseRecord {
+    pub record_id: u64,
+    pub activated_by: Address,
+    pub level: PauseLevel,
+    pub reason: PauseReason,
+    pub description: String,
+    pub activated_at: u64,
+    /// 0 means no expiry.
+    pub expires_at: u64,
+    pub lifted_at: u64,
+    pub lifted_by: Vec<Address>,
+}
+
+/// Live state of the circuit breaker stored in persistent storage.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CircuitBreakerState {
+    pub is_paused: bool,
+    pub level: PauseLevel,
+    pub current_record_id: u64,
+    pub paused_at: u64,
+    pub expires_at: u64,
+}
+
+/// A pending multi-authority pause approval request.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PauseApproval {
+    pub approval_id: u64,
+    pub proposed_level: PauseLevel,
+    pub proposed_reason: PauseReason,
+    pub description: String,
+    pub expires_at: u64,
+    pub proposer: Address,
+    pub approvals: Vec<Address>,
+    pub required_approvals: u32,
+    pub executed: bool,
 }
