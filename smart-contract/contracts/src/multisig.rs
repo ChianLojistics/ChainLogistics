@@ -72,7 +72,12 @@ fn require_signer(env: &Env, caller: &Address) -> Result<(), Error> {
 
 fn approval_threshold(env: &Env, kind: &Symbol) -> Option<u32> {
     let config = get_multisig_config(env)?;
-    Some(config.thresholds.get(kind.clone()).unwrap_or(config.threshold))
+    Some(
+        config
+            .thresholds
+            .get(kind.clone())
+            .unwrap_or(config.threshold),
+    )
 }
 
 fn threshold_reached(env: &Env, kind: &Symbol, approvals: &Vec<Address>) -> bool {
@@ -87,7 +92,10 @@ fn rejection_threshold_reached(env: &Env, kind: &Symbol, rejections: &Vec<Addres
         return false;
     };
 
-    let threshold = config.thresholds.get(kind.clone()).unwrap_or(config.threshold);
+    let threshold = config
+        .thresholds
+        .get(kind.clone())
+        .unwrap_or(config.threshold);
     let max_rejections = config
         .signers
         .len()
