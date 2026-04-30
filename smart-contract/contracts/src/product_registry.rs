@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
 use crate::events::{ProductDeactivated, ProductReactivated, ProductRegistered};

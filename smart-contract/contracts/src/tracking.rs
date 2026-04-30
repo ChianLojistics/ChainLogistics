@@ -211,11 +211,11 @@ mod test_tracking {
     fn setup_uninitialized(
         env: &Env,
     ) -> (
-        ChainLogisticsContractClient,
-        ProductRegistryContractClient,
+        ChainLogisticsContractClient<'_>,
+        ProductRegistryContractClient<'_>,
         Address,
         Address,
-        super::TrackingContractClient,
+        super::TrackingContractClient<'_>,
     ) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let cl_id = env.register_contract(None, ChainLogisticsContract);
@@ -239,11 +239,11 @@ mod test_tracking {
     fn setup_initialized(
         env: &Env,
     ) -> (
-        ChainLogisticsContractClient,
-        ProductRegistryContractClient,
+        ChainLogisticsContractClient<'_>,
+        ProductRegistryContractClient<'_>,
         Address,
         Address,
-        super::TrackingContractClient,
+        super::TrackingContractClient<'_>,
     ) {
         let (cl_client, registry_client, admin, cl_id, tracking_client) = setup_uninitialized(env);
         tracking_client.init(&cl_id);

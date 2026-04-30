@@ -10,9 +10,9 @@ use soroban_sdk::{
 fn setup(
     env: &Env,
 ) -> (
-    ChainLogisticsContractClient,
-    ProductRegistryContractClient,
-    AuthorizationContractClient,
+    ChainLogisticsContractClient<'_>,
+    ProductRegistryContractClient<'_>,
+    AuthorizationContractClient<'_>,
     Address,
     Address,
     Address,

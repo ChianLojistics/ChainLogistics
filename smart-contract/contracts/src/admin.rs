@@ -153,7 +153,7 @@ mod test_admin {
 
     use crate::{AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient};
 
-    fn setup(env: &Env) -> (AdminContractClient, Address) {
+    fn setup(env: &Env) -> (AdminContractClient<'_>, Address) {
         let contract_id = env.register_contract(None, AdminContract);
         let client = AdminContractClient::new(env, &contract_id);
         let admin = Address::generate(env);

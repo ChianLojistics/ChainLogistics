@@ -405,9 +405,9 @@ mod test_event_query {
     fn setup(
         env: &Env,
     ) -> (
-        ProductRegistryContractClient,
-        TrackingContractClient,
-        super::EventQueryContractClient,
+        ProductRegistryContractClient<'_>,
+        TrackingContractClient<'_>,
+        super::EventQueryContractClient<'_>,
         Address,
         Address,
     ) {

@@ -55,6 +55,7 @@ fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
 }
 
 /// Writes a product to storage.
+#[allow(dead_code)]
 fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
@@ -68,6 +69,7 @@ fn calc_has_more(offset: u64, current_len: u64, total_count: u64) -> Result<bool
 
 /// Ensures the caller is the product owner.
 /// Returns Unauthorized if caller is not the owner.
+#[allow(dead_code)]
 fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     caller.require_auth();
     if &product.owner != caller {

@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
 
 use crate::error::Error;
 use crate::events::ProductTransferred;
@@ -135,10 +135,12 @@ fn transfer_batch_chunk(
             auth_client.update_product_owner(owner, &product_id, new_owner);
             pr_client.transfer_owner(&self_address, &product_id, new_owner);
 
-            env.events().publish(
-                (Symbol::new(env, "product_transferred"), product_id),
-                (owner.clone(), new_owner.clone()),
-            );
+            ProductTransferred {
+                product_id,
+                from: owner.clone(),
+                to: new_owner.clone(),
+            }
+            .publish(env);
 
             transferred_count = transferred_count
                 .checked_add(1)
@@ -346,6 +348,10 @@ impl ProductTransferContract {
         estimate_batch(item_count)
     }
 
+    pub fn get_batch_transfer_gas_policy(_env: Env) -> GasPolicy {
+        gas_policy()
+    }
+
     pub fn batch_transfer_products_chunk(
         env: Env,
         owner: Address,
@@ -372,10 +378,10 @@ mod test_product_transfer {
     fn setup(
         env: &Env,
     ) -> (
-        ProductRegistryContractClient,
-        AuthorizationContractClient,
+        ProductRegistryContractClient<'_>,
+        AuthorizationContractClient<'_>,
         Address,
-        ProductTransferContractClient,
+        ProductTransferContractClient<'_>,
         Address,
     ) {
         let auth_id = env.register_contract(None, AuthorizationContract);

@@ -357,7 +357,7 @@ mod test_upgrade {
 
     use crate::{AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient};
 
-    fn setup(env: &Env) -> (UpgradeContractClient, Address) {
+    fn setup(env: &Env) -> (UpgradeContractClient<'_>, Address) {
         let contract_id = env.register_contract(None, UpgradeContract);
         let client = UpgradeContractClient::new(env, &contract_id);
         let admin = Address::generate(env);

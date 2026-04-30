@@ -1,7 +1,5 @@
 #![cfg_attr(test, allow(unused_imports, unused_variables))]
-// Test-only allowances: During testing, we often import utilities and declare variables
-// that are only used for test setup or debugging. These warnings are suppressed
-// for test code to avoid noise while maintaining strict warnings for production code.
+#![cfg_attr(test, allow(deprecated))]
 #![no_std]
 
 mod authorization;

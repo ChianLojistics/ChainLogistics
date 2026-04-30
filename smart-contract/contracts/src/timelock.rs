@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use soroban_sdk::{
     auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation},
     contract, contractimpl, vec, Address, Env, IntoVal, Symbol, Val, Vec,
@@ -359,11 +361,11 @@ mod test_timelock {
     fn setup(
         env: &Env,
     ) -> (
-        TimelockContractClient,
+        TimelockContractClient<'_>,
         Address,
         Address,
-        crate::ChainLogisticsContractClient,
-        UpgradeContractClient,
+        crate::ChainLogisticsContractClient<'_>,
+        UpgradeContractClient<'_>,
         Address,
     ) {
         let timelock_id = env.register_contract(None, TimelockContract);

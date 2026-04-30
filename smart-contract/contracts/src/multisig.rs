@@ -10,7 +10,6 @@ use crate::events::{
     ProposalSubmitted, UnpauseExecuted, UpgradeCompleteExecuted, UpgradeFailExecuted,
     UpgradeInitiateExecuted,
 };
-use crate::types::{DataKey, MultiSigConfig, Proposal};
 use crate::types::{DataKey, MultiSigConfig, Proposal, ProposalStatus};
 use crate::{storage, validation_contract::ValidationContract};
 use soroban_sdk::{contract, contractimpl, Address, Env, Map, Symbol, Val, Vec};
@@ -71,21 +70,30 @@ fn require_signer(env: &Env, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
-fn threshold_reached(env: &Env, approvals: &Vec<Address>) -> bool {
-    if let Some(config) = get_multisig_config(env) {
-        let threshold = config
-            .thresholds
-            .get(kind.clone())
-            .unwrap_or(config.threshold);
-        let max_rejections = config
-            .signers
-            .len()
-            .saturating_sub(threshold)
-            .saturating_add(1);
-        rejections.len() >= max_rejections
-    } else {
-        false
-    }
+fn approval_threshold(env: &Env, kind: &Symbol) -> Option<u32> {
+    let config = get_multisig_config(env)?;
+    Some(config.thresholds.get(kind.clone()).unwrap_or(config.threshold))
+}
+
+fn threshold_reached(env: &Env, kind: &Symbol, approvals: &Vec<Address>) -> bool {
+    let Some(threshold) = approval_threshold(env, kind) else {
+        return false;
+    };
+    approvals.len() >= threshold
+}
+
+fn rejection_threshold_reached(env: &Env, kind: &Symbol, rejections: &Vec<Address>) -> bool {
+    let Some(config) = get_multisig_config(env) else {
+        return false;
+    };
+
+    let threshold = config.thresholds.get(kind.clone()).unwrap_or(config.threshold);
+    let max_rejections = config
+        .signers
+        .len()
+        .saturating_sub(threshold)
+        .saturating_add(1);
+    rejections.len() >= max_rejections
 }
 
 /// Get the time lock for a specific proposal kind.
@@ -169,6 +177,36 @@ impl MultiSigContract {
 
         MultisigInitialized { signers, threshold }.publish(&env);
 
+        Ok(())
+    }
+
+    /// Reject a proposal.
+    /// Only signers can reject.
+    pub fn reject_proposal(env: Env, rejecter: Address, proposal_id: u64) -> Result<(), Error> {
+        require_signer(&env, &rejecter)?;
+        rejecter.require_auth();
+
+        let mut proposal = get_proposal(&env, proposal_id).ok_or(Error::ProposalNotFound)?;
+
+        if proposal.status != ProposalStatus::Active {
+            return Err(Error::ProposalAlreadyExecuted);
+        }
+
+        if proposal.approvals.contains(&rejecter) {
+            return Err(Error::AlreadyApproved);
+        }
+
+        if proposal.rejections.contains(&rejecter) {
+            return Err(Error::AlreadyRejected);
+        }
+
+        proposal.rejections.push_back(rejecter);
+
+        if rejection_threshold_reached(&env, &proposal.kind, &proposal.rejections) {
+            proposal.status = ProposalStatus::Rejected;
+        }
+
+        put_proposal(&env, &proposal);
         Ok(())
     }
 
@@ -383,11 +421,16 @@ impl MultiSigContract {
             return Err(Error::InvalidInput);
         }
 
+        let proposal_kind = proposal.kind.clone();
+        let proposal_args = proposal.args.clone();
+        let proposal_target = proposal.target.clone();
+        let executor_clone = executor.clone();
+
         ProposalExecuted {
             proposal_id,
-            executor,
-            kind: proposal.kind,
-            args: proposal.args,
+            executor: executor_clone,
+            kind: proposal_kind.clone(),
+            args: proposal_args.clone(),
         }
         .publish(&env);
         // Execute the proposal via cross-contract call
@@ -396,19 +439,8 @@ impl MultiSigContract {
         // However, for generic support, we just pass the args as provided.
         let scope = Symbol::new(&env, "multisig_exec");
         storage::acquire_reentrancy_lock(&env, &scope)?;
-        let _result: Val =
-            env.invoke_contract(&proposal.target, &proposal.kind, proposal.args.clone());
+        let _result: Val = env.invoke_contract(&proposal_target, &proposal_kind, proposal_args);
         storage::release_reentrancy_lock(&env, &scope);
-
-        // Emit execution event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_executed"),
-                &proposal_id,
-                &executor,
-            ),
-            (&proposal.kind, &proposal.args),
-        );
 
         Ok(())
     }
@@ -464,11 +496,11 @@ mod test_multisig {
         pub fn pause(env: Env, _caller: Address) {}
     }
 
-    fn setup(env: &Env) -> (MultiSigContractClient, Vec<Address>) {
+    fn setup(env: &Env) -> (MultiSigContractClient<'_>, Vec<Address>) {
         let contract_id = env.register_contract(None, MultiSigContract);
         let client = MultiSigContractClient::new(env, &contract_id);
 
-        let mut signers = Vec::new(&env);
+        let mut signers = Vec::new(env);
         signers.push_back(Address::generate(env));
         signers.push_back(Address::generate(env));
         signers.push_back(Address::generate(env));
