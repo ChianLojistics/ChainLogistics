@@ -18,6 +18,11 @@ export function LanguageSelector() {
     i18n.changeLanguage(lng);
   };
 
+  const toggleLanguage = () => {
+    const newLang = i18n.language === "en" ? "es" : "en";
+    changeLanguage(newLang);
+  };
+
   if (!mounted) return null;
 
   return (

@@ -1,0 +1,103 @@
+# Auto-scaling configuration for ChainLogistics
+# This file defines scaling rules for Kubernetes/Docker Swarm deployments
+
+version: '3.8'
+
+services:
+  backend:
+    image: chainlogistics/backend:latest
+    deploy:
+      mode: replicated
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+      labels:
+        - "com.docker.compose.autoscaling.enabled=true"
+        - "com.docker.compose.autoscaling.min-replicas=2"
+        - "com.docker.compose.autoscaling.max-replicas=10"
+        - "com.docker.compose.autoscaling.target-cpu=70"
+        - "com.docker.compose.autoscaling.target-memory=80"
+
+# Auto-scaling Rules Configuration
+autoscaling:
+  rules:
+    - name: cpu-based-scaling
+      service: backend
+      metric: cpu
+      target: 70
+      min_replicas: 2
+      max_replicas: 10
+      scale_up_cooldown: 60
+      scale_down_cooldown: 300
+      scale_up_step: 1
+      scale_down_step: 1
+    
+    - name: memory-based-scaling
+      service: backend
+      metric: memory
+      target: 80
+      min_replicas: 2
+      max_replicas: 10
+      scale_up_cooldown: 60
+      scale_down_cooldown: 300
+      scale_up_step: 1
+      scale_down_step: 1
+    
+    - name: request-rate-scaling
+      service: backend
+      metric: requests_per_second
+      target: 1000
+      min_replicas: 2
+      max_replicas: 15
+      scale_up_cooldown: 30
+      scale_down_cooldown: 600
+      scale_up_step: 2
+      scale_down_step: 1
+    
+    - name: response-time-scaling
+      service: backend
+      metric: response_time_p95
+      target: 500
+      min_replicas: 2
+      max_replicas: 10
+      scale_up_cooldown: 30
+      scale_down_cooldown: 300
+      scale_up_step: 2
+      scale_down_step: 1
+
+# Health Check Configuration
+health_checks:
+  backend:
+    path: /health
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 30s
+    failure_threshold: 3
+    success_threshold: 2
+
+# Circuit Breaker Configuration
+circuit_breaker:
+  backend:
+    failure_threshold: 5
+    success_threshold: 2
+    timeout: 30s
+    half_open_max_calls: 3

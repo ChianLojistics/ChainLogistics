@@ -71,6 +71,26 @@ Authorization: Bearer your_jwt_token_here
 
 The API uses standard HTTP status codes and returns error responses in JSON format.
 
+## Audit Logging
+
+The backend records structured audit events for authenticated API traffic and login attempts. Audit entries include actor identifiers, API key identifiers when available, IP address, user agent, HTTP method/path/status, event classification, correlation ID, sanitized metadata, and tamper-evident HMAC hash-chain fields.
+
+**Configuration:**
+
+```
+AUDIT_LOGGING_ENABLED=true
+AUDIT_HMAC_KEY=change_me_in_production
+AUDIT_RETENTION_DAYS=365
+```
+
+**Correlation IDs:**
+
+Clients may send `X-Correlation-Id` or `X-Request-Id`. The API returns `X-Correlation-Id` on responses so requests can be matched with audit records and operational logs.
+
+**Audit Report:**
+
+`GET /api/v1/audit/report` returns paginated audit events for auditor/admin users. Supported query filters include `user_id`, `actor_api_key_id`, `event_category`, `event_type`, `resource_type`, `target_resource_id`, `success`, `correlation_id`, `start`, `end`, `limit`, and `offset`.
+
 ### Error Response Format
 
 ```json

@@ -435,3 +435,82 @@ pub struct TimelockOperation {
     pub status: TimelockStatus,
     pub approvals: Vec<Address>,
 }
+
+// ─── Quality Control Types ────────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QualityCertification {
+    pub certification_id: String,
+    pub certification_type: String,
+    pub issuer: String,
+    pub certificate_id: String,
+    pub valid_from: u64,
+    pub valid_until: u64,
+    pub status: String,
+    pub metadata: String,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QualityReading {
+    pub reading_id: String,
+    pub product_id: String,
+    pub sensor_id: String,
+    pub parameter: String,
+    pub value: i128,
+    pub unit: String,
+    pub timestamp: u64,
+    pub location: String,
+    pub status: String, // "normal", "warning", "critical"
+    pub threshold_min: Option<i128>,
+    pub threshold_max: Option<i128>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QualityParameter {
+    pub name: String,
+    pub unit: String,
+    pub threshold_min: Option<i128>,
+    pub threshold_max: Option<i128>,
+    pub critical_threshold_min: Option<i128>,
+    pub critical_threshold_max: Option<i128>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParameterStats {
+    pub count: u32,
+    pub sum: i128,
+    pub min: i128,
+    pub max: i128,
+    pub avg: i128,
+    pub last_reading: i128,
+    pub last_timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SensorInfo {
+    pub address: Address,
+    pub sensor_id: String,
+    pub sensor_type: String,
+    pub authorized: bool,
+}
+
+// Extend DataKey for quality control
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum QualityDataKey {
+    QualityControlEnabled(String),
+    QualityControlAdmin(String),
+    QualityCertification(String, String), // product_id, certification_id
+    QualityCertifications(String),        // product_id -> Vec<certification_id>
+    QualityReading(String, String),       // product_id, reading_id
+    QualityReadings(String),              // product_id -> Vec<reading_id>
+    QualityParameters(String),            // product_id -> Vec<QualityParameter>
+    ParameterStats(String, String),       // product_id, parameter_name
+    AuthorizedSensor(String, Address),    // product_id, sensor_address
+    AuthorizedSensors(String),            // product_id -> Vec<sensor_address>
+}

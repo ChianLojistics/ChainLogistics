@@ -13,6 +13,8 @@ jobs:
   rust-tests:
     name: Rust Tests & Quality
     runs-on: ubuntu-latest
+    env:
+      STELLAR_CLI_VERSION: 23.4.0
     defaults:
       run:
         working-directory: ./smart-contract
@@ -31,7 +33,53 @@ jobs:
       # Use the official Stellar CLI GitHub Action (v23.4.0)
       # Replaces the old manual soroban-cli curl install
       - name: Install Stellar CLI
-        uses: stellar/stellar-cli@v23.4.0
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$HOME/.local/bin"
+
+          arch="$(uname -m)"
+          case "$arch" in
+            x86_64) asset_arch="x86_64" ;;
+            aarch64|arm64) asset_arch="aarch64" ;;
+            *) echo "Unsupported architecture: $arch"; exit 1 ;;
+          esac
+
+          version="${STELLAR_CLI_VERSION}"
+          base_url="https://github.com/stellar/stellar-cli/releases/download/v${version}"
+
+          urls=(
+            "${base_url}/stellar-cli-${version}-${asset_arch}-unknown-linux-gnu.tar.gz"
+            "${base_url}/stellar-cli-${version}-${asset_arch}-unknown-linux-musl.tar.gz"
+          )
+
+          success="false"
+          for url in "${urls[@]}"; do
+            echo "Attempting download: ${url}"
+            if curl -fL --retry 6 --retry-all-errors --retry-delay 5 -o stellar-cli.tar.gz "${url}"; then
+              success="true"
+              break
+            fi
+          done
+
+          if [ "$success" != "true" ]; then
+            echo "Failed to download stellar-cli v${version} from GitHub releases."
+            exit 1
+          fi
+
+          tmpdir="$(mktemp -d)"
+          tar -xzf stellar-cli.tar.gz -C "$tmpdir"
+          stellar_path="$(find "$tmpdir" -type f -name stellar | head -n 1)"
+          if [ -z "$stellar_path" ]; then
+            echo "Could not find 'stellar' binary in downloaded archive."
+            exit 1
+          fi
+          mv "$stellar_path" "$HOME/.local/bin/stellar"
+          chmod +x "$HOME/.local/bin/stellar"
+
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          stellar --version
 
       - name: Cache Cargo registry
         uses: actions/cache@v4

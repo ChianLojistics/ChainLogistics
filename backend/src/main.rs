@@ -1,5 +1,5 @@
 use axum::{
-    middleware,
+    middleware as axum_middleware,
     routing::{get, post},
     Router,
 };
@@ -27,6 +27,8 @@ mod websocket;
 
 use config::Config;
 use database::Database;
+use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, RecallService, AuditService, BatchService, RegulatoryService, IoTService, QualityService, SupplierService};
+use utils::CronService;
 use error::AppError;
 use monitoring::MonitoringSystem;
 
@@ -132,22 +134,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(middleware::from_fn(
+                .layer(axum_middleware::from_fn(
                     middleware::error_handler::request_logger,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::error_handler::global_error_handler,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::security::enforce_https,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::security::security_headers,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum_middleware::from_fn_with_state(
                     app_state.clone(),
                     middleware::security::cors_policy,
                 )),

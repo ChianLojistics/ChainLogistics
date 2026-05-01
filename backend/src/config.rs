@@ -7,6 +7,7 @@ pub struct Config {
     pub server: ServerConfig,
     pub redis: RedisConfig,
     pub security: SecurityConfig,
+    pub audit: AuditConfig,
     pub encryption_key: String,
     pub jwt_secret: String,
 }
@@ -14,6 +15,7 @@ pub struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub url: String,
+    pub read_replica_urls: Vec<String>,
     pub max_connections: u32,
     pub min_connections: u32,
     pub connect_timeout: u64,
@@ -62,6 +64,12 @@ impl Default for Config {
                 url: env::var("DATABASE_URL").unwrap_or_else(|_| {
                     "postgres://chainlogistics:password@localhost/chainlogistics".to_string()
                 }),
+                read_replica_urls: env::var("DATABASE_READ_REPLICA_URLS")
+                    .unwrap_or_else(|_| "".to_string())
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.trim().to_string())
+                    .collect(),
                 max_connections: 20,
                 min_connections: 5,
                 connect_timeout: 30,
@@ -97,6 +105,18 @@ impl Default for Config {
                     .split(',')
                     .map(|s| s.trim().to_string())
                     .collect(),
+            },
+            audit: AuditConfig {
+                enabled: env::var("AUDIT_LOGGING_ENABLED")
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
+                hmac_key: env::var("AUDIT_HMAC_KEY")
+                    .unwrap_or_else(|_| "default_audit_hmac_key_change_me_in_production".to_string()),
+                retention_days: env::var("AUDIT_RETENTION_DAYS")
+                    .unwrap_or_else(|_| "365".to_string())
+                    .parse()
+                    .unwrap_or(365),
             },
             encryption_key: env::var("ENCRYPTION_KEY")
                 .unwrap_or_else(|_| "0123456789abcdef0123456789abcdef".to_string()), // 32 chars for AES-256
