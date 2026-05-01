@@ -43,11 +43,18 @@ pub struct SecurityConfig {
     pub allowed_origins: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuditConfig {
-    pub enabled: bool,
-    pub hmac_key: String,
-    pub retention_days: i64,
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("Invalid PORT value: {0}")]
+    InvalidPort(String),
+    #[error("Missing required environment variable: {0}")]
+    MissingVar(String),
+    #[error("Configuration validation error: {0}")]
+    ValidationError(String),
+    #[error("Configuration error: {0}")]
+    Config(#[from] config::ConfigError),
 }
 
 impl Default for Config {
@@ -70,10 +77,10 @@ impl Default for Config {
             },
             server: ServerConfig {
                 host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
-                port: env::var("PORT")
-                    .unwrap_or_else(|_| "3001".to_string())
-                    .parse()
-                    .unwrap_or(3001),
+                port: match env::var("PORT") {
+                    Ok(port_str) => port_str.parse().unwrap_or(3001),
+                    Err(_) => 3001,
+                },
                 tls_enabled: env::var("TLS_ENABLED")
                     .unwrap_or_else(|_| "false".to_string())
                     .parse()
@@ -120,7 +127,12 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn from_env() -> Result<Self, config::ConfigError> {
+    /// Loads configuration from environment variables and configuration files.
+    /// Validates settings and logs configuration status.
+    /// 
+    /// # Errors
+    /// Returns `ConfigError` if required variables are missing or invalid.
+    pub fn from_env() -> Result<Self, ConfigError> {
         let profile = env::var("CHAINLOGISTICS_ENV")
             .or_else(|_| env::var("APP_ENV"))
             .unwrap_or_else(|_| "development".to_string());
@@ -136,38 +148,113 @@ impl Config {
             )
             .build()?;
 
-        let config: Config = cfg.try_deserialize()?;
+        let mut config: Config = cfg.try_deserialize()?;
+
+        // Safe and strict validation of PORT variable
+        match env::var("PORT") {
+            Ok(port_str) => {
+                match port_str.parse::<u16>() {
+                    Ok(port) => {
+                        if port == 0 {
+                            tracing::error!("Invalid PORT: 0 is not allowed");
+                            return Err(ConfigError::ValidationError("PORT cannot be 0".to_string()));
+                        }
+                        tracing::info!("Using PORT from environment: {}", port);
+                        config.server.port = port;
+                    }
+                    Err(_) => {
+                        tracing::error!("Invalid PORT value in environment: '{}'", port_str);
+                        return Err(ConfigError::InvalidPort(port_str));
+                    }
+                }
+            }
+            Err(_) => {
+                tracing::info!("PORT not set in environment, using default: {}", config.server.port);
+            }
+        }
+
+        tracing::info!("Configuration loaded successfully for profile: {}", profile);
         config.validate()?;
         Ok(config)
     }
-    fn validate(&self) -> Result<(), config::ConfigError> {
+
+
+    fn validate(&self) -> Result<(), ConfigError> {
         if self.database.url.trim().is_empty() {
-            return Err(config::ConfigError::Message(
+            return Err(ConfigError::ValidationError(
                 "database.url must not be empty".to_string(),
             ));
         }
         if self.redis.url.trim().is_empty() {
-            return Err(config::ConfigError::Message(
+            return Err(ConfigError::ValidationError(
                 "redis.url must not be empty".to_string(),
             ));
         }
         if self.jwt_secret.trim().len() < 16 {
-            return Err(config::ConfigError::Message(
+            return Err(ConfigError::ValidationError(
                 "jwt_secret must be at least 16 characters".to_string(),
             ));
         }
         if self.encryption_key.trim().len() != 32 {
-            return Err(config::ConfigError::Message(
+            return Err(ConfigError::ValidationError(
                 "encryption_key must be exactly 32 characters (AES-256 key)".to_string(),
             ));
         }
         if self.server.tls_enabled
             && (self.server.tls_cert_path.is_none() || self.server.tls_key_path.is_none())
         {
-            return Err(config::ConfigError::Message(
+            return Err(ConfigError::ValidationError(
                 "tls_cert_path and tls_key_path are required when tls_enabled=true".to_string(),
+            ));
+        }
+        if self.server.port == 0 {
+            return Err(ConfigError::ValidationError(
+                "server.port must be between 1 and 65535".to_string(),
             ));
         }
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_valid_port() {
+        env::set_var("PORT", "8080");
+        let config = Config::from_env();
+        assert!(config.is_ok());
+        assert_eq!(config.unwrap().server.port, 8080);
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_invalid_port_non_numeric() {
+        env::set_var("PORT", "abc");
+        let config = Config::from_env();
+        assert!(config.is_err());
+        match config.unwrap_err() {
+            ConfigError::InvalidPort(val) => assert_eq!(val, "abc"),
+            _ => panic!("Expected InvalidPort error"),
+        }
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_invalid_port_out_of_range() {
+        env::set_var("PORT", "70000");
+        let config = Config::from_env();
+        assert!(config.is_err());
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_missing_port_variable() {
+        env::remove_var("PORT");
+        let config = Config::from_env();
+        assert!(config.is_ok());
+    }
+}
+

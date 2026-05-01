@@ -393,3 +393,46 @@ pub async fn list_reports(
     let reports = state.carbon_service.list_reports(owner_id).await?;
     Ok(Json(serde_json::json!({ "reports": reports, "total": reports.len() })))
 }
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/dashboard",
+    tag = "carbon",
+    responses(
+        (status = 200, description = "Sustainability dashboard generated successfully"),
+        (status = 401, description = "Unauthorized")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_sustainability_dashboard(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let dashboard = state.carbon_service.get_sustainability_dashboard().await?;
+    Ok(Json(dashboard))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/supplier-score/{supplier_address}",
+    tag = "carbon",
+    params(
+        ("supplier_address" = String, Path, description = "Supplier Stellar Address")
+    ),
+    responses(
+        (status = 200, description = "Supplier sustainability score retrieved"),
+        (status = 401, description = "Unauthorized")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_supplier_score(
+    State(state): State<AppState>,
+    Path(supplier_address): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let score = state.carbon_service.get_supplier_score(&supplier_address).await?;
+    Ok(Json(serde_json::json!({ "supplier_address": supplier_address, "sustainability_score": score })))
+}
+

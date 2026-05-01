@@ -43,13 +43,7 @@ pub struct AppState {
     pub financial_service: Arc<FinancialService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
-    pub recall_service: Arc<RecallService>,
-    pub regulatory_service: Arc<RegulatoryService>,
-    pub iot_service: Arc<IoTService>,
-    pub quality_service: Arc<QualityService>,
-    pub supplier_service: Arc<SupplierService>,
-    pub audit_service: Arc<AuditService>,
-    pub batch_service: Arc<BatchService>,
+    pub collaboration_service: Arc<CollaborationService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -58,6 +52,7 @@ pub struct AppState {
 impl AppState {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let config = Config::from_env()?;
+
 
         // Initialize database
         let db = Database::new(&config.database).await?;
@@ -84,19 +79,7 @@ impl AppState {
             config.redis.url.clone(),
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
-        let recall_service = Arc::new(RecallService::new(db.pool().clone()));
-        let regulatory_service = Arc::new(RegulatoryService::new(db.pool().clone()));
-        let iot_service = Arc::new(IoTService::new(db.pool().clone()));
-        let quality_service = Arc::new(QualityService::new(db.pool().clone()));
-        let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
-        let batch_service = Arc::new(BatchService::new(db.pool().clone(), redis_client.clone()));
-
-        let audit_service = Arc::new(AuditService::new(
-            db.pool().clone(),
-            config.audit.enabled,
-            config.audit.hmac_key.clone(),
-            config.audit.retention_days,
-        ));
+        let collaboration_service = Arc::new(CollaborationService::new(db.pool().clone()));
         
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
@@ -111,17 +94,12 @@ impl AppState {
             financial_service,
             analytics_service,
             carbon_service,
-            recall_service,
-            regulatory_service,
-            iot_service,
-            quality_service,
-            supplier_service,
-            audit_service,
-            batch_service,
+            collaboration_service,
             redis_client,
             config,
             monitoring_system,
         })
+
     }
 }
 

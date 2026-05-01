@@ -24,20 +24,9 @@ pub use audit_service::AuditService;
 pub mod digital_twin_service;
 pub use digital_twin_service::DigitalTwinService;
 
-pub mod regulatory_service;
-pub use regulatory_service::RegulatoryService;
+pub mod collaboration;
+pub use collaboration::CollaborationService;
 
-pub mod iot_service;
-pub use iot_service::IoTService;
-
-pub mod quality_service;
-pub use quality_service::QualityService;
-
-pub mod supplier_service;
-pub use supplier_service::SupplierService;
-
-pub mod batch_service;
-pub use batch_service::{BatchService, BatchRepository};
 
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.

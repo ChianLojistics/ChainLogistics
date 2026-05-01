@@ -595,7 +595,102 @@ impl CarbonService {
         .await?;
         Ok(reports)
     }
+
+    /// Calculate the sustainability score for a supplier based on their products' emissions reductions.
+    pub async fn get_supplier_score(&self, supplier_address: &str) -> Result<f64, AppError> {
+        let row = sqlx::query!(
+            r#"
+            SELECT AVG(cf.reduction_percentage) as avg_reduction
+            FROM carbon_footprints cf
+            JOIN products p ON p.id = cf.product_id
+            WHERE p.owner_address = $1
+            "#,
+            supplier_address
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        // Score is base 50 + average reduction percentage, capped at 100
+        let score = match row.avg_reduction {
+            Some(reduction) => {
+                let r: f64 = reduction.to_string().parse().unwrap_or(0.0);
+                (50.0 + r).min(100.0)
+            }
+            None => 50.0,
+        };
+        Ok((score * 10.0).round() / 10.0) // Round to 1 decimal place
+    }
+
+    /// Generates an overall sustainability metrics dashboard overview.
+    pub async fn get_sustainability_dashboard(&self) -> Result<serde_json::Value, AppError> {
+        let emissions = sqlx::query!(
+            r#"
+            SELECT 
+                COALESCE(SUM(total_emissions), 0) as total_emissions,
+                COALESCE(SUM(emissions_reduction), 0) as total_reductions,
+                AVG(reduction_percentage) as avg_reduction
+            FROM carbon_footprints
+            "#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let credits = sqlx::query!(
+            r#"
+            SELECT
+                COALESCE(SUM(quantity) FILTER (WHERE status = 'retired'), 0) AS retired_credits,
+                COALESCE(SUM(quantity) FILTER (WHERE status = 'listed'), 0) AS listed_credits
+            FROM carbon_credits
+            "#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let top_suppliers = sqlx::query!(
+            r#"
+            SELECT p.owner_address, AVG(cf.reduction_percentage) as avg_reduction
+            FROM carbon_footprints cf
+            JOIN products p ON p.id = cf.product_id
+            GROUP BY p.owner_address
+            ORDER BY avg_reduction DESC NULLS LAST
+            LIMIT 5
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut suppliers_ranking = Vec::new();
+        for s in top_suppliers {
+            let avg: f64 = match s.avg_reduction {
+                Some(v) => v.to_string().parse().unwrap_or(0.0),
+                None => 0.0,
+            };
+            suppliers_ranking.push(serde_json::json!({
+                "supplier": s.owner_address,
+                "sustainability_score": (50.0 + avg).min(100.0)
+            }));
+        }
+
+        let total_emissions: f64 = emissions.total_emissions.unwrap_or_default().to_string().parse().unwrap_or(0.0);
+        let total_reductions: f64 = emissions.total_reductions.unwrap_or_default().to_string().parse().unwrap_or(0.0);
+        let avg_reduction: f64 = match emissions.avg_reduction {
+            Some(v) => v.to_string().parse().unwrap_or(0.0),
+            None => 0.0,
+        };
+
+        Ok(serde_json::json!({
+            "metrics": {
+                "total_emissions_kg": total_emissions,
+                "total_reductions_kg": total_reductions,
+                "average_reduction_percentage": avg_reduction,
+                "credits_retired_tonnes": credits.retired_credits.unwrap_or_default().to_string().parse::<f64>().unwrap_or(0.0),
+                "credits_listed_tonnes": credits.listed_credits.unwrap_or_default().to_string().parse::<f64>().unwrap_or(0.0),
+            },
+            "top_sustainable_suppliers": suppliers_ranking
+        }))
+    }
 }
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
