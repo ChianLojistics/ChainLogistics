@@ -1,6 +1,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::error::Error;
+use crate::events::TrackingEventPublished;
 use crate::types::{Product, TrackingEvent, TrackingEventFilter, TrackingEventPage};
 use crate::validation_contract::ValidationContract;
 use crate::{storage, AuthorizationContractClient};
@@ -54,6 +55,7 @@ fn read_product(env: &Env, product_id: &String) -> Result<Product, Error> {
 }
 
 /// Writes a product to storage.
+#[allow(dead_code)]
 fn write_product(env: &Env, product: &Product) {
     storage::put_product(env, product);
 }
@@ -67,6 +69,7 @@ fn calc_has_more(offset: u64, current_len: u64, total_count: u64) -> Result<bool
 
 /// Ensures the caller is the product owner.
 /// Returns Unauthorized if caller is not the owner.
+#[allow(dead_code)]
 fn require_owner(product: &Product, caller: &Address) -> Result<(), Error> {
     caller.require_auth();
     if &product.owner != caller {
@@ -252,26 +255,11 @@ impl ChainLogisticsContract {
     // Note: transfer_product is now in ProductTransferContract
     // get_product_event_ids, get_event_count are now in ProductQueryContract
 
-    /// Add a tracking event to a product.
-    ///
-    /// # Arguments
-    /// * `actor` - The address adding the event (must be authorized)
-    /// * `product_id` - The ID of the product
-    /// * `event_type` - The type of event (e.g., "shipped", "received")
-    /// * `location` - The location where the event occurred
-    /// * `data_hash` - Hash of the event data
-    /// * `note` - Optional note about the event
-    /// * `metadata` - Additional metadata as key-value pairs
-    ///
-    /// # Returns
-    /// * `Result<u64, Error>` - The ID of the newly created event
-    ///
-    /// # Errors
-    /// * `ContractPaused` - If the contract is paused
-    /// * `ProductNotFound` - If the product does not exist
-    /// * `ProductDeactivated` - If the product is deactivated
-    /// * `Unauthorized` - If the actor is not authorized
-    /// * Various validation errors for invalid inputs
+    // This function has 8 parameters which exceeds clippy's default limit of 7.
+    // However, this is a public contract entrypoint and changing the signature would be
+    // a breaking change for any existing clients. The parameters represent distinct
+    // pieces of tracking information that are all required for a single atomic operation.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_tracking_event(
         env: Env,
         actor: Address,
@@ -314,14 +302,12 @@ impl ChainLogisticsContract {
 
         storage::index_event_by_type(&env, &product_id, &event_type, event_id)?;
 
-        env.events().publish(
-            (
-                Symbol::new(&env, "tracking_event"),
-                product_id.clone(),
-                event_id,
-            ),
-            event.clone(),
-        );
+        TrackingEventPublished {
+            product_id: product_id.clone(),
+            event_id,
+            event: event.clone(),
+        }
+        .publish(&env);
 
         Ok(event_id)
     }

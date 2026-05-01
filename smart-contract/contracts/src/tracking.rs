@@ -6,6 +6,7 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Map, String, Symbol, Vec};
 
 use crate::error::Error;
+use crate::events::TrackingEventPublished;
 use crate::storage;
 use crate::types::{DataKey, TrackingEvent};
 use crate::validation_contract::ValidationContract;
@@ -51,6 +52,11 @@ fn require_init(env: &Env) -> Result<(), Error> {
 #[contract]
 pub struct TrackingContract;
 
+// The TrackingContract implementation has functions with >7 parameters.
+// These are public contract entrypoints where signature changes would be breaking.
+// The parameters represent distinct pieces of tracking information required for
+// atomic operations. We allow this pattern rather than breaking the public API.
+#[allow(clippy::too_many_arguments)]
 #[contractimpl]
 impl TrackingContract {
     /// Initialize the TrackingContract with the main contract address.
@@ -74,24 +80,12 @@ impl TrackingContract {
 
     /// Add a new tracking event to a product.
     /// Requires authentication from the actor.
-    /// Validates inputs and emits a tracking event.
-    ///
-    /// # Arguments
-    /// * `actor` - The address adding the event (must be authorized)
-    /// * `product_id` - The ID of the product
-    /// * `event_type` - The type of event (e.g., "shipped", "received")
-    /// * `location` - The location where the event occurred
-    /// * `data_hash` - Hash of the event data
-    /// * `note` - Optional note about the event
-    /// * `metadata` - Additional metadata as key-value pairs
-    ///
-    /// # Returns
-    /// * `Result<u64, Error>` - The ID of the newly created event
-    ///
-    /// # Errors
-    /// * `NotInitialized` - If the tracking contract is not initialized
-    /// * `ContractPaused` - If the main contract is paused
-    /// * Various validation errors for invalid inputs
+    /// Validates metadata and emits tracking event.
+    // This function has 8 parameters which exceeds clippy's default limit of 7.
+    // However, this is a public contract entrypoint and changing the signature would be
+    // a breaking change for any existing clients. The parameters represent distinct
+    // pieces of tracking information that are all required for a single atomic operation.
+    #[allow(clippy::too_many_arguments)]
     pub fn tracking_add_event(
         env: Env,
         actor: Address,
@@ -141,15 +135,12 @@ impl TrackingContract {
         // Index by type (single write)
         storage::index_event_by_type(&env, &product_id, &event_type, event_id)?;
 
-        // Emit event (no storage cost)
-        env.events().publish(
-            (
-                Symbol::new(&env, "tracking_event"),
-                product_id.clone(),
-                event_id,
-            ),
-            event.clone(),
-        );
+        TrackingEventPublished {
+            product_id: product_id.clone(),
+            event_id,
+            event: event.clone(),
+        }
+        .publish(&env);
 
         Ok(event_id)
     }
@@ -220,11 +211,11 @@ mod test_tracking {
     fn setup_uninitialized(
         env: &Env,
     ) -> (
-        ChainLogisticsContractClient,
-        ProductRegistryContractClient,
+        ChainLogisticsContractClient<'_>,
+        ProductRegistryContractClient<'_>,
         Address,
         Address,
-        super::TrackingContractClient,
+        super::TrackingContractClient<'_>,
     ) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let cl_id = env.register_contract(None, ChainLogisticsContract);
@@ -248,11 +239,11 @@ mod test_tracking {
     fn setup_initialized(
         env: &Env,
     ) -> (
-        ChainLogisticsContractClient,
-        ProductRegistryContractClient,
+        ChainLogisticsContractClient<'_>,
+        ProductRegistryContractClient<'_>,
         Address,
         Address,
-        super::TrackingContractClient,
+        super::TrackingContractClient<'_>,
     ) {
         let (cl_client, registry_client, admin, cl_id, tracking_client) = setup_uninitialized(env);
         tracking_client.init(&cl_id);

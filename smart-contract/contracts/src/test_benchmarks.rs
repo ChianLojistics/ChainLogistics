@@ -8,7 +8,12 @@ use crate::{
 // Benchmarks here are deterministic workload benchmarks intended to track
 // relative gas/footprint trends between changes. They are not wall-clock tests.
 
-fn setup(env: &Env) -> (ProductRegistryContractClient, ProductTransferContractClient) {
+fn setup(
+    env: &Env,
+) -> (
+    ProductRegistryContractClient<'_>,
+    ProductTransferContractClient<'_>,
+) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
 

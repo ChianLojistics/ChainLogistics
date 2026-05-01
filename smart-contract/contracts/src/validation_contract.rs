@@ -41,6 +41,7 @@ impl ValidationContract {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn require_auth(actor: &Address) -> Result<(), Error> {
         actor.require_auth();
         Ok(())

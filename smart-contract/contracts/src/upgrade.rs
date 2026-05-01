@@ -1,6 +1,10 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol};
 
 use crate::error::Error;
+use crate::events::{
+    EmergencyPause, EmergencyUnpause, UpgradeCompleted, UpgradeFailed, UpgradeInitiated,
+    UpgradeReset,
+};
 use crate::types::{ContractVersion, DataKey, UpgradeInfo, UpgradeStatus};
 use crate::ChainLogisticsContractClient;
 
@@ -222,11 +226,12 @@ impl UpgradeContract {
         set_upgrade_status(&env, &UpgradeStatus::InProgress);
         set_upgrade_info(&env, &upgrade_info);
 
-        // Emit upgrade initiated event
-        env.events().publish(
-            (Symbol::new(&env, "upgrade_initiated"),),
-            (current_version, new_version, caller.clone()),
-        );
+        UpgradeInitiated {
+            current_version,
+            new_version,
+            caller,
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -249,15 +254,12 @@ impl UpgradeContract {
         // Mark upgrade as completed
         set_upgrade_status(&env, &UpgradeStatus::Completed);
 
-        // Emit upgrade completed event
-        env.events().publish(
-            (Symbol::new(&env, "upgrade_completed"),),
-            (
-                upgrade_info.new_version,
-                upgrade_info.new_contract_address,
-                caller,
-            ),
-        );
+        UpgradeCompleted {
+            new_version: upgrade_info.new_version,
+            new_contract_address: upgrade_info.new_contract_address,
+            caller,
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -275,9 +277,7 @@ impl UpgradeContract {
         // Mark upgrade as failed
         set_upgrade_status(&env, &UpgradeStatus::Failed);
 
-        // Emit upgrade failed event
-        env.events()
-            .publish((Symbol::new(&env, "upgrade_failed"),), (&caller, &reason));
+        UpgradeFailed { caller, reason }.publish(&env);
 
         Ok(())
     }
@@ -301,9 +301,7 @@ impl UpgradeContract {
             let _ = main_client.try_pause(&caller);
         }
 
-        // Emit emergency pause event
-        env.events()
-            .publish((Symbol::new(&env, "emergency_pause"),), (&caller, &reason));
+        EmergencyPause { caller, reason }.publish(&env);
 
         Ok(())
     }
@@ -327,9 +325,7 @@ impl UpgradeContract {
             let _ = main_client.try_unpause(&caller);
         }
 
-        // Emit emergency unpause event
-        env.events()
-            .publish((Symbol::new(&env, "emergency_unpause"),), &caller);
+        EmergencyUnpause { caller }.publish(&env);
 
         Ok(())
     }
@@ -348,9 +344,7 @@ impl UpgradeContract {
         env.storage().persistent().remove(&DataKey::UpgradeInfo);
         set_upgrade_status(&env, &UpgradeStatus::NotStarted);
 
-        // Emit upgrade reset event
-        env.events()
-            .publish((Symbol::new(&env, "upgrade_reset"),), &caller);
+        UpgradeReset { caller }.publish(&env);
 
         Ok(())
     }
@@ -363,7 +357,7 @@ mod test_upgrade {
 
     use crate::{AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient};
 
-    fn setup(env: &Env) -> (UpgradeContractClient, Address) {
+    fn setup(env: &Env) -> (UpgradeContractClient<'_>, Address) {
         let contract_id = env.register_contract(None, UpgradeContract);
         let client = UpgradeContractClient::new(env, &contract_id);
         let admin = Address::generate(env);

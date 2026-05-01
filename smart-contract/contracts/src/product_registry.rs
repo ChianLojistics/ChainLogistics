@@ -1,12 +1,7 @@
-/// Product Registry contract for managing product lifecycle.
-/// This contract handles:
-/// - Product registration
-/// - Product deactivation and reactivation
-/// - Product queries and search
-/// - Product statistics
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
+use crate::events::{ProductDeactivated, ProductReactivated, ProductRegistered};
 use crate::storage;
 use crate::types::{DeactInfo, Origin, Product, ProductConfig, ProductStats};
 use crate::validation_contract::ValidationContract;
@@ -194,10 +189,11 @@ impl ProductRegistryContract {
             .ok_or(Error::ArithmeticOverflow)?;
         storage::set_active_products(&env, active);
 
-        env.events().publish(
-            (Symbol::new(&env, "product_registered"), config.id.clone()),
-            product.clone(),
-        );
+        ProductRegistered {
+            product_id: config.id.clone(),
+            product: product.clone(),
+        }
+        .publish(&env);
 
         Ok(product)
     }
@@ -307,10 +303,12 @@ impl ProductRegistryContract {
         let active = storage::get_active_products(&env).saturating_sub(1);
         storage::set_active_products(&env, active);
 
-        env.events().publish(
-            (Symbol::new(&env, "product_deactivated"), product_id.clone()),
-            (owner, reason),
-        );
+        ProductDeactivated {
+            product_id: product_id.clone(),
+            owner,
+            reason,
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -341,10 +339,11 @@ impl ProductRegistryContract {
             .ok_or(Error::ArithmeticOverflow)?;
         storage::set_active_products(&env, active);
 
-        env.events().publish(
-            (Symbol::new(&env, "product_reactivated"), product_id.clone()),
+        ProductReactivated {
+            product_id: product_id.clone(),
             owner,
-        );
+        }
+        .publish(&env);
 
         Ok(())
     }

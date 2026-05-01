@@ -117,6 +117,8 @@ pub fn set_auth(env: &Env, product_id: &String, actor: &Address, value: bool) {
     StorageContract::set_auth(env, product_id, actor, value)
 }
 
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn is_authorized(env: &Env, product_id: &String, actor: &Address) -> bool {
     StorageContract::is_authorized(env, product_id, actor)
 }
@@ -213,6 +215,7 @@ pub fn set_quality_control_enabled(env: &Env, product_id: &String, enabled: bool
     );
 }
 
+#[allow(dead_code)]
 pub fn is_quality_control_enabled(env: &Env, product_id: &String) -> bool {
     env.storage()
         .persistent()

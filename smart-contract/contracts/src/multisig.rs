@@ -5,6 +5,11 @@
 /// - Proposal approval
 /// - Proposal execution
 use crate::error::Error;
+use crate::events::{
+    AdminTransferExecuted, MultisigInitialized, PauseExecuted, ProposalApproved, ProposalExecuted,
+    ProposalSubmitted, UnpauseExecuted, UpgradeCompleteExecuted, UpgradeFailExecuted,
+    UpgradeInitiateExecuted,
+};
 use crate::types::{DataKey, MultiSigConfig, Proposal, ProposalStatus};
 use crate::{storage, validation_contract::ValidationContract};
 use soroban_sdk::{contract, contractimpl, Address, Env, Map, Symbol, Val, Vec};
@@ -65,48 +70,38 @@ fn require_signer(env: &Env, caller: &Address) -> Result<(), Error> {
     Ok(())
 }
 
-/// Check if an address is a signer.
-fn is_signer(env: &Env, address: &Address) -> bool {
-    if let Some(config) = get_multisig_config(env) {
-        config.signers.contains(address)
-    } else {
-        false
-    }
+fn approval_threshold(env: &Env, kind: &Symbol) -> Option<u32> {
+    let config = get_multisig_config(env)?;
+    Some(
+        config
+            .thresholds
+            .get(kind.clone())
+            .unwrap_or(config.threshold),
+    )
 }
 
-/// Check if the threshold has been reached for a specific proposal kind.
 fn threshold_reached(env: &Env, kind: &Symbol, approvals: &Vec<Address>) -> bool {
-    if let Some(config) = get_multisig_config(env) {
-        let threshold = config
-            .thresholds
-            .get(kind.clone())
-            .unwrap_or(config.threshold);
-        approvals.len() >= threshold
-    } else {
-        false
-    }
+    let Some(threshold) = approval_threshold(env, kind) else {
+        return false;
+    };
+    approvals.len() >= threshold
 }
 
-/// Check if the rejection threshold has been reached.
-/// For simplicity, we'll say if more than (Total - Threshold) have rejected, it's rejected.
-/// Or just any signer can reject for now? The requirements say "Audit trail of approvals and rejections".
-/// Let's say if 1/3 of signers reject, or just if any signer rejects?
-/// Typically, "rejected" means it can no longer be approved.
 fn rejection_threshold_reached(env: &Env, kind: &Symbol, rejections: &Vec<Address>) -> bool {
-    if let Some(config) = get_multisig_config(env) {
-        let threshold = config
-            .thresholds
-            .get(kind.clone())
-            .unwrap_or(config.threshold);
-        let max_rejections = config
-            .signers
-            .len()
-            .saturating_sub(threshold)
-            .saturating_add(1);
-        rejections.len() >= max_rejections
-    } else {
-        false
-    }
+    let Some(config) = get_multisig_config(env) else {
+        return false;
+    };
+
+    let threshold = config
+        .thresholds
+        .get(kind.clone())
+        .unwrap_or(config.threshold);
+    let max_rejections = config
+        .signers
+        .len()
+        .saturating_sub(threshold)
+        .saturating_add(1);
+    rejections.len() >= max_rejections
 }
 
 /// Get the time lock for a specific proposal kind.
@@ -188,12 +183,38 @@ impl MultiSigContract {
         set_multisig_config(&env, &config);
         set_next_proposal_id(&env, 1);
 
-        // Emit initialization event
-        env.events().publish(
-            (Symbol::new(&env, "multisig_initialized"),),
-            (signers, threshold),
-        );
+        MultisigInitialized { signers, threshold }.publish(&env);
 
+        Ok(())
+    }
+
+    /// Reject a proposal.
+    /// Only signers can reject.
+    pub fn reject_proposal(env: Env, rejecter: Address, proposal_id: u64) -> Result<(), Error> {
+        require_signer(&env, &rejecter)?;
+        rejecter.require_auth();
+
+        let mut proposal = get_proposal(&env, proposal_id).ok_or(Error::ProposalNotFound)?;
+
+        if proposal.status != ProposalStatus::Active {
+            return Err(Error::ProposalAlreadyExecuted);
+        }
+
+        if proposal.approvals.contains(&rejecter) {
+            return Err(Error::AlreadyApproved);
+        }
+
+        if proposal.rejections.contains(&rejecter) {
+            return Err(Error::AlreadyRejected);
+        }
+
+        proposal.rejections.push_back(rejecter);
+
+        if rejection_threshold_reached(&env, &proposal.kind, &proposal.rejections) {
+            proposal.status = ProposalStatus::Rejected;
+        }
+
+        put_proposal(&env, &proposal);
         Ok(())
     }
 
@@ -259,15 +280,13 @@ impl MultiSigContract {
 
         put_proposal(&env, &proposal);
 
-        // Emit proposal submitted event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_submitted"),
-                &proposal_id,
-                &proposer,
-            ),
-            (&kind, &args),
-        );
+        ProposalSubmitted {
+            proposal_id,
+            proposer: proposer.clone(),
+            kind: kind.clone(),
+            args: args.clone(),
+        }
+        .publish(&env);
 
         Ok(proposal_id)
     }
@@ -316,61 +335,11 @@ impl MultiSigContract {
 
         put_proposal(&env, &proposal);
 
-        // Emit approval event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_approved"),
-                &proposal_id,
-                &approver,
-            ),
-            (proposal.status.clone(),),
-        );
-
-        Ok(())
-    }
-
-    /// Reject a proposal.
-    /// Only signers can reject.
-    ///
-    /// # Arguments
-    /// * `rejecter` - The address rejecting the proposal
-    /// * `proposal_id` - The ID of the proposal to reject
-    pub fn reject_proposal(env: Env, rejecter: Address, proposal_id: u64) -> Result<(), Error> {
-        require_signer(&env, &rejecter)?;
-        rejecter.require_auth();
-
-        let mut proposal = get_proposal(&env, proposal_id).ok_or(Error::ProposalNotFound)?;
-
-        if proposal.status != ProposalStatus::Active {
-            return Err(Error::ProposalAlreadyExecuted);
+        ProposalApproved {
+            proposal_id,
+            approver: approver.clone(),
         }
-
-        if proposal.rejections.contains(&rejecter) {
-            return Err(Error::AlreadyRejected);
-        }
-
-        if proposal.approvals.contains(&rejecter) {
-            return Err(Error::AlreadyApproved);
-        }
-
-        proposal.rejections.push_back(rejecter.clone());
-
-        // Check if rejection threshold is reached
-        if rejection_threshold_reached(&env, &proposal.kind, &proposal.rejections) {
-            proposal.status = ProposalStatus::Rejected;
-        }
-
-        put_proposal(&env, &proposal);
-
-        // Emit rejection event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_rejected"),
-                &proposal_id,
-                &rejecter,
-            ),
-            (proposal.status.clone(),),
-        );
+        .publish(&env);
 
         Ok(())
     }
@@ -424,25 +393,62 @@ impl MultiSigContract {
         proposal.status = ProposalStatus::Executed;
         put_proposal(&env, &proposal);
 
+        // Execute the proposal
+        let transfer_admin = Symbol::new(&env, "transfer_admin");
+        let initiate_upgrade = Symbol::new(&env, "initiate_upgrade");
+        let complete_upgrade = Symbol::new(&env, "complete_upgrade");
+        let fail_upgrade = Symbol::new(&env, "fail_upgrade");
+        let pause = Symbol::new(&env, "pause");
+        let unpause = Symbol::new(&env, "unpause");
+
+        if proposal.kind == transfer_admin {
+            // For now, just emit an event; integration will come later
+            AdminTransferExecuted {
+                args: proposal.args.clone(),
+                executor: executor.clone(),
+            }
+            .publish(&env);
+        } else if proposal.kind == initiate_upgrade {
+            UpgradeInitiateExecuted {
+                args: proposal.args.clone(),
+                executor: executor.clone(),
+            }
+            .publish(&env);
+        } else if proposal.kind == complete_upgrade {
+            UpgradeCompleteExecuted { _unused: 0 }.publish(&env);
+        } else if proposal.kind == fail_upgrade {
+            UpgradeFailExecuted {
+                args: proposal.args.clone(),
+            }
+            .publish(&env);
+        } else if proposal.kind == pause {
+            PauseExecuted { _unused: 0 }.publish(&env);
+        } else if proposal.kind == unpause {
+            UnpauseExecuted { _unused: 0 }.publish(&env);
+        } else {
+            return Err(Error::InvalidInput);
+        }
+
+        let proposal_kind = proposal.kind.clone();
+        let proposal_args = proposal.args.clone();
+        let proposal_target = proposal.target.clone();
+        let executor_clone = executor.clone();
+
+        ProposalExecuted {
+            proposal_id,
+            executor: executor_clone,
+            kind: proposal_kind.clone(),
+            args: proposal_args.clone(),
+        }
+        .publish(&env);
         // Execute the proposal via cross-contract call
         // We pass the current contract address as the first argument if the target expects a 'caller' argument
         // Many functions in our contracts take 'caller' as the first or second argument.
         // However, for generic support, we just pass the args as provided.
         let scope = Symbol::new(&env, "multisig_exec");
         storage::acquire_reentrancy_lock(&env, &scope)?;
-        let _result: Val =
-            env.invoke_contract(&proposal.target, &proposal.kind, proposal.args.clone());
+        let _result: Val = env.invoke_contract(&proposal_target, &proposal_kind, proposal_args);
         storage::release_reentrancy_lock(&env, &scope);
-
-        // Emit execution event
-        env.events().publish(
-            (
-                Symbol::new(&env, "proposal_executed"),
-                &proposal_id,
-                &executor,
-            ),
-            (&proposal.kind, &proposal.args),
-        );
 
         Ok(())
     }
@@ -498,11 +504,11 @@ mod test_multisig {
         pub fn pause(env: Env, _caller: Address) {}
     }
 
-    fn setup(env: &Env) -> (MultiSigContractClient, Vec<Address>) {
+    fn setup(env: &Env) -> (MultiSigContractClient<'_>, Vec<Address>) {
         let contract_id = env.register_contract(None, MultiSigContract);
         let client = MultiSigContractClient::new(env, &contract_id);
 
-        let mut signers = Vec::new(&env);
+        let mut signers = Vec::new(env);
         signers.push_back(Address::generate(env));
         signers.push_back(Address::generate(env));
         signers.push_back(Address::generate(env));

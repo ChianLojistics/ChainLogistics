@@ -264,6 +264,7 @@ impl StorageContract {
         }
     }
 
+    #[cfg(test)]
     pub fn is_authorized(env: &Env, product_id: &String, actor: &Address) -> bool {
         env.storage()
             .persistent()

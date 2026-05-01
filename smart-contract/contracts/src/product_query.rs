@@ -81,7 +81,7 @@ mod test_product_query {
     };
     use soroban_sdk::{testutils::Address as _, Address, Env, Map, Vec};
 
-    fn setup(env: &Env) -> (ProductRegistryContractClient, Address) {
+    fn setup(env: &Env) -> (ProductRegistryContractClient<'_>, Address) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let pr_id = env.register_contract(None, ProductRegistryContract);
         let pr_client = ProductRegistryContractClient::new(env, &pr_id);

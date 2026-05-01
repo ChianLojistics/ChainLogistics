@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Symbol, Vec};
 
 use crate::error::Error;
@@ -517,7 +519,7 @@ mod test_oracle_security {
     use soroban_sdk::testutils::{Address as _, Ledger as _};
     use soroban_sdk::{Address, Env};
 
-    fn setup(env: &Env) -> (OracleSecurityContractClient, Address) {
+    fn setup(env: &Env) -> (OracleSecurityContractClient<'_>, Address) {
         let contract_id = env.register_contract(None, OracleSecurityContract);
         let client = OracleSecurityContractClient::new(env, &contract_id);
         let admin = Address::generate(env);

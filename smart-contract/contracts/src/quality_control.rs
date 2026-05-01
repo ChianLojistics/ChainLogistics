@@ -1,5 +1,7 @@
 #![allow(unexpected_cfgs)]
 #![allow(dead_code)]
+#![allow(clippy::too_many_arguments)]
+#![allow(deprecated)]
 
 use soroban_sdk::{contract, contractimpl, Address, Env, Map, String, Symbol, Vec};
 
