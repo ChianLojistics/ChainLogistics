@@ -1,9 +1,10 @@
 use std::time::Duration;
 use sqlx::PgPool;
 use chrono::{DateTime, Utc};
-use crate::services::{SyncService, ProductService, EventService};
+use crate::services::{SyncService, ProductService, EventService, ApiKeyService};
 
 pub mod aggregation;
+pub mod crypto;
 
 pub struct BackupService {
     pool: PgPool,
@@ -88,16 +89,18 @@ impl BackupService {
 // Cron service for scheduled tasks
 pub struct CronService {
     pool: PgPool,
+    redis_client: redis::Client,
     backup_service: BackupService,
     sync_service: SyncService,
 }
 
 impl CronService {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
         Self {
             pool: pool.clone(),
+            redis_client: redis_client.clone(),
             backup_service: BackupService::new(pool.clone()),
-            sync_service: SyncService::new(pool),
+            sync_service: SyncService::new(pool, redis_client),
         }
     }
 
@@ -145,6 +148,20 @@ impl CronService {
             }
         });
 
+        // Disable API keys inactive for 90+ days — runs once per day
+        let api_key_service = ApiKeyService::new(pool.clone());
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(86400));
+            loop {
+                interval.tick().await;
+                match api_key_service.disable_inactive_keys(90).await {
+                    Ok(n) if n > 0 => tracing::info!("Disabled {} inactive API keys", n),
+                    Ok(_) => {}
+                    Err(e) => tracing::error!("Failed to disable inactive API keys: {}", e),
+                }
+            }
+        });
+
         tracing::info!("Cron scheduler started");
     }
 }
@@ -162,8 +179,9 @@ impl Clone for SyncService {
     fn clone(&self) -> Self {
         Self {
             pool: self.pool.clone(),
-            product_service: ProductService::new(self.pool.clone()),
-            event_service: EventService::new(self.pool),
+            redis_client: self.redis_client.clone(),
+            product_service: ProductService::new(self.pool.clone(), self.redis_client.clone()),
+            event_service: EventService::new(self.pool.clone(), self.redis_client.clone()),
         }
     }
 }

@@ -4,6 +4,7 @@ import * as React from "react";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { fuzzyScore } from "@/lib/search/fuzzy";
 
 type BaseSuggestion = {
   id: string;
@@ -133,11 +134,18 @@ export function SearchInput<
     const q = inputValue.trim().toLowerCase();
     if (q.length < minQueryLength) return [] as TSuggestion[];
 
-    const res = suggestions.filter((s) =>
-      labelOf(s).toLowerCase().includes(q)
-    );
+    const scored = suggestions
+      .map((s) => {
+        const label = labelOf(s);
+        const { matched, score } = fuzzyScore(q, label);
+        return { s, matched, score };
+      })
+      .filter((x) => x.matched)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxSuggestions)
+      .map((x) => x.s);
 
-    return res.slice(0, maxSuggestions);
+    return scored;
   }, [inputValue, labelOf, maxSuggestions, minQueryLength, suggestions]);
 
   const listboxId = React.useId();

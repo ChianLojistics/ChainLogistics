@@ -12,8 +12,8 @@ fn setup_load_test_env(
     env: &Env,
 ) -> (
     Address,
-    ProductRegistryContractClient,
-    ProductTransferContractClient,
+    ProductRegistryContractClient<'_>,
+    ProductTransferContractClient<'_>,
 ) {
     env.mock_all_auths();
     env.budget().reset_unlimited();
@@ -36,6 +36,7 @@ fn setup_load_test_env(
     (owner, pr_client, transfer_client)
 }
 
+#[allow(dead_code)]
 fn create_test_product_config(
     env: &Env,
     id: &str,

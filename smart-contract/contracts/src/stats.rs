@@ -189,9 +189,9 @@ mod test_stats {
     fn setup(
         env: &Env,
     ) -> (
-        ProductRegistryContractClient,
-        TrackingContractClient,
-        super::StatsContractClient,
+        ProductRegistryContractClient<'_>,
+        TrackingContractClient<'_>,
+        super::StatsContractClient<'_>,
     ) {
         let auth_id = env.register_contract(None, AuthorizationContract);
         let registry_id = env.register_contract(None, ProductRegistryContract);

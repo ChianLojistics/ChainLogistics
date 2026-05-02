@@ -7,7 +7,7 @@ use crate::{
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
-fn setup(env: &Env) -> ProductRegistryContractClient {
+fn setup(env: &Env) -> ProductRegistryContractClient<'_> {
     let auth_id = env.register_contract(None, AuthorizationContract);
     let contract_id = env.register_contract(None, ProductRegistryContract);
     let client = ProductRegistryContractClient::new(env, &contract_id);
