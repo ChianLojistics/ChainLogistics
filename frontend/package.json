@@ -41,8 +41,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "tailwindcss": "^4.2.4",
-    "autoprefixer": "^10.4.20",
+    "@tailwindcss/postcss": "^4.2.4",
     "@testing-library/jest-dom": "^6.1.4",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.5.1",
