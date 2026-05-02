@@ -16,6 +16,7 @@ export default defineConfig({
       "**/dist/**",
       "**/.next/**",
       "**/coverage/**",
+      "e2e/**",
       "tests/e2e/**"
     ],
     coverage: {

@@ -140,7 +140,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm install @rollup/rollup-linux-x64-gnu --save-optional
+          npm install lightningcss-linux-x64-gnu --save-optional
 
       - name: Run npm audit
         run: npm audit --audit-level=moderate
@@ -186,7 +189,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm install @rollup/rollup-linux-x64-gnu --save-optional
+          npm install lightningcss-linux-x64-gnu --save-optional
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps

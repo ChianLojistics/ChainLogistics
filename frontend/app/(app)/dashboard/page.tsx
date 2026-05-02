@@ -175,7 +175,13 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     if (status !== "connected" || !publicKey) return;
-    load();
+    
+    // Use setTimeout to avoid calling setState synchronously in effect
+    const timeoutId = setTimeout(() => {
+      load();
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
   }, [status, publicKey, load]);
 
   React.useEffect(() => {

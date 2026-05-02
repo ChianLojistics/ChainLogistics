@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, Clock } from "lucide-react";
+import { Check } from "lucide-react";
 
 interface ProgressStep {
   id: string;
