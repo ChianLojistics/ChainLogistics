@@ -5,6 +5,7 @@ use soroban_sdk::{contracttype, i64, u64, Address, BytesN, Map, String, Symbol, 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Product {
+    pub id: String,
     pub product_id: String,
     pub name: String,
     pub origin: String,
@@ -14,10 +15,14 @@ pub struct Product {
     pub certifications: Vec<String>,
     pub media_hashes: Vec<BytesN<32>>,
     pub custom_fields: Map<String, String>,
+    pub custom: Map<String, String>,
     pub created_at: u64,
     pub updated_at: u64,
     pub status: ProductStatus,
     pub supply_chain_events: Vec<SupplyChainEvent>,
+    pub owner: Address,
+    pub active: bool,
+    pub deactivation_info: Vec<String>,
 }
 
 #[contracttype]
@@ -138,6 +143,7 @@ pub enum DataKey {
     CircuitBreakerNextRecordId,
     CircuitBreakerPendingApproval(u64),
     CircuitBreakerNextApprovalId,
+    EventSeq,
 }
 
 // ─── Event Types ───────────────────────────────────────────────────────────
@@ -216,7 +222,7 @@ pub struct Proposal {
     pub proposer: Address,
     pub proposal_type: ProposalType,
     pub target_address: Address,
-    pub call_data: Vec<u8>,
+    pub call_data: BytesN<32>,
     pub approvals: Vec<Address>,
     pub executed: bool,
     pub created_at: u64,
@@ -259,6 +265,7 @@ pub enum PauseReason {
     Maintenance,
     MarketVolatility,
     SystemUpgrade,
+    ContractBug,
     Other,
 }
 
@@ -274,8 +281,8 @@ pub struct PauseRecord {
     pub activated_at: u64,
     /// 0 means no expiry.
     pub expires_at: u64,
-    /// Address that lifted the pause (0 if still active).
-    pub lifted_by: Address,
+    /// Addresses that lifted the pause (empty if still active).
+    pub lifted_by: Vec<Address>,
     /// When the pause was lifted (0 if still active).
     pub lifted_at: u64,
 }
