@@ -53,6 +53,8 @@ mod test_error_coverage;
 #[cfg(test)]
 mod test_integration;
 #[cfg(not(target_arch = "wasm32"))]
+mod timelock;
+#[cfg(not(target_arch = "wasm32"))]
 mod tracking;
 #[cfg(not(target_arch = "wasm32"))]
 mod upgrade;
@@ -77,6 +79,8 @@ pub use product_registry::*;
 pub use product_transfer::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use stats::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use timelock::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use tracking::*;
 #[cfg(not(target_arch = "wasm32"))]
