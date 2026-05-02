@@ -42,7 +42,6 @@ mod load_tests;
 mod oracle;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_query;
-#[cfg(not(target_arch = "wasm32"))]
 mod product_registry;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_transfer;
@@ -69,12 +68,6 @@ mod test_circuit_breaker;
 mod test_error_coverage;
 #[cfg(test)]
 mod test_integration;
-#[cfg(not(target_arch = "wasm32"))]
-mod timelock;
-#[cfg(not(target_arch = "wasm32"))]
-mod tracking;
-#[cfg(not(target_arch = "wasm32"))]
-mod upgrade;
 
 // Public API Surface
 //

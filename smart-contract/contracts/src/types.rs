@@ -171,6 +171,14 @@ pub enum DataKey {
     TimelockOperation(u64),
     NextTimelockOperationId,
     ReentrancyLock(Symbol),
+    // ── Circuit Breaker ──────────────────────────────────────────────────
+    CircuitBreakerContract,
+    CircuitBreakerState,
+    CircuitBreakerGuardians,
+    CircuitBreakerPauseRecord(u64),
+    CircuitBreakerNextRecordId,
+    CircuitBreakerPendingApproval(u64),
+    CircuitBreakerNextApprovalId,
 }
 
 // ─── Event Types ───────────────────────────────────────────────────────────
@@ -507,6 +515,80 @@ pub struct SensorInfo {
     pub sensor_id: String,
     pub sensor_type: String,
     pub authorized: bool,
+}
+
+// ─── Circuit Breaker Types ─────────────────────────────────────────────────
+
+/// Pause severity levels.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PauseLevel {
+    /// Informational — no functions blocked.
+    Advisory,
+    /// Block write operations (add_tracking_event, register_product).
+    Partial,
+    /// Block writes and mutations (transfer_product, batch_transfer).
+    Full,
+    /// Block everything including reads (except status queries).
+    Emergency,
+}
+
+/// Reason category for a pause — used for off-chain monitoring and audit.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PauseReason {
+    SecurityBreach,
+    OracleFailure,
+    RegulatoryAction,
+    Maintenance,
+    MarketVolatility,
+    SystemUpgrade,
+    ContractBug,
+    Other,
+}
+
+/// Historical pause record stored for audit and analytics.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PauseRecord {
+    pub record_id: u64,
+    pub activated_by: Address,
+    pub level: PauseLevel,
+    pub reason: PauseReason,
+    pub description: String,
+    pub activated_at: u64,
+    /// 0 means no expiry.
+    pub expires_at: u64,
+    /// Addresses that lifted the pause (empty if still active).
+    pub lifted_by: Vec<Address>,
+    /// When the pause was lifted (0 if still active).
+    pub lifted_at: u64,
+}
+
+/// Live state of the circuit breaker stored in persistent storage.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CircuitBreakerState {
+    pub is_paused: bool,
+    pub level: PauseLevel,
+    pub current_record_id: u64,
+    pub paused_at: u64,
+    pub expires_at: u64,
+}
+
+/// A pending multi-authority pause approval request.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PauseApproval {
+    pub approval_id: u64,
+    pub proposed_level: PauseLevel,
+    pub proposed_reason: PauseReason,
+    pub description: String,
+    pub expires_at: u64,
+    pub proposer: Address,
+    pub approvals: Vec<Address>,
+    pub required_approvals: u32,
+    pub executed: bool,
 }
 
 // Extend DataKey for quality control
