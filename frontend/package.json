@@ -68,8 +68,6 @@
     "lodash-es": "^4.17.21",
     "picomatch": "^4.0.2",
     "postcss": "^8.5.10",
-    "vite": "^7.3.2",
-    "@rollup/rollup-linux-x64-gnu": "npm:@rollup/rollup-linux-x64-gnu@^4.60.2",
-    "lightningcss-linux-x64-gnu": "npm:lightningcss-linux-x64-gnu@^1.29.1"
+    "vite": "^7.3.2"
   }
 }
