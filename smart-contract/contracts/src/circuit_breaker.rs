@@ -43,7 +43,7 @@
 /// | `cb_proposal_created`     | Multi-auth proposal created               |
 /// | `cb_proposal_approved`    | Guardian approved a proposal              |
 /// | `cb_proposal_executed`    | Proposal threshold reached, pause applied |
-#![allow(deprecated)]
+#[allow(deprecated)]
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 
 use crate::error::Error;
