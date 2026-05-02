@@ -1,5 +1,6 @@
 /// Comprehensive tests for the CircuitBreakerContract.
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod test_circuit_breaker {
     use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env, Vec};
 
