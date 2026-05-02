@@ -30,6 +30,8 @@ mod admin;
 mod circuit_breaker;
 #[cfg(not(target_arch = "wasm32"))]
 mod event_query;
+#[cfg(test)]
+mod load_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_query;
 #[cfg(not(target_arch = "wasm32"))]
@@ -38,12 +40,6 @@ mod product_registry;
 mod product_transfer;
 #[cfg(not(target_arch = "wasm32"))]
 mod stats;
-#[cfg(not(target_arch = "wasm32"))]
-mod tracking;
-#[cfg(not(target_arch = "wasm32"))]
-mod upgrade;
-#[cfg(test)]
-mod load_tests;
 #[cfg(test)]
 mod test;
 #[cfg(test)]
@@ -56,6 +52,10 @@ mod test_circuit_breaker;
 mod test_error_coverage;
 #[cfg(test)]
 mod test_integration;
+#[cfg(not(target_arch = "wasm32"))]
+mod tracking;
+#[cfg(not(target_arch = "wasm32"))]
+mod upgrade;
 
 pub use authorization::*;
 pub use contract::*;

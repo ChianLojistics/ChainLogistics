@@ -105,13 +105,13 @@ pub enum DataKey {
     Proposal(u64),         // Proposal by ID
     NextProposalId,        // Next proposal ID counter
     // ── Circuit Breaker ──────────────────────────────────────────────────
-    CircuitBreakerContract,       // Address of the circuit breaker contract
-    CircuitBreakerState,          // Global CircuitBreakerState struct
-    CircuitBreakerGuardians,      // Vec<Address> of authorised guardians
+    CircuitBreakerContract,         // Address of the circuit breaker contract
+    CircuitBreakerState,            // Global CircuitBreakerState struct
+    CircuitBreakerGuardians,        // Vec<Address> of authorised guardians
     CircuitBreakerPauseRecord(u64), // PauseRecord by sequential ID
-    CircuitBreakerNextRecordId,   // u64 counter for pause records
+    CircuitBreakerNextRecordId,     // u64 counter for pause records
     CircuitBreakerPendingApproval(u64), // PauseApproval struct for multi-auth pauses
-    CircuitBreakerNextApprovalId, // u64 counter for pending approvals
+    CircuitBreakerNextApprovalId,   // u64 counter for pending approvals
 }
 
 #[contracttype]

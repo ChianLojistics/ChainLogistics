@@ -454,7 +454,8 @@ mod test_circuit_breaker {
         );
 
         // Advance time significantly
-        env.ledger().set_timestamp(env.ledger().timestamp() + 999_999);
+        env.ledger()
+            .set_timestamp(env.ledger().timestamp() + 999_999);
 
         assert!(client.is_paused());
     }

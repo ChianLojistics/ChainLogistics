@@ -119,9 +119,10 @@ fn next_record_id(env: &Env) -> u64 {
 }
 
 fn put_record(env: &Env, record: &PauseRecord) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::CircuitBreakerPauseRecord(record.record_id), record);
+    env.storage().persistent().set(
+        &DataKey::CircuitBreakerPauseRecord(record.record_id),
+        record,
+    );
 }
 
 fn get_record(env: &Env, record_id: u64) -> Option<PauseRecord> {
@@ -144,9 +145,10 @@ fn next_approval_id(env: &Env) -> u64 {
 }
 
 fn put_approval(env: &Env, approval: &PauseApproval) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::CircuitBreakerPendingApproval(approval.approval_id), approval);
+    env.storage().persistent().set(
+        &DataKey::CircuitBreakerPendingApproval(approval.approval_id),
+        approval,
+    );
 }
 
 fn get_approval(env: &Env, approval_id: u64) -> Option<PauseApproval> {
@@ -261,11 +263,7 @@ impl CircuitBreakerContract {
     /// * `guardians` — initial set of guardian addresses (may be empty).
     ///
     /// Can only be called once.
-    pub fn initialize(
-        env: Env,
-        admin: Address,
-        guardians: Vec<Address>,
-    ) -> Result<(), Error> {
+    pub fn initialize(env: Env, admin: Address, guardians: Vec<Address>) -> Result<(), Error> {
         if has_admin(&env) {
             return Err(Error::CircuitBreakerAlreadyInitialized);
         }
@@ -299,10 +297,8 @@ impl CircuitBreakerContract {
             },
         );
 
-        env.events().publish(
-            (Symbol::new(&env, "cb_initialized"),),
-            (admin, guardians),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "cb_initialized"),), (admin, guardians));
 
         Ok(())
     }
@@ -451,8 +447,7 @@ impl CircuitBreakerContract {
     ) -> Result<(), Error> {
         require_guardian(&env, &approver)?;
 
-        let mut approval =
-            get_approval(&env, approval_id).ok_or(Error::ApprovalNotFound)?;
+        let mut approval = get_approval(&env, approval_id).ok_or(Error::ApprovalNotFound)?;
 
         if approval.executed {
             return Err(Error::ApprovalAlreadyExecuted);
@@ -488,8 +483,7 @@ impl CircuitBreakerContract {
         require_guardian(&env, &executor)?;
         validate_duration(pause_duration_secs)?;
 
-        let mut approval =
-            get_approval(&env, approval_id).ok_or(Error::ApprovalNotFound)?;
+        let mut approval = get_approval(&env, approval_id).ok_or(Error::ApprovalNotFound)?;
 
         if approval.executed {
             return Err(Error::ApprovalAlreadyExecuted);
@@ -551,10 +545,8 @@ impl CircuitBreakerContract {
         state.expires_at = 0;
         set_state(&env, &state);
 
-        env.events().publish(
-            (Symbol::new(&env, "cb_lifted"), record_id),
-            caller,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "cb_lifted"), record_id), caller);
 
         Ok(record_id)
     }
