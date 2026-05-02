@@ -51,7 +51,12 @@ export function ProductFilters({
   }, [localSearch]);
 
   useEffect(() => {
-    setSaved(loadSavedSearches<SavedFilters>(storageKey));
+    // Use setTimeout to avoid calling setState synchronously in effect
+    const timeoutId = setTimeout(() => {
+      setSaved(loadSavedSearches<SavedFilters>(storageKey));
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const updateFilter = (key: keyof FilterState, value: string) => {

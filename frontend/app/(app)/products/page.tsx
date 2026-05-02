@@ -39,7 +39,12 @@ export default function ProductsPage() {
       next.status = "all";
     }
 
-    setFilters(next);
+    // Use setTimeout to avoid calling setState synchronously in effect
+    const timeoutId = setTimeout(() => {
+      setFilters(next);
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -87,7 +92,12 @@ export default function ProductsPage() {
 
   // Fetch products
   useEffect(() => {
-    fetchProducts();
+    // Use setTimeout to avoid calling setState synchronously in effect
+    const timeoutId = setTimeout(() => {
+      fetchProducts();
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
   }, [fetchProducts]);
 
   // Extract unique categories and owners for filter dropdowns

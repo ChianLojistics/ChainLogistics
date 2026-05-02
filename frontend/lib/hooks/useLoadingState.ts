@@ -79,7 +79,7 @@ export function useLoadingState(
 /**
  * Hook for async operations with automatic loading state management
  */
-export function useAsync<T, E = Error>(
+export function useAsync<T>(
   asyncFunction: () => Promise<T>,
   immediate = true
 ) {

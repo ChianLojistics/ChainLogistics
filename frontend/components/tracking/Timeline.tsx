@@ -62,7 +62,12 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
   }, [productId, offset, PAGE_SIZE]);
 
   useEffect(() => {
-    loadEvents();
+    // Use setTimeout to avoid calling setState synchronously in effect
+    const timeoutId = setTimeout(() => {
+      loadEvents();
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
   }, [loadEvents]);
 
   if (loading) {

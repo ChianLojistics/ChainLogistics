@@ -160,7 +160,6 @@ export function LoadingOverlay({
       )}
       role="status"
       aria-label={message}
-      aria-modal="true"
     >
       <div className="bg-white rounded-lg shadow-lg p-8 max-w-sm w-full mx-4">
         <div className="text-center">
