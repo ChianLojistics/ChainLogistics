@@ -12,7 +12,7 @@ mod test_circuit_breaker {
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
-    fn deploy(env: &Env) -> (CircuitBreakerContractClient, Address, Vec<Address>) {
+    fn deploy(env: &Env) -> (CircuitBreakerContractClient<'_>, Address, Vec<Address>) {
         let id = env.register_contract(None, CircuitBreakerContract);
         let client = CircuitBreakerContractClient::new(env, &id);
         let admin = Address::generate(env);

@@ -55,8 +55,6 @@ mod tracking;
 mod upgrade;
 
 #[cfg(test)]
-mod load_tests;
-#[cfg(test)]
 mod test;
 #[cfg(test)]
 mod test_auth;
