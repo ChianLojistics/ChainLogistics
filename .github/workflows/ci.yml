@@ -145,7 +145,7 @@ jobs:
       - name: Install Linux-specific native modules
         run: |
           npm install @rollup/rollup-linux-x64-gnu@4.60.2 --no-save
-          npm install lightningcss-linux-x64-gnu@1.29.1 --no-save
+          npm install tailwindcss-linux-x64-gnu@4.2.4 --no-save
 
       - name: Run npm audit
         run: npm audit --audit-level=moderate
@@ -196,7 +196,7 @@ jobs:
       - name: Install Linux-specific native modules
         run: |
           npm install @rollup/rollup-linux-x64-gnu@4.60.2 --no-save
-          npm install lightningcss-linux-x64-gnu@1.29.1 --no-save
+          npm install tailwindcss-linux-x64-gnu@4.2.4 --no-save
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
