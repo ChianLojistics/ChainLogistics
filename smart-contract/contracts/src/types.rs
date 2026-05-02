@@ -1,124 +1,154 @@
-use soroban_sdk::{contracttype, Address, BytesN, Map, String, Symbol, Val, Vec};
+use soroban_sdk::{contracttype, i64, u64, Address, BytesN, Map, String, Symbol, Vec, I256, U256};
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DeactInfo {
-    pub reason: String,
-    pub deactivated_at: u64,
-    pub deactivated_by: Address,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Origin {
-    pub location: String,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProductConfig {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub origin_location: String,
-    pub category: String,
-    pub tags: Vec<String>,
-    pub certifications: Vec<BytesN<32>>,
-    pub media_hashes: Vec<BytesN<32>>,
-    pub custom: Map<Symbol, String>,
-}
+// ─── Core Product Types ───────────────────────────────────────────────────────
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Product {
-    pub id: String,
+    pub product_id: String,
     pub name: String,
-    pub description: String,
-    pub origin: Origin,
-    pub owner: Address,
-    pub created_at: u64,
-    pub active: bool,
+    pub origin: String,
     pub category: String,
+    pub description: String,
     pub tags: Vec<String>,
-    pub certifications: Vec<BytesN<32>>,
+    pub certifications: Vec<String>,
     pub media_hashes: Vec<BytesN<32>>,
-    pub custom: Map<Symbol, String>,
-    pub deactivation_info: Vec<DeactInfo>,
+    pub custom_fields: Map<String, String>,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub status: ProductStatus,
+    pub supply_chain_events: Vec<SupplyChainEvent>,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TrackingEvent {
+pub enum ProductStatus {
+    Active,
+    Deactivated,
+    Recalled,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SupplyChainEvent {
     pub event_id: u64,
     pub product_id: String,
-    pub actor: Address,
-    pub timestamp: u64,
     pub event_type: Symbol,
-    pub location: String, // Added missing location field
+    pub location: String,
+    pub timestamp: u64,
+    pub participant: Address,
     pub data_hash: BytesN<32>,
-    pub note: String,
-    pub metadata: Map<Symbol, String>,
+    pub metadata: Map<String, String>,
+}
+
+// ─── Batch Operations ─────────────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchProductTransfer {
+    pub batch_id: u64,
+    pub transfers: Vec<ProductTransfer>,
+    pub total_amount: U256,
+    pub from_address: Address,
+    pub to_address: Address,
+    pub timestamp: u64,
+    pub metadata: Map<String, String>,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TrackingEventPage {
-    pub events: Vec<TrackingEvent>,
-    pub total_count: u64,
+pub struct ProductTransfer {
+    pub product_id: String,
+    pub quantity: U256,
+    pub unit_price: Option<U256>,
+}
+
+// ─── Search and Query Types ───────────────────────────────────────────────────
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProductSearchQuery {
+    pub keywords: Vec<String>,
+    pub category: Option<String>,
+    pub origin: Option<String>,
+    pub certification: Option<String>,
+    pub status: Option<ProductStatus>,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProductSearchResult {
+    pub products: Vec<Product>,
+    pub total_count: u32,
     pub has_more: bool,
 }
 
+// ─── Validation Types ───────────────────────────────────────────────────────
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProductStats {
-    pub total_products: u64,
-    pub active_products: u64,
+pub struct ValidationResult {
+    pub is_valid: bool,
+    pub errors: Vec<ValidationError>,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValidationError {
+    pub field: String,
+    pub error_code: u32,
+    pub message: String,
+}
+
+// ─── Storage Keys ───────────────────────────────────────────────────────────
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Product(String),
-    ProductEventIds(String),
-    ProductEventTimestamps(String),
-    ProductEventIdsByType(String, Symbol),
-    ProductEventIdsByActor(String, Address),
-    Event(u64),
-    EventSeq,
-    EventTypeIndex(String, Symbol, u64),
-    EventTypeCount(String, Symbol),
+    ProductCount,
+    Batch(u64),
+    BatchCount,
+    SearchIndex(String),
+    ValidationCache(String),
     Auth(String, Address),
     Admin,
     Paused,
-    AuthContract, // Added for cross-contract delegation
-    MainContract, // Added for ProductTransferContract
+    AuthContract,
+    MainContract,
     TransferContract,
-    MultiSigContract, // Multi-signature contract address
+    MultiSigContract,
     TotalProducts,
     ActiveProducts,
-    SearchIndex(IndexKey), // For product search functionality
-    ContractVersion,       // Current contract version
-    UpgradeInfo,           // Current upgrade information
-    UpgradeStatus,         // Current upgrade status
-    EmergencyPause,        // Emergency pause flag
-    MultiSigConfig,        // Multi-signature configuration
-    Proposal(u64),         // Proposal by ID
-    NextProposalId,        // Next proposal ID counter
+    SearchIndex(IndexKey),
+    ContractVersion,
+    UpgradeInfo,
+    UpgradeStatus,
+    EmergencyPause,
+    MultiSigConfig,
+    Proposal(u64),
+    NextProposalId,
     // ── Circuit Breaker ──────────────────────────────────────────────────
-    CircuitBreakerContract,         // Address of the circuit breaker contract
-    CircuitBreakerState,            // Global CircuitBreakerState struct
-    CircuitBreakerGuardians,        // Vec<Address> of authorised guardians
-    CircuitBreakerPauseRecord(u64), // PauseRecord by sequential ID
-    CircuitBreakerNextRecordId,     // u64 counter for pause records
-    CircuitBreakerPendingApproval(u64), // PauseApproval struct for multi-auth pauses
-    CircuitBreakerNextApprovalId,   // u64 counter for pending approvals
+    CircuitBreakerContract,
+    CircuitBreakerState,
+    CircuitBreakerGuardians,
+    CircuitBreakerPauseRecord(u64),
+    CircuitBreakerNextRecordId,
+    CircuitBreakerPendingApproval(u64),
+    CircuitBreakerNextApprovalId,
 }
+
+// ─── Event Types ───────────────────────────────────────────────────────────
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrackingEventInput {
     pub product_id: String,
     pub event_type: Symbol,
+    pub location: String,
+    pub participant: Address,
     pub data_hash: BytesN<32>,
     pub note: String,
 }
@@ -132,11 +162,15 @@ pub struct TrackingEventFilter {
     pub location: String,
 }
 
+// ─── Index Types ───────────────────────────────────────────────────────────
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum IndexKey {
-    Keyword(String), // keyword -> Vec<product_id>
+    Keyword(String),
 }
+
+// ─── Upgrade Types ─────────────────────────────────────────────────────────
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -165,37 +199,43 @@ pub enum UpgradeStatus {
     Failed,
 }
 
-// ─── Multi-Signature Types ─────────────────────────────────────────────────────
+// ─── Multi-Signature Types ─────────────────────────────────────────────────
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MultiSigConfig {
     pub signers: Vec<Address>,
     pub threshold: u32,
+    pub proposal_expiry: u64,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Proposal {
-    pub id: u64,
-    pub kind: Symbol, // "transfer_admin", "initiate_upgrade", "complete_upgrade", "fail_upgrade", "pause", "unpause"
-    pub args: Vec<Val>,
+    pub proposal_id: u64,
     pub proposer: Address,
-    pub created_at: u64,
-    pub executed: bool,
+    pub proposal_type: ProposalType,
+    pub target_address: Address,
+    pub call_data: Vec<u8>,
     pub approvals: Vec<Address>,
+    pub executed: bool,
+    pub created_at: u64,
+    pub expires_at: u64,
 }
 
-// ─── Circuit Breaker Types ────────────────────────────────────────────────────
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProposalType {
+    Upgrade,
+    Transfer,
+    Pause,
+    Unpause,
+    Custom,
+}
 
-/// Severity level of a pause — controls which functions are blocked.
-///
-/// | Level      | Blocked operations                                      |
-/// |------------|---------------------------------------------------------|
-/// | Advisory   | None — informational only, no functions blocked         |
-/// | Partial    | Tracking event writes; product registration             |
-/// | Full       | All state-mutating operations                           |
-/// | Emergency  | All operations including reads (except status queries)  |
+// ─── Circuit Breaker Types ─────────────────────────────────────────────────
+
+/// Pause severity levels.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PauseLevel {
@@ -203,9 +243,9 @@ pub enum PauseLevel {
     Advisory,
     /// Block write operations (add_tracking_event, register_product).
     Partial,
-    /// Block all state-mutating operations.
+    /// Block writes and mutations (transfer_product, batch_transfer).
     Full,
-    /// Block everything including reads (maximum lockdown).
+    /// Block everything including reads (except status queries).
     Emergency,
 }
 
@@ -216,13 +256,13 @@ pub enum PauseReason {
     SecurityBreach,
     OracleFailure,
     RegulatoryAction,
-    ContractBug,
-    MarketVolatility,
     Maintenance,
+    MarketVolatility,
+    SystemUpgrade,
     Other,
 }
 
-/// Immutable record written to storage when a pause is activated or lifted.
+/// Historical pause record stored for audit and analytics.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PauseRecord {
@@ -234,8 +274,10 @@ pub struct PauseRecord {
     pub activated_at: u64,
     /// 0 means no expiry.
     pub expires_at: u64,
+    /// Address that lifted the pause (0 if still active).
+    pub lifted_by: Address,
+    /// When the pause was lifted (0 if still active).
     pub lifted_at: u64,
-    pub lifted_by: Vec<Address>,
 }
 
 /// Live state of the circuit breaker stored in persistent storage.
