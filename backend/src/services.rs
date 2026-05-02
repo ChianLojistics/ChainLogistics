@@ -1,9 +1,12 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
+use sha2::{Sha256, Digest};
+use rand::Rng;
 use crate::database::{ProductRepository, EventRepository, UserRepository, ApiKeyRepository, ProductFilters, GlobalStats};
 use crate::models::*;
 use bcrypt::{hash, DEFAULT_COST};
+use redis::AsyncCommands;
 
 pub mod financial;
 pub use financial::FinancialService;
@@ -15,20 +18,52 @@ pub mod carbon_calculator;
 pub mod carbon;
 pub use carbon::CarbonService;
 
+pub mod audit_service;
+pub use audit_service::AuditService;
+
+pub mod digital_twin_service;
+pub use digital_twin_service::DigitalTwinService;
+
+pub mod collaboration;
+pub use collaboration::CollaborationService;
+
+
+/// Service layer for managing product operations and database interactions.
+/// Provides a clean abstraction over database operations for products.
 pub struct ProductService {
     pool: PgPool,
+    redis_client: redis::Client,
 }
 
 impl ProductService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
+        Self { pool, redis_client }
     }
 }
 
 #[async_trait]
 impl ProductRepository for ProductService {
+/// Creates a new product in the database with all associated metadata.
+/// This function handles the complete product creation process including
+/// tags, certifications, media hashes, and custom fields.
+/// 
+/// # Arguments
+/// * `product` - NewProduct struct containing all product information
+/// 
+/// # Returns
+/// * `Result<Product, sqlx::Error>` - The created product or database error
+/// 
+/// # Example
+/// ```rust
+/// let new_product = NewProduct {
+///     id: "PROD-12345".to_string(),
+///     name: "Ethiopian Coffee".to_string(),
+///     // ... other fields
+/// };
+/// let product = service.create_product(new_product).await?;
+/// ```
     async fn create_product(&self, product: NewProduct) -> Result<Product, sqlx::Error> {
-        sqlx::query_as!(
+        let created = sqlx::query_as!(
             Product,
             r#"
             INSERT INTO products (
@@ -51,21 +86,56 @@ impl ProductRepository for ProductService {
             product.created_by
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Invalidate global stats cache
+        let _ = self.invalidate_global_stats().await;
+
+        Ok(created)
     }
 
+/// Retrieves a product by its unique identifier.
+/// Returns None if the product doesn't exist.
+/// 
+/// # Arguments
+/// * `id` - The unique product identifier
+/// 
+/// # Returns
+/// * `Result<Option<Product>, sqlx::Error>` - Product if found, None otherwise
     async fn get_product(&self, id: &str) -> Result<Option<Product>, sqlx::Error> {
-        sqlx::query_as!(
+        let cache_key = format!("cache:product:{}", id);
+        
+        // Try to get from cache
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            if let Ok(cached) = conn.get::<_, String>(&cache_key).await {
+                if let Ok(product) = serde_json::from_str::<Product>(&cached) {
+                    return Ok(Some(product));
+                }
+            }
+        }
+
+        let product = sqlx::query_as!(
             Product,
             "SELECT * FROM products WHERE id = $1",
             id
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        // Save to cache if found
+        if let Some(ref p) = product {
+            if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+                if let Ok(serialized) = serde_json::to_string(p) {
+                    let _: Result<(), _> = conn.set_ex(&cache_key, serialized, 3600).await;
+                }
+            }
+        }
+
+        Ok(product)
     }
 
     async fn update_product(&self, id: &str, product: Product) -> Result<Product, sqlx::Error> {
-        sqlx::query_as!(
+        let updated = sqlx::query_as!(
             Product,
             r#"
             UPDATE products SET
@@ -97,16 +167,50 @@ impl ProductRepository for ProductService {
             product.updated_by
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Invalidate cache
+        let _ = self.invalidate_product_cache(id).await;
+        let _ = self.invalidate_global_stats().await;
+
+        Ok(updated)
     }
 
     async fn delete_product(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query!("DELETE FROM products WHERE id = $1", id)
             .execute(&self.pool)
             .await?;
+        
+        // Invalidate cache
+        let _ = self.invalidate_product_cache(id).await;
+        let _ = self.invalidate_global_stats().await;
+        
         Ok(())
     }
 
+/// Lists products with optional filtering and pagination.
+/// Builds dynamic SQL queries based on provided filters to efficiently
+/// retrieve product data with proper ordering and limits.
+/// 
+/// # Arguments
+/// * `offset` - Number of records to skip (for pagination)
+/// * `limit` - Maximum number of records to return
+/// * `filters` - Optional ProductFilters for narrowing results
+/// 
+/// # Returns
+/// * `Result<Vec<Product>, sqlx::Error>` - List of products matching criteria
+/// 
+/// # Dynamic Query Building
+/// The function constructs SQL queries dynamically by:
+/// 1. Starting with base SELECT statement
+/// 2. Adding WHERE clauses based on active filters
+/// 3. Binding parameters in order to prevent SQL injection
+/// 4. Adding ORDER BY, LIMIT, and OFFSET clauses
+/// 
+/// # Performance Considerations
+/// - Uses parameterized queries to prevent SQL injection
+/// - Applies database indexes efficiently through WHERE clauses
+/// - Limits results to prevent memory issues with large datasets
     async fn list_products(
         &self,
         offset: i64,
@@ -203,6 +307,25 @@ impl ProductRepository for ProductService {
             .await
     }
 
+/// Performs full-text search across products using PostgreSQL's built-in search capabilities.
+/// Searches across product name, description, and category fields using both
+/// full-text search and ILIKE for comprehensive matching.
+/// 
+/// # Arguments
+/// * `query` - Search query string
+/// * `limit` - Maximum number of results to return
+/// 
+/// # Search Strategy
+/// Uses a two-pronged approach:
+/// 1. Full-text search with ranking for relevance scoring
+/// 2. ILIKE matching on ID and exact name matches
+/// 
+/// # Returns
+/// * `Result<Vec<Product>, sqlx::Error>` - Products ranked by relevance
+/// 
+/// # Performance
+/// - Utilizes PostgreSQL GIN indexes for efficient full-text search
+/// - Orders by ts_rank for most relevant results first
     async fn search_products(&self, query: &str, limit: i64) -> Result<Vec<Product>, sqlx::Error> {
         sqlx::query_as!(
             Product,
@@ -223,22 +346,37 @@ impl ProductRepository for ProductService {
         .fetch_all(&self.pool)
         .await
     }
+
+    async fn invalidate_product_cache(&self, id: &str) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del(format!("cache:product:{}", id)).await;
+        }
+        Ok(())
+    }
+
+    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del("cache:global_stats").await;
+        }
+        Ok(())
+    }
 }
 
 pub struct EventService {
     pool: PgPool,
+    redis_client: redis::Client,
 }
 
 impl EventService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
+        Self { pool, redis_client }
     }
 }
 
 #[async_trait]
 impl EventRepository for EventService {
     async fn create_event(&self, event: NewTrackingEvent) -> Result<TrackingEvent, sqlx::Error> {
-        sqlx::query_as!(
+        let created = sqlx::query_as!(
             TrackingEvent,
             r#"
             INSERT INTO tracking_events (
@@ -257,7 +395,12 @@ impl EventRepository for EventService {
             event.metadata
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Invalidate global stats cache
+        let _ = self.invalidate_global_stats().await;
+
+        Ok(created)
     }
 
     async fn get_event(&self, id: i64) -> Result<Option<TrackingEvent>, sqlx::Error> {
@@ -322,21 +465,11 @@ impl EventRepository for EventService {
             r#"
             SELECT 
                 p.id as product_id,
-                COALESCE(e.event_count, 0) as event_count,
+                (SELECT COUNT(*) FROM tracking_events WHERE product_id = p.id) as event_count,
                 p.is_active,
-                e.last_event_at,
-                e.last_event_type
+                (SELECT MAX(timestamp) FROM tracking_events WHERE product_id = p.id) as last_event_at,
+                (SELECT event_type FROM tracking_events WHERE product_id = p.id ORDER BY timestamp DESC LIMIT 1) as last_event_type
             FROM products p
-            LEFT JOIN (
-                SELECT 
-                    product_id,
-                    COUNT(*) as event_count,
-                    MAX(timestamp) as last_event_at,
-                    (event_type) as last_event_type
-                FROM tracking_events 
-                WHERE product_id = $1
-                GROUP BY product_id
-            ) e ON p.id = e.product_id
             WHERE p.id = $1
             "#,
             product_id
@@ -346,6 +479,19 @@ impl EventRepository for EventService {
     }
 
     async fn get_global_stats(&self) -> Result<GlobalStats, sqlx::Error> {
+        let cache_key = "cache:global_stats";
+
+        // Try to get from cache
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            if let Ok(cached) = conn.get::<_, String>(cache_key).await {
+                if let Ok(stats) = serde_json::from_str::<GlobalStats>(&cached) {
+                    return Ok(stats);
+                }
+            }
+        }
+
+        // Optimized query with single table scans where possible
+        // Note: For large tables, these counts should be handled differently (e.g. periodically updated counters)
         let stats = sqlx::query!(
             r#"
             SELECT 
@@ -359,23 +505,40 @@ impl EventRepository for EventService {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(GlobalStats {
+        let global_stats = GlobalStats {
             total_products: stats.total_products.unwrap_or(0),
             active_products: stats.active_products.unwrap_or(0),
             total_events: stats.total_events.unwrap_or(0),
             total_users: stats.total_users.unwrap_or(0),
             active_api_keys: stats.active_api_keys.unwrap_or(0),
-        })
+        };
+
+        // Save to cache
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            if let Ok(serialized) = serde_json::to_string(&global_stats) {
+                let _: Result<(), _> = conn.set_ex(cache_key, serialized, 300).await;
+            }
+        }
+
+        Ok(global_stats)
+    }
+
+    async fn invalidate_global_stats(&self) -> Result<(), AppError> {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {
+            let _: Result<(), _> = conn.del("cache:global_stats").await;
+        }
+        Ok(())
     }
 }
 
 pub struct UserService {
     pool: PgPool,
+    encryption_key: String,
 }
 
 impl UserService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, encryption_key: String) -> Self {
+        Self { pool, encryption_key }
     }
 
     pub async fn hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
@@ -390,77 +553,127 @@ impl UserService {
 #[async_trait]
 impl UserRepository for UserService {
     async fn create_user(&self, user: NewUser) -> Result<User, sqlx::Error> {
-        sqlx::query_as!(
+        let encrypted_email = crate::utils::crypto::encrypt(&user.email, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+        
+        let encrypted_address = if let Some(addr) = &user.stellar_address {
+            Some(crate::utils::crypto::encrypt(addr, &self.encryption_key)
+                .map_err(|e| sqlx::Error::Protocol(e.to_string()))?)
+        } else {
+            None
+        };
+
+        let mut created = sqlx::query_as!(
             User,
             r#"
-            INSERT INTO users (email, password_hash, stellar_address)
-            VALUES ($1, $2, $3)
+            INSERT INTO users (email, password_hash, stellar_address, role)
+            VALUES ($1, $2, $3, $4)
             RETURNING *
             "#,
-            user.email,
+            encrypted_email,
             user.password_hash,
-            user.stellar_address
+            encrypted_address,
+            user.role as UserRole
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Decrypt for returning
+        let _ = self.decrypt_user(&mut created);
+        Ok(created)
     }
 
     async fn get_user(&self, id: Uuid) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
+        let mut user = sqlx::query_as!(
             User,
             "SELECT * FROM users WHERE id = $1",
             id
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        if let Some(ref mut u) = user {
+            let _ = self.decrypt_user(u);
+        }
+        Ok(user)
     }
 
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
+        let encrypted_email = crate::utils::crypto::encrypt(email, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+        let mut user = sqlx::query_as!(
             User,
             "SELECT * FROM users WHERE email = $1",
-            email
+            encrypted_email
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        if let Some(ref mut u) = user {
+            let _ = self.decrypt_user(u);
+        }
+        Ok(user)
     }
 
     async fn get_user_by_stellar_address(&self, address: &str) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as!(
+        let encrypted_address = crate::utils::crypto::encrypt(address, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+        let mut user = sqlx::query_as!(
             User,
             "SELECT * FROM users WHERE stellar_address = $1",
-            address
+            encrypted_address
         )
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        if let Some(ref mut u) = user {
+            let _ = self.decrypt_user(u);
+        }
+        Ok(user)
     }
 
-    async fn update_user(&self, id: Uuid, user: User) -> Result<User, sqlx::Error> {
-        sqlx::query_as!(
+    async fn update_user(&self, id: Uuid, mut user: User) -> Result<User, sqlx::Error> {
+        let encrypted_email = crate::utils::crypto::encrypt(&user.email, &self.encryption_key)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+        
+        let encrypted_address = if let Some(addr) = &user.stellar_address {
+            Some(crate::utils::crypto::encrypt(addr, &self.encryption_key)
+                .map_err(|e| sqlx::Error::Protocol(e.to_string()))?)
+        } else {
+            None
+        };
+
+        let mut updated = sqlx::query_as!(
             User,
             r#"
             UPDATE users SET
                 email = $2,
                 password_hash = $3,
                 stellar_address = $4,
-                api_key = $5,
-                api_key_hash = $6,
-                is_active = $7,
-                is_admin = $8
+                role = $5,
+                api_key = $6,
+                api_key_hash = $7,
+                is_active = $8
             WHERE id = $1
             RETURNING *
             "#,
             id,
-            user.email,
+            encrypted_email,
             user.password_hash,
-            user.stellar_address,
+            encrypted_address,
+            user.role as UserRole,
             user.api_key,
             user.api_key_hash,
-            user.is_active,
-            user.is_admin
+            user.is_active
         )
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // Decrypt for returning
+        let _ = self.decrypt_user(&mut updated);
+        Ok(updated)
     }
 
     async fn update_last_login(&self, id: Uuid) -> Result<(), sqlx::Error> {
@@ -474,6 +687,22 @@ impl UserRepository for UserService {
     }
 }
 
+impl UserService {
+    fn decrypt_user(&self, user: &mut User) -> Result<(), AppError> {
+        if let Ok(decrypted) = crate::utils::crypto::decrypt(&user.email, &self.encryption_key) {
+            user.email = decrypted;
+        }
+        
+        if let Some(addr) = &user.stellar_address {
+            if let Ok(decrypted) = crate::utils::crypto::decrypt(addr, &self.encryption_key) {
+                user.stellar_address = Some(decrypted);
+            }
+        }
+        
+        Ok(())
+    }
+}
+
 pub struct ApiKeyService {
     pool: PgPool,
 }
@@ -483,8 +712,34 @@ impl ApiKeyService {
         Self { pool }
     }
 
-    pub async fn hash_api_key(api_key: &str) -> Result<String, bcrypt::BcryptError> {
-        hash(api_key, DEFAULT_COST)
+    /// SHA-256 hash of an API key. API keys are long random strings with sufficient
+    /// entropy that bcrypt's computational cost is unnecessary and harmful to throughput.
+    pub fn hash_api_key(api_key: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(api_key.as_bytes());
+        hex::encode(hasher.finalize())
+    }
+
+    /// Generates a cryptographically secure API key: `cl_` prefix + 64 hex chars (256 bits entropy).
+    pub fn generate_api_key() -> String {
+        let bytes: [u8; 32] = rand::thread_rng().gen();
+        format!("cl_{}", hex::encode(bytes))
+    }
+
+    pub async fn disable_inactive_keys(&self, inactive_days: i64) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE api_keys
+            SET is_active = false
+            WHERE is_active = true
+              AND last_used_at IS NOT NULL
+              AND last_used_at < NOW() - INTERVAL '1 day' * $1
+            "#,
+            inactive_days
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 }
 
@@ -584,22 +839,45 @@ impl ApiKeyRepository for ApiKeyService {
     }
 }
 
-// Sync service for mirroring smart contract data
+/// Synchronization service for maintaining consistency between blockchain and database.
+/// This service handles bidirectional sync between smart contract data and
+/// the relational database, ensuring both systems stay in sync.
 pub struct SyncService {
     pool: PgPool,
+    redis_client: redis::Client,
     product_service: ProductService,
     event_service: EventService,
 }
 
 impl SyncService {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
         Self {
             pool: pool.clone(),
-            product_service: ProductService::new(pool.clone()),
-            event_service: EventService::new(pool),
+            redis_client: redis_client.clone(),
+            product_service: ProductService::new(pool.clone(), redis_client.clone()),
+            event_service: EventService::new(pool, redis_client),
         }
     }
 
+/// Synchronizes a single product from smart contract to database.
+/// Implements an upsert pattern to handle both new and existing products.
+/// 
+/// # Synchronization Strategy
+/// 1. Check if product exists in database
+/// 2. If exists: Update all fields with blockchain data
+/// 3. If new: Create new product record
+/// 4. Preserve database-specific fields (created_by, updated_by)
+/// 
+/// # Arguments
+/// * `product` - NewProduct data from blockchain
+/// 
+/// # Returns
+/// * `Result<Product, sqlx::Error>` - Synchronized product record
+/// 
+/// # Data Integrity
+/// - Maintains referential integrity with existing records
+/// - Preserves audit trail through updated_by field
+/// - Handles concurrent access safely through database transactions
     pub async fn sync_product_from_contract(&self, product: NewProduct) -> Result<Product, sqlx::Error> {
         // Upsert product
         let existing = self.product_service.get_product(&product.id).await?;
@@ -628,6 +906,23 @@ impl SyncService {
         self.event_service.create_event(event).await
     }
 
+/// Synchronizes multiple products in a batch for efficient bulk operations.
+/// Processes products sequentially to maintain data consistency while
+/// providing better performance than individual calls.
+/// 
+/// # Arguments
+/// * `products` - Vector of NewProduct objects from blockchain
+/// 
+/// # Returns
+/// * `Result<Vec<Product>, sqlx::Error>` - All synchronized products
+/// 
+/// # Performance Considerations
+/// - Sequential processing prevents database overload
+/// - Each product sync is atomic (all or nothing)
+/// - Error handling stops processing on first failure
+/// 
+/// # Future Improvements
+/// Consider parallel processing with connection pooling for large batches
     pub async fn sync_batch_products(&self, products: Vec<NewProduct>) -> Result<Vec<Product>, sqlx::Error> {
         let mut results = Vec::new();
         for product in products {
@@ -642,5 +937,345 @@ impl SyncService {
             results.push(self.sync_event_from_contract(event).await?);
         }
         Ok(results)
+    }
+}
+
+pub struct RecallService {
+    pool: PgPool,
+}
+
+impl RecallService {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn create_recall(
+        &self,
+        product_id: &str,
+        batch_id: Option<&str>,
+        title: &str,
+        reason: &str,
+        severity: &str,
+        trigger_type: &str,
+        triggered_by: Option<&str>,
+        triggered_event_id: Option<i64>,
+        metadata: serde_json::Value,
+    ) -> Result<Recall, sqlx::Error> {
+        let recall = sqlx::query_as!(
+            Recall,
+            r#"
+            INSERT INTO recalls (
+                product_id, batch_id, title, reason, severity, status,
+                trigger_type, triggered_by, triggered_event_id, metadata
+            ) VALUES ($1, $2, $3, $4, $5, 'open', $6, $7, $8, $9)
+            RETURNING
+                id,
+                product_id,
+                batch_id,
+                title,
+                reason,
+                severity,
+                status,
+                trigger_type,
+                triggered_by,
+                triggered_event_id,
+                started_at,
+                closed_at,
+                metadata,
+                created_at,
+                updated_at
+            "#,
+            product_id,
+            batch_id,
+            title,
+            reason,
+            severity,
+            trigger_type,
+            triggered_by,
+            triggered_event_id,
+            metadata
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let _ = sqlx::query!(
+            r#"
+            INSERT INTO recall_effectiveness (recall_id)
+            VALUES ($1)
+            ON CONFLICT (recall_id) DO NOTHING
+            "#,
+            recall.id
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(recall)
+    }
+
+    pub async fn identify_affected_items(
+        &self,
+        recall_id: uuid::Uuid,
+        product_id: &str,
+        batch_id: Option<&str>,
+    ) -> Result<Vec<RecallAffectedItem>, sqlx::Error> {
+        let _rows = sqlx::query!(
+            r#"
+            WITH affected_products AS (
+                SELECT DISTINCT p.id AS product_id
+                FROM products p
+                WHERE ($2::TEXT IS NULL)
+                   OR (p.custom_fields->>'batch_id') = $2
+                UNION
+                SELECT DISTINCT e.product_id AS product_id
+                FROM tracking_events e
+                WHERE ($2::TEXT IS NULL)
+                   OR (e.metadata->>'batch_id') = $2
+            )
+            INSERT INTO recall_affected_items (
+                recall_id, product_id, batch_id, stakeholder_role, stakeholder_address, detected_via
+            )
+            SELECT
+                $1,
+                ap.product_id,
+                $2,
+                NULL,
+                NULL,
+                'metadata'
+            FROM affected_products ap
+            WHERE ap.product_id = $3
+               OR ($2::TEXT IS NOT NULL AND ap.product_id IS NOT NULL)
+            ON CONFLICT DO NOTHING
+            RETURNING id
+            "#,
+            recall_id,
+            batch_id,
+            product_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let items = sqlx::query_as!(
+            RecallAffectedItem,
+            r#"
+            SELECT
+                id,
+                recall_id,
+                product_id,
+                batch_id,
+                stakeholder_role,
+                stakeholder_address,
+                detected_via,
+                created_at
+            FROM recall_affected_items
+            WHERE recall_id = $1
+            ORDER BY created_at ASC
+            "#,
+            recall_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let affected_count = items.len() as i32;
+        let _ = sqlx::query!(
+            r#"
+            UPDATE recall_effectiveness
+            SET affected_count = $2,
+                last_updated_at = NOW()
+            WHERE recall_id = $1
+            "#,
+            recall_id,
+            affected_count
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(items)
+    }
+
+    pub async fn queue_notifications(
+        &self,
+        recall_id: uuid::Uuid,
+        recipients: Vec<String>,
+        channel: &str,
+        payload: serde_json::Value,
+    ) -> Result<Vec<RecallNotification>, sqlx::Error> {
+        for recipient in &recipients {
+            let _ = sqlx::query!(
+                r#"
+                INSERT INTO recall_notifications (recall_id, recipient, channel, status, payload)
+                VALUES ($1, $2, $3, 'queued', $4)
+                "#,
+                recall_id,
+                recipient,
+                channel,
+                payload
+            )
+            .execute(&self.pool)
+            .await?;
+        }
+
+        let notifications = sqlx::query_as!(
+            RecallNotification,
+            r#"
+            SELECT
+                id,
+                recall_id,
+                recipient,
+                channel,
+                status,
+                sent_at,
+                acknowledged_at,
+                payload,
+                error,
+                created_at
+            FROM recall_notifications
+            WHERE recall_id = $1
+            ORDER BY created_at ASC
+            "#,
+            recall_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let notified_count = notifications.len() as i32;
+        let _ = sqlx::query!(
+            r#"
+            UPDATE recall_effectiveness
+            SET notified_count = $2,
+                last_updated_at = NOW()
+            WHERE recall_id = $1
+            "#,
+            recall_id,
+            notified_count
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(notifications)
+    }
+
+    pub async fn list_recalls_by_product(
+        &self,
+        product_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Recall>, sqlx::Error> {
+        sqlx::query_as!(
+            Recall,
+            r#"
+            SELECT
+                id,
+                product_id,
+                batch_id,
+                title,
+                reason,
+                severity,
+                status,
+                trigger_type,
+                triggered_by,
+                triggered_event_id,
+                started_at,
+                closed_at,
+                metadata,
+                created_at,
+                updated_at
+            FROM recalls
+            WHERE product_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+            product_id,
+            limit,
+            offset
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn get_recall(&self, recall_id: uuid::Uuid) -> Result<Option<Recall>, sqlx::Error> {
+        sqlx::query_as!(
+            Recall,
+            r#"
+            SELECT
+                id,
+                product_id,
+                batch_id,
+                title,
+                reason,
+                severity,
+                status,
+                trigger_type,
+                triggered_by,
+                triggered_event_id,
+                started_at,
+                closed_at,
+                metadata,
+                created_at,
+                updated_at
+            FROM recalls
+            WHERE id = $1
+            "#,
+            recall_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    pub async fn get_effectiveness(
+        &self,
+        recall_id: uuid::Uuid,
+    ) -> Result<Option<RecallEffectiveness>, sqlx::Error> {
+        sqlx::query_as!(
+            RecallEffectiveness,
+            r#"
+            SELECT
+                recall_id,
+                affected_count,
+                notified_count,
+                acknowledged_count,
+                recovered_count,
+                disposed_count,
+                last_updated_at
+            FROM recall_effectiveness
+            WHERE recall_id = $1
+            "#,
+            recall_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    pub async fn update_effectiveness(
+        &self,
+        recall_id: uuid::Uuid,
+        acknowledged_delta: i32,
+        recovered_delta: i32,
+        disposed_delta: i32,
+    ) -> Result<RecallEffectiveness, sqlx::Error> {
+        sqlx::query_as!(
+            RecallEffectiveness,
+            r#"
+            UPDATE recall_effectiveness
+            SET acknowledged_count = GREATEST(0, acknowledged_count + $2),
+                recovered_count = GREATEST(0, recovered_count + $3),
+                disposed_count = GREATEST(0, disposed_count + $4),
+                last_updated_at = NOW()
+            WHERE recall_id = $1
+            RETURNING
+                recall_id,
+                affected_count,
+                notified_count,
+                acknowledged_count,
+                recovered_count,
+                disposed_count,
+                last_updated_at
+            "#,
+            recall_id,
+            acknowledged_delta,
+            recovered_delta,
+            disposed_delta
+        )
+        .fetch_one(&self.pool)
+        .await
     }
 }

@@ -1,0 +1,15 @@
+[server]
+host = "0.0.0.0"
+port = 3001
+tls_enabled = false
+
+[database]
+max_connections = 20
+min_connections = 5
+connect_timeout = 30
+idle_timeout = 600
+
+[security]
+enforce_https = true
+hsts_max_age = 31536000
+allowed_origins = ["https://localhost:3000"]

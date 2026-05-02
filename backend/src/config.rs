@@ -6,11 +6,16 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub server: ServerConfig,
     pub redis: RedisConfig,
+    pub security: SecurityConfig,
+    pub audit: AuditConfig,
+    pub encryption_key: String,
+    pub jwt_secret: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub url: String,
+    pub read_replica_urls: Vec<String>,
     pub max_connections: u32,
     pub min_connections: u32,
     pub connect_timeout: u64,
@@ -21,6 +26,9 @@ pub struct DatabaseConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    pub tls_enabled: bool,
+    pub tls_cert_path: Option<String>,
+    pub tls_key_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,12 +36,40 @@ pub struct RedisConfig {
     pub url: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityConfig {
+    pub enforce_https: bool,
+    pub hsts_max_age: u64,
+    pub allowed_origins: Vec<String>,
+}
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("Invalid PORT value: {0}")]
+    InvalidPort(String),
+    #[error("Missing required environment variable: {0}")]
+    MissingVar(String),
+    #[error("Configuration validation error: {0}")]
+    ValidationError(String),
+    #[error("Configuration error: {0}")]
+    Config(#[from] config::ConfigError),
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             database: DatabaseConfig {
-                url: env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| "postgres://chainlogistics:password@localhost/chainlogistics".to_string()),
+                url: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                    "postgres://chainlogistics:password@localhost/chainlogistics".to_string()
+                }),
+                read_replica_urls: env::var("DATABASE_READ_REPLICA_URLS")
+                    .unwrap_or_else(|_| "".to_string())
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.trim().to_string())
+                    .collect(),
                 max_connections: 20,
                 min_connections: 5,
                 connect_timeout: 30,
@@ -41,26 +77,184 @@ impl Default for Config {
             },
             server: ServerConfig {
                 host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
-                port: env::var("PORT")
-                    .unwrap_or_else(|_| "3001".to_string())
+                port: match env::var("PORT") {
+                    Ok(port_str) => port_str.parse().unwrap_or(3001),
+                    Err(_) => 3001,
+                },
+                tls_enabled: env::var("TLS_ENABLED")
+                    .unwrap_or_else(|_| "false".to_string())
                     .parse()
-                    .unwrap_or(3001),
+                    .unwrap_or(false),
+                tls_cert_path: env::var("TLS_CERT_PATH").ok(),
+                tls_key_path: env::var("TLS_KEY_PATH").ok(),
             },
             redis: RedisConfig {
-                url: env::var("REDIS_URL")
-                    .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
+                url: env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string()),
             },
+            security: SecurityConfig {
+                enforce_https: env::var("ENFORCE_HTTPS")
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
+                hsts_max_age: env::var("HSTS_MAX_AGE")
+                    .unwrap_or_else(|_| "31536000".to_string())
+                    .parse()
+                    .unwrap_or(31536000), // 1 year
+                allowed_origins: env::var("ALLOWED_ORIGINS")
+                    .unwrap_or_else(|_| "https://localhost:3000".to_string())
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect(),
+            },
+            audit: AuditConfig {
+                enabled: env::var("AUDIT_LOGGING_ENABLED")
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
+                hmac_key: env::var("AUDIT_HMAC_KEY")
+                    .unwrap_or_else(|_| "default_audit_hmac_key_change_me_in_production".to_string()),
+                retention_days: env::var("AUDIT_RETENTION_DAYS")
+                    .unwrap_or_else(|_| "365".to_string())
+                    .parse()
+                    .unwrap_or(365),
+            },
+            encryption_key: env::var("ENCRYPTION_KEY")
+                .unwrap_or_else(|_| "0123456789abcdef0123456789abcdef".to_string()), // 32 chars for AES-256
+            jwt_secret: env::var("JWT_SECRET")
+                .unwrap_or_else(|_| "default_jwt_secret_change_me_in_production".to_string()),
         }
     }
 }
 
 impl Config {
-    pub fn from_env() -> Result<Self, config::ConfigError> {
+    /// Loads configuration from environment variables and configuration files.
+    /// Validates settings and logs configuration status.
+    /// 
+    /// # Errors
+    /// Returns `ConfigError` if required variables are missing or invalid.
+    pub fn from_env() -> Result<Self, ConfigError> {
+        let profile = env::var("CHAINLOGISTICS_ENV")
+            .or_else(|_| env::var("APP_ENV"))
+            .unwrap_or_else(|_| "development".to_string());
+
         let cfg = config::Config::builder()
             .add_source(config::Config::try_from(&Config::default())?)
-            .add_source(config::Environment::with_prefix("CHAINLOGISTICS"))
+            .add_source(config::File::with_name("config/default").required(false))
+            .add_source(config::File::with_name(&format!("config/{}", profile)).required(false))
+            .add_source(
+                config::Environment::with_prefix("CHAINLOGISTICS")
+                    .separator("__")
+                    .try_parsing(true),
+            )
             .build()?;
 
-        cfg.try_deserialize()
+        let mut config: Config = cfg.try_deserialize()?;
+
+        // Safe and strict validation of PORT variable
+        match env::var("PORT") {
+            Ok(port_str) => {
+                match port_str.parse::<u16>() {
+                    Ok(port) => {
+                        if port == 0 {
+                            tracing::error!("Invalid PORT: 0 is not allowed");
+                            return Err(ConfigError::ValidationError("PORT cannot be 0".to_string()));
+                        }
+                        tracing::info!("Using PORT from environment: {}", port);
+                        config.server.port = port;
+                    }
+                    Err(_) => {
+                        tracing::error!("Invalid PORT value in environment: '{}'", port_str);
+                        return Err(ConfigError::InvalidPort(port_str));
+                    }
+                }
+            }
+            Err(_) => {
+                tracing::info!("PORT not set in environment, using default: {}", config.server.port);
+            }
+        }
+
+        tracing::info!("Configuration loaded successfully for profile: {}", profile);
+        config.validate()?;
+        Ok(config)
+    }
+
+
+    fn validate(&self) -> Result<(), ConfigError> {
+        if self.database.url.trim().is_empty() {
+            return Err(ConfigError::ValidationError(
+                "database.url must not be empty".to_string(),
+            ));
+        }
+        if self.redis.url.trim().is_empty() {
+            return Err(ConfigError::ValidationError(
+                "redis.url must not be empty".to_string(),
+            ));
+        }
+        if self.jwt_secret.trim().len() < 16 {
+            return Err(ConfigError::ValidationError(
+                "jwt_secret must be at least 16 characters".to_string(),
+            ));
+        }
+        if self.encryption_key.trim().len() != 32 {
+            return Err(ConfigError::ValidationError(
+                "encryption_key must be exactly 32 characters (AES-256 key)".to_string(),
+            ));
+        }
+        if self.server.tls_enabled
+            && (self.server.tls_cert_path.is_none() || self.server.tls_key_path.is_none())
+        {
+            return Err(ConfigError::ValidationError(
+                "tls_cert_path and tls_key_path are required when tls_enabled=true".to_string(),
+            ));
+        }
+        if self.server.port == 0 {
+            return Err(ConfigError::ValidationError(
+                "server.port must be between 1 and 65535".to_string(),
+            ));
+        }
+        Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_valid_port() {
+        env::set_var("PORT", "8080");
+        let config = Config::from_env();
+        assert!(config.is_ok());
+        assert_eq!(config.unwrap().server.port, 8080);
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_invalid_port_non_numeric() {
+        env::set_var("PORT", "abc");
+        let config = Config::from_env();
+        assert!(config.is_err());
+        match config.unwrap_err() {
+            ConfigError::InvalidPort(val) => assert_eq!(val, "abc"),
+            _ => panic!("Expected InvalidPort error"),
+        }
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_invalid_port_out_of_range() {
+        env::set_var("PORT", "70000");
+        let config = Config::from_env();
+        assert!(config.is_err());
+        env::remove_var("PORT");
+    }
+
+    #[test]
+    fn test_missing_port_variable() {
+        env::remove_var("PORT");
+        let config = Config::from_env();
+        assert!(config.is_ok());
+    }
+}
+

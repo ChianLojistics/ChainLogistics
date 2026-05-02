@@ -9,9 +9,9 @@ use crate::{
 fn setup(
     env: &Env,
 ) -> (
-    ProductRegistryContractClient,
-    AuthorizationContractClient,
-    ProductTransferContractClient,
+    ProductRegistryContractClient<'_>,
+    AuthorizationContractClient<'_>,
+    ProductTransferContractClient<'_>,
 ) {
     let auth_id = env.register_contract(None, AuthorizationContract);
     let registry_id = env.register_contract(None, ProductRegistryContract);

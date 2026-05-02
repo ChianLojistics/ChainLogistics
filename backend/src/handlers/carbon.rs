@@ -17,6 +17,20 @@ use crate::{
 
 // ── Footprint ─────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/footprint/calculate",
+    tag = "carbon",
+    request_body = CalculateFootprintRequest,
+    responses(
+        (status = 201, description = "Carbon footprint calculated successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/footprint/calculate
 pub async fn calculate_footprint(
     State(state): State<AppState>,
@@ -26,6 +40,20 @@ pub async fn calculate_footprint(
     Ok((StatusCode::CREATED, Json(record)))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/footprint/preview",
+    tag = "carbon",
+    request_body = CalculateFootprintRequest,
+    responses(
+        (status = 200, description = "Footprint preview generated successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/footprint/preview
 pub async fn preview_footprint(
     State(state): State<AppState>,
@@ -35,6 +63,22 @@ pub async fn preview_footprint(
     Ok(Json(serde_json::json!(breakdown)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/footprint/{product_id}",
+    tag = "carbon",
+    params(
+        ("product_id" = String, Path, description = "Product ID")
+    ),
+    responses(
+        (status = 200, description = "Footprints listed successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// GET /api/v1/carbon/footprint/:product_id
 pub async fn list_footprints(
     State(state): State<AppState>,
@@ -46,6 +90,20 @@ pub async fn list_footprints(
 
 // ── Credits ───────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/credits/generate",
+    tag = "carbon",
+    request_body = GenerateCreditRequest,
+    responses(
+        (status = 201, description = "Carbon credit generated successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/credits/generate
 pub async fn generate_credit(
     State(state): State<AppState>,
@@ -57,6 +115,20 @@ pub async fn generate_credit(
     Ok((StatusCode::CREATED, Json(credit)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/credits",
+    tag = "carbon",
+    params(ListCreditsQuery),
+    responses(
+        (status = 200, description = "Credits listed successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// GET /api/v1/carbon/credits
 pub async fn list_credits(
     State(state): State<AppState>,
@@ -68,6 +140,23 @@ pub async fn list_credits(
     Ok(Json(serde_json::json!({ "credits": credits, "total": credits.len() })))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/credits/{id}",
+    tag = "carbon",
+    params(
+        ("id" = Uuid, Path, description = "Credit ID")
+    ),
+    responses(
+        (status = 200, description = "Credit retrieved successfully"),
+        (status = 404, description = "Credit not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// GET /api/v1/carbon/credits/:id
 pub async fn get_credit(
     State(state): State<AppState>,
@@ -77,6 +166,20 @@ pub async fn get_credit(
     Ok(Json(serde_json::json!(credit)))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/credits/retire",
+    tag = "carbon",
+    request_body = RetireCreditRequest,
+    responses(
+        (status = 200, description = "Credit retired successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/credits/retire
 pub async fn retire_credit(
     State(state): State<AppState>,
@@ -90,6 +193,19 @@ pub async fn retire_credit(
 
 // ── Marketplace ───────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/market",
+    tag = "carbon",
+    responses(
+        (status = 200, description = "Market summary retrieved successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// GET /api/v1/carbon/market
 pub async fn market_summary(
     State(state): State<AppState>,
@@ -98,6 +214,20 @@ pub async fn market_summary(
     Ok(Json(serde_json::json!(summary)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/market/trades",
+    tag = "carbon",
+    params(ListTradesQuery),
+    responses(
+        (status = 200, description = "Trades listed successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// GET /api/v1/carbon/market/trades
 pub async fn list_trades(
     State(state): State<AppState>,
@@ -107,6 +237,20 @@ pub async fn list_trades(
     Ok(Json(serde_json::json!({ "trades": trades, "total": trades.len() })))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/market/list",
+    tag = "carbon",
+    request_body = CreateTradeRequest,
+    responses(
+        (status = 201, description = "Credit listed for sale successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/market/list
 pub async fn list_credit_for_sale(
     State(state): State<AppState>,
@@ -118,6 +262,20 @@ pub async fn list_credit_for_sale(
     Ok((StatusCode::CREATED, Json(trade)))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/market/purchase",
+    tag = "carbon",
+    request_body = PurchaseCreditRequest,
+    responses(
+        (status = 200, description = "Credit purchased successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/market/purchase
 pub async fn purchase_credit(
     State(state): State<AppState>,
@@ -131,6 +289,20 @@ pub async fn purchase_credit(
 
 // ── Verification ──────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/verify",
+    tag = "carbon",
+    request_body = RequestVerificationRequest,
+    responses(
+        (status = 201, description = "Verification requested successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/verify
 pub async fn request_verification(
     State(state): State<AppState>,
@@ -145,6 +317,22 @@ pub async fn request_verification(
     Ok((StatusCode::CREATED, Json(verification)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/verify/{credit_id}",
+    tag = "carbon",
+    params(
+        ("credit_id" = Uuid, Path, description = "Credit ID")
+    ),
+    responses(
+        (status = 200, description = "Verifications listed successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// GET /api/v1/carbon/verify/:credit_id
 pub async fn list_verifications(
     State(state): State<AppState>,
@@ -158,6 +346,20 @@ pub async fn list_verifications(
 
 // ── Reporting ─────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/carbon/reports",
+    tag = "carbon",
+    request_body = GenerateReportRequest,
+    responses(
+        (status = 201, description = "Report generated successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// POST /api/v1/carbon/reports
 pub async fn generate_report(
     State(state): State<AppState>,
@@ -169,6 +371,19 @@ pub async fn generate_report(
     Ok((StatusCode::CREATED, Json(report)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/reports",
+    tag = "carbon",
+    responses(
+        (status = 200, description = "Reports listed successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Rate limit exceeded")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 /// GET /api/v1/carbon/reports
 pub async fn list_reports(
     State(state): State<AppState>,
@@ -178,3 +393,46 @@ pub async fn list_reports(
     let reports = state.carbon_service.list_reports(owner_id).await?;
     Ok(Json(serde_json::json!({ "reports": reports, "total": reports.len() })))
 }
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/dashboard",
+    tag = "carbon",
+    responses(
+        (status = 200, description = "Sustainability dashboard generated successfully"),
+        (status = 401, description = "Unauthorized")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_sustainability_dashboard(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let dashboard = state.carbon_service.get_sustainability_dashboard().await?;
+    Ok(Json(dashboard))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/carbon/supplier-score/{supplier_address}",
+    tag = "carbon",
+    params(
+        ("supplier_address" = String, Path, description = "Supplier Stellar Address")
+    ),
+    responses(
+        (status = 200, description = "Supplier sustainability score retrieved"),
+        (status = 401, description = "Unauthorized")
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+pub async fn get_supplier_score(
+    State(state): State<AppState>,
+    Path(supplier_address): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let score = state.carbon_service.get_supplier_score(&supplier_address).await?;
+    Ok(Json(serde_json::json!({ "supplier_address": supplier_address, "sustainability_score": score })))
+}
+

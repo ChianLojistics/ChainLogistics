@@ -1,6 +1,7 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, Symbol};
+use soroban_sdk::{contract, contractimpl, Address, Env};
 
 use crate::error::Error;
+use crate::events::{AdminInitialized, AdminTransferred, ContractPaused, ContractUnpaused};
 use crate::types::DataKey;
 use crate::ChainLogisticsContractClient;
 
@@ -16,16 +17,6 @@ fn set_admin(env: &Env, admin: &Address) {
 
 fn has_admin(env: &Env) -> bool {
     env.storage().persistent().has(&DataKey::Admin)
-}
-
-fn get_multisig_contract(env: &Env) -> Option<Address> {
-    env.storage().persistent().get(&DataKey::MultiSigContract)
-}
-
-fn set_multisig_contract(env: &Env, address: &Address) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::MultiSigContract, address);
 }
 
 fn get_main_contract(env: &Env) -> Option<Address> {
@@ -66,9 +57,7 @@ impl AdminContract {
         set_admin(&env, &admin);
         set_main_contract(&env, &main_contract);
 
-        // Emit initialization event
-        env.events()
-            .publish((Symbol::new(&env, "admin_initialized"),), admin);
+        AdminInitialized { admin }.publish(&env);
 
         Ok(())
     }
@@ -102,9 +91,7 @@ impl AdminContract {
             Err(Err(_)) => return Err(Error::InvalidInput),
         }
 
-        // Emit pause event
-        env.events()
-            .publish((Symbol::new(&env, "contract_paused"),), caller);
+        ContractPaused { caller }.publish(&env);
 
         Ok(())
     }
@@ -123,9 +110,7 @@ impl AdminContract {
             Err(Err(_)) => return Err(Error::InvalidInput),
         }
 
-        // Emit unpause event
-        env.events()
-            .publish((Symbol::new(&env, "contract_unpaused"),), caller);
+        ContractUnpaused { caller }.publish(&env);
 
         Ok(())
     }
@@ -151,11 +136,11 @@ impl AdminContract {
             Err(Err(_)) => return Err(Error::InvalidInput),
         }
 
-        // Emit transfer event
-        env.events().publish(
-            (Symbol::new(&env, "admin_transferred"),),
-            (current_admin, new_admin),
-        );
+        AdminTransferred {
+            current_admin,
+            new_admin,
+        }
+        .publish(&env);
 
         Ok(())
     }
@@ -168,7 +153,7 @@ mod test_admin {
 
     use crate::{AuthorizationContract, ChainLogisticsContract, ChainLogisticsContractClient};
 
-    fn setup(env: &Env) -> (AdminContractClient, Address) {
+    fn setup(env: &Env) -> (AdminContractClient<'_>, Address) {
         let contract_id = env.register_contract(None, AdminContract);
         let client = AdminContractClient::new(env, &contract_id);
         let admin = Address::generate(env);

@@ -62,7 +62,12 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
   }, [productId, offset, PAGE_SIZE]);
 
   useEffect(() => {
-    loadEvents();
+    // Use setTimeout to avoid calling setState synchronously in effect
+    const timeoutId = setTimeout(() => {
+      loadEvents();
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
   }, [loadEvents]);
 
   if (loading) {
@@ -148,7 +153,7 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
 
 function TimelineSkeleton() {
   return (
-    <div className="space-y-0">
+    <div className="space-y-0" data-testid="timeline-skeleton">
       {[1, 2, 3].map((i) => (
         <div key={i} className="relative flex gap-4 sm:gap-6">
           <div className="flex flex-col items-center">

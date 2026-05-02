@@ -1,4 +1,5 @@
 import type { TimelineEvent } from "@/lib/types/tracking";
+import { normalizeTimelineEvent } from "@/lib/types/tracking";
 import { createContractClient } from "@/lib/stellar/contractClient";
 import { trackContractInteraction, trackError } from "@/lib/analytics";
 import { CONTRACT_CONFIG, validateContractConfig } from "./config";
@@ -13,6 +14,38 @@ export type ProductEventsPage = {
 
 const DEFAULT_EVENTS_PAGE_SIZE = 20;
 const MAX_EVENTS_PAGE_SIZE = 50;
+
+const E2E_MOCKS_ENABLED = process.env.NEXT_PUBLIC_E2E_MOCKS === "true";
+
+function getE2EMockEvents(productId: string): TimelineEvent[] {
+  const nowSec = Math.floor(Date.now() / 1000);
+  return [
+    {
+      event_id: 3,
+      product_id: productId,
+      actor: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      timestamp: nowSec - 3600,
+      event_type: "SHIP",
+      note: "Mock: Shipment dispatched",
+    },
+    {
+      event_id: 2,
+      product_id: productId,
+      actor: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      timestamp: nowSec - 7200,
+      event_type: "PACKAGE",
+      note: "Mock: Packaged for shipping",
+    },
+    {
+      event_id: 1,
+      product_id: productId,
+      actor: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      timestamp: nowSec - 10_800,
+      event_type: "HARVEST",
+      note: "Mock: Harvested at origin",
+    },
+  ];
+}
 
 export async function fetchProductEventsPage(
   productId: string,
@@ -29,6 +62,18 @@ export async function fetchProductEventsPage(
   );
 
   try {
+    if (E2E_MOCKS_ENABLED) {
+      const all = getE2EMockEvents(productId);
+      const paged = all.slice(offset, offset + limit);
+      return {
+        events: paged,
+        total: all.length,
+        offset,
+        limit,
+        hasMore: offset + limit < all.length,
+      };
+    }
+
     validateContractConfig();
 
     const contractClient = createContractClient({
@@ -44,6 +89,7 @@ export async function fetchProductEventsPage(
     const events = await Promise.all(pagedIds.map((id) => contractClient.get_event(id)));
     const validEvents = events
       .filter((e): e is TimelineEvent => e !== null)
+      .map(normalizeTimelineEvent)
       .sort((a, b) => b.timestamp - a.timestamp);
 
     const page: ProductEventsPage = {

@@ -15,7 +15,9 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "**/.next/**",
-      "**/coverage/**"
+      "**/coverage/**",
+      "e2e/**",
+      "tests/e2e/**"
     ],
     coverage: {
       provider: "v8",
