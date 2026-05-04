@@ -258,6 +258,8 @@ impl TimelockContract {
             execute_by: env.ledger().timestamp() + delay_seconds + config.grace_period_seconds,
             status: TimelockStatus::PendingApprovals,
             approvals,
+            required_approvals: config.threshold,
+            executed: false,
         };
         maybe_queue(&mut operation, config.threshold);
         store_operation(&env, &operation);

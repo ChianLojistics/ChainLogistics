@@ -33,12 +33,15 @@ mod validation_contract;
 #[cfg(not(target_arch = "wasm32"))]
 mod admin;
 #[cfg(not(target_arch = "wasm32"))]
+mod circuit_breaker;
+#[cfg(not(target_arch = "wasm32"))]
 mod event_query;
+#[cfg(test)]
+mod load_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod oracle;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_query;
-#[cfg(not(target_arch = "wasm32"))]
 mod product_registry;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_transfer;
@@ -52,13 +55,13 @@ mod tracking;
 mod upgrade;
 
 #[cfg(test)]
-mod load_tests;
-#[cfg(test)]
 mod test;
 #[cfg(test)]
 mod test_auth;
 #[cfg(test)]
 mod test_benchmarks;
+#[cfg(test)]
+mod test_circuit_breaker;
 #[cfg(test)]
 mod test_error_coverage;
 #[cfg(test)]
@@ -83,6 +86,8 @@ pub use types::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use admin::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use circuit_breaker::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use event_query::*;
 #[cfg(not(target_arch = "wasm32"))]

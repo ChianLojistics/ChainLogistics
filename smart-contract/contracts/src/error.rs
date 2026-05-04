@@ -81,6 +81,22 @@ pub enum Error {
     TimelockDelayTooLong = 84,
     TimelockCancelled = 85,
 
+    // --- Circuit Breaker (110-125) ---
+    CircuitBreakerNotInitialized = 110,
+    CircuitBreakerAlreadyInitialized = 111,
+    NotGuardian = 112,
+    TooManyGuardians = 113,
+    DuplicateGuardian = 114,
+    PauseRecordNotFound = 115,
+    ApprovalNotFound = 116,
+    ApprovalAlreadyExecuted = 117,
+    ApprovalAlreadyVoted = 118,
+    ApprovalExpired = 119,
+    ApprovalThresholdNotReached = 120,
+    PauseExpired = 121,
+    InvalidPauseDuration = 122,
+    PauseDescriptionTooLong = 123,
+
     // --- Security / Arithmetic (91-110) ---
     InvalidAddress = 91,
     InvalidTimestamp = 92,
