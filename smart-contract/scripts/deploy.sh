@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 # Default values
 NETWORK="testnet"
 CONTRACT_NAME="hello_world"
-WASM_PATH="target/wasm32-unknown-unknown/release/${CONTRACT_NAME}.wasm"
+WASM_PATH="target/wasm32v1-none/release/${CONTRACT_NAME}.wasm"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --contract-name)
       CONTRACT_NAME="$2"
-      WASM_PATH="target/wasm32-unknown-unknown/release/${CONTRACT_NAME}.wasm"
+      WASM_PATH="target/wasm32v1-none/release/${CONTRACT_NAME}.wasm"
       shift 2
       ;;
     --help)
@@ -49,7 +49,7 @@ cd "$(dirname "$0")/.."
 cd contracts
 
 # Build the contract
-cargo build --target wasm32-unknown-unknown --release
+cargo build --target wasm32v1-none --release
 
 if [ ! -f "../${WASM_PATH}" ]; then
   echo -e "${RED}Error: WASM file not found at ${WASM_PATH}${NC}"

@@ -1,6 +1,10 @@
 # Rust build artifacts
-backend/target/
+target/
 **/target/
+backend/target/
+sdk/rust/target/
+smart-contract/target/
+smart-contract/contracts/target/
 **/*.rs.bk
 *.pdb
 
@@ -48,4 +52,6 @@ task.md
 GITHUB_ISSUES.md
 pr.md
 
-node_modules
+# Frontend Testing
+playwright-report/
+test-results/
