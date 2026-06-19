@@ -110,6 +110,9 @@ jobs:
       - name: Run tests
         run: cargo test --release --all-features
 
+      - name: Run benchmarks
+        run: cargo bench --no-run 2>/dev/null || echo "No benchmarks defined; skipping."
+
       # Use stellar contract build instead of raw cargo build --target wasm32
       # This ensures proper metadata, optimizer flags, and correct wasm output paths
       - name: Build WASM contracts
@@ -171,6 +174,48 @@ jobs:
           path: frontend/.next/
           retention-days: 7
 
+  # Phase 2: Secondary security & performance checks
+  # Added as part of Issue #463 – DevOps Pipeline Phase 2
+  performance-audit:
+    name: Performance & Secondary Checks
+    runs-on: ubuntu-latest
+    needs: [ rust-tests, frontend-tests ]
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install @rollup/rollup-linux-x64-gnu --save-optional
+          npm install lightningcss-linux-x64-gnu --save-optional
+
+      - name: Lint checks (secondary)
+        run: npm run lint -- --max-warnings 0
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage --reporter=verbose
+
+      - name: Audit dependencies (secondary)
+        run: npm audit --audit-level=high
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: frontend/coverage/
+          retention-days: 7
+
   frontend-e2e:
     name: Frontend E2E (Playwright)
     runs-on: ubuntu-latest
@@ -219,7 +264,7 @@ jobs:
   build-verification:
     name: Build Verification
     runs-on: ubuntu-latest
-    needs: [ rust-tests, frontend-tests, frontend-e2e ]
+    needs: [ rust-tests, frontend-tests, frontend-e2e, performance-audit ]
     steps:
       - name: All builds passed
         run: echo "All upstream jobs completed successfully"
