@@ -179,6 +179,10 @@ pub enum DataKey {
     CircuitBreakerNextRecordId,
     CircuitBreakerPendingApproval(u64),
     CircuitBreakerNextApprovalId,
+    // ── State Channel ────────────────────────────────────────────────────
+    Channel(u64),            // Channel state by channel id
+    ChannelSeq,              // Monotonic channel id counter
+    ProductChannels(String), // Channel ids opened against a product
 }
 
 // ─── Event Types ───────────────────────────────────────────────────────────
@@ -309,6 +313,80 @@ pub struct Proposal {
     pub approvals: Vec<Address>,
     /// Addresses that have rejected the proposal
     pub rejections: Vec<Address>,
+}
+
+// ─── State Channel Types ─────────────────────────────────────────────────────
+
+/// Lifecycle status of a high-frequency IoT state channel.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ChannelStatus {
+    /// Channel is open; parties exchange signed updates off-chain.
+    Open,
+    /// A closing state has been submitted; the dispute window is running.
+    Closing,
+    /// Channel is finalized and the last state is anchored on-chain.
+    Closed,
+}
+
+/// A bidirectionally-signed off-chain state for a channel.
+///
+/// IoT sensors stream individual readings off-chain. The backend folds those
+/// readings into a single `state_root` commitment (e.g. an ElGamal/Pedersen
+/// aggregate that supports weighted transitions) and counts them in
+/// `batch_count`. Both channel participants sign the `(channel_id, nonce,
+/// batch_count, state_root)` tuple. A single on-chain submission therefore
+/// anchors an arbitrary number of off-chain updates.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignedState {
+    /// Channel this state belongs to (binds the signature to one channel).
+    pub channel_id: u64,
+    /// Monotonically increasing sequence number; higher always wins.
+    pub nonce: u64,
+    /// Number of off-chain updates folded into `state_root`.
+    pub batch_count: u64,
+    /// Commitment root over the batched IoT updates.
+    pub state_root: BytesN<32>,
+    /// Ed25519 signature by party A over the state tuple.
+    pub sig_a: BytesN<64>,
+    /// Ed25519 signature by party B over the state tuple.
+    pub sig_b: BytesN<64>,
+}
+
+/// On-chain record of an IoT tracking state channel.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Channel {
+    /// Unique channel identifier.
+    pub channel_id: u64,
+    /// Product whose tracking data flows through this channel.
+    pub product_id: String,
+    /// First participant (e.g. the IoT data producer / backend).
+    pub party_a: Address,
+    /// Second participant (e.g. the auditor / receiver).
+    pub party_b: Address,
+    /// Ed25519 public key used by party A to sign off-chain states.
+    pub pubkey_a: BytesN<32>,
+    /// Ed25519 public key used by party B to sign off-chain states.
+    pub pubkey_b: BytesN<32>,
+    /// Current channel lifecycle status.
+    pub status: ChannelStatus,
+    /// Highest nonce anchored so far.
+    pub nonce: u64,
+    /// Total off-chain updates represented by the anchored state.
+    pub batch_count: u64,
+    /// Last anchored commitment root.
+    pub state_root: BytesN<32>,
+    /// Dispute window length in seconds.
+    pub dispute_window: u64,
+    /// Ledger timestamp after which a closing channel can be finalized
+    /// (0 while the channel is still `Open`).
+    pub dispute_deadline: u64,
+    /// Ledger timestamp the channel was opened.
+    pub opened_at: u64,
+    /// Ledger timestamp the channel was finalized (0 until `Closed`).
+    pub closed_at: u64,
 }
 
 // ─── Oracle Security Types ───────────────────────────────────────────────────

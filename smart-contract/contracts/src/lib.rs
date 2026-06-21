@@ -46,6 +46,8 @@ mod product_registry;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_transfer;
 #[cfg(not(target_arch = "wasm32"))]
+mod state_channel;
+#[cfg(not(target_arch = "wasm32"))]
 mod stats;
 #[cfg(not(target_arch = "wasm32"))]
 mod timelock;
@@ -98,6 +100,8 @@ pub use product_query::*;
 pub use product_registry::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use product_transfer::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use state_channel::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use stats::*;
 #[cfg(not(target_arch = "wasm32"))]
