@@ -70,9 +70,9 @@ export function ProgressIndicator({
                       : "bg-gray-200 text-gray-600"
                 )}
               >
-                {completedSteps.includes(index) ? (
-                  <Check size={20} className="aria-label=Completed" />
-                ) : (
+                  {completedSteps.includes(index) ? (
+                    <Check size={20} aria-label="Completed" />
+                  ) : (
                   index + 1
                 )}
               </div>
