@@ -10,6 +10,8 @@ export function LoadingSpinner({ size = 24, className, ...props }: LoadingSpinne
         <Loader2
             size={size}
             className={cn("animate-spin text-muted-foreground", className)}
+            role="status"
+            aria-label="Loading"
             {...props}
         />
     );
