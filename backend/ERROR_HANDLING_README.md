@@ -190,7 +190,7 @@ match service.create_product(request).await {
 ## Files Modified/Created
 
 ### Modified
-- `backend/src/error.rs` - Enhanced error types and sanitization
+- `backend/src/error/` - Enhanced error types and sanitization
 - `backend/src/middleware.rs` - Added error_handler module
 - `backend/src/main.rs` - Integrated error monitoring and middleware
 

@@ -8,7 +8,7 @@ This document describes the comprehensive error handling and sanitization implem
 
 ### Components
 
-1. **Error Types** (`backend/src/error.rs`)
+1. **Error Types** (`backend/src/error/mod.rs`)
    - Standardized error codes for programmatic handling
    - Comprehensive error variants covering all failure scenarios
    - Automatic error conversions from common library errors
