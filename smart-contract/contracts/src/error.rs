@@ -110,4 +110,18 @@ pub enum Error {
     CertificationNotFound = 103,
     InvalidCertification = 104,
     ReadingNotFound = 105,
+
+    // --- State Channel (130-145) ---
+    ChannelNotFound = 130,
+    ChannelNotOpen = 131,
+    ChannelAlreadyClosed = 132,
+    ChannelNotClosing = 133,
+    StaleStateNonce = 134,
+    ChannelMismatch = 135,
+    DisputeWindowTooShort = 136,
+    DisputeWindowTooLong = 137,
+    DisputePeriodActive = 138,
+    DisputePeriodExpired = 139,
+    NotChannelParticipant = 140,
+    InvalidSignature = 141,
 }
