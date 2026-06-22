@@ -1,8 +1,8 @@
+use crate::database::{ProductFilters, ProductRepository};
+use crate::models::{AppError, NewProduct, Product};
 use async_trait::async_trait;
-use sqlx::PgPool;
 use redis::AsyncCommands;
-use crate::database::{ProductRepository, ProductFilters};
-use crate::models::{Product, NewProduct, AppError};
+use sqlx::PgPool;
 
 pub struct ProductService {
     pub(crate) pool: PgPool,
@@ -200,9 +200,7 @@ impl ProductRepository for ProductService {
             q = q.bind(binding);
         }
 
-        q.build_query_as::<Product>()
-            .fetch_all(&self.pool)
-            .await
+        q.build_query_as::<Product>().fetch_all(&self.pool).await
     }
 
     async fn count_products(&self, filters: Option<ProductFilters>) -> Result<i64, sqlx::Error> {
@@ -243,9 +241,7 @@ impl ProductRepository for ProductService {
             q = q.bind(binding);
         }
 
-        q.build_scalar::<i64>()
-            .fetch_one(&self.pool)
-            .await
+        q.build_scalar::<i64>().fetch_one(&self.pool).await
     }
 
     async fn search_products(&self, query: &str, limit: i64) -> Result<Vec<Product>, sqlx::Error> {

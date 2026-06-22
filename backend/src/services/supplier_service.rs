@@ -1,7 +1,7 @@
-use sqlx::PgPool;
-use uuid::Uuid;
 use crate::models::supplier::*;
 use rust_decimal::Decimal;
+use sqlx::PgPool;
+use uuid::Uuid;
 
 pub struct SupplierService {
     pool: PgPool,
@@ -98,9 +98,7 @@ impl SupplierService {
             q = q.bind(binding);
         }
 
-        q.build_query_as::<Supplier>()
-            .fetch_all(&self.pool)
-            .await
+        q.build_query_as::<Supplier>().fetch_all(&self.pool).await
     }
 
     pub async fn update_supplier_verification(
@@ -143,7 +141,10 @@ impl SupplierService {
     }
 
     // Supplier Ratings
-    pub async fn create_rating(&self, rating: NewSupplierRating) -> Result<SupplierRating, sqlx::Error> {
+    pub async fn create_rating(
+        &self,
+        rating: NewSupplierRating,
+    ) -> Result<SupplierRating, sqlx::Error> {
         sqlx::query_as::<SupplierRating, _>(
             r#"
             INSERT INTO supplier_ratings (
@@ -164,7 +165,11 @@ impl SupplierService {
         .await
     }
 
-    pub async fn get_ratings(&self, supplier_id: &str, limit: i64) -> Result<Vec<SupplierRating>, sqlx::Error> {
+    pub async fn get_ratings(
+        &self,
+        supplier_id: &str,
+        limit: i64,
+    ) -> Result<Vec<SupplierRating>, sqlx::Error> {
         sqlx::query_as::<SupplierRating, _>(
             "SELECT id, supplier_id, rater_id, rating_type, score, comment, rating_period_start, rating_period_end, created_at FROM supplier_ratings WHERE supplier_id = $1 ORDER BY created_at DESC LIMIT $2",
         )
@@ -174,7 +179,11 @@ impl SupplierService {
         .await
     }
 
-    pub async fn get_average_rating(&self, supplier_id: &str, rating_type: Option<String>) -> Result<Option<Decimal>, sqlx::Error> {
+    pub async fn get_average_rating(
+        &self,
+        supplier_id: &str,
+        rating_type: Option<String>,
+    ) -> Result<Option<Decimal>, sqlx::Error> {
         if let Some(rt) = rating_type {
             sqlx::query_scalar::<_, Decimal>(
                 "SELECT AVG(score) FROM supplier_ratings WHERE supplier_id = $1 AND rating_type = $2",
@@ -194,7 +203,10 @@ impl SupplierService {
     }
 
     // Supplier Performance
-    pub async fn create_performance(&self, perf: NewSupplierPerformance) -> Result<SupplierPerformance, sqlx::Error> {
+    pub async fn create_performance(
+        &self,
+        perf: NewSupplierPerformance,
+    ) -> Result<SupplierPerformance, sqlx::Error> {
         sqlx::query_as::<SupplierPerformance, _>(
             r#"
             INSERT INTO supplier_performance (
@@ -217,7 +229,11 @@ impl SupplierService {
         .await
     }
 
-    pub async fn get_performance(&self, supplier_id: &str, limit: i64) -> Result<Vec<SupplierPerformance>, sqlx::Error> {
+    pub async fn get_performance(
+        &self,
+        supplier_id: &str,
+        limit: i64,
+    ) -> Result<Vec<SupplierPerformance>, sqlx::Error> {
         sqlx::query_as::<SupplierPerformance, _>(
             "SELECT id, supplier_id, metric_type, metric_value, unit, measurement_period_start, measurement_period_end, target_value, benchmark_value, created_at FROM supplier_performance WHERE supplier_id = $1 ORDER BY measurement_period_start DESC LIMIT $2",
         )
@@ -228,7 +244,10 @@ impl SupplierService {
     }
 
     // Supplier Compliance
-    pub async fn create_compliance(&self, compliance: NewSupplierCompliance) -> Result<SupplierCompliance, sqlx::Error> {
+    pub async fn create_compliance(
+        &self,
+        compliance: NewSupplierCompliance,
+    ) -> Result<SupplierCompliance, sqlx::Error> {
         sqlx::query_as::<SupplierCompliance, _>(
             r#"
             INSERT INTO supplier_compliance (
@@ -273,7 +292,10 @@ impl SupplierService {
         .await
     }
 
-    pub async fn get_compliance(&self, supplier_id: &str) -> Result<Vec<SupplierCompliance>, sqlx::Error> {
+    pub async fn get_compliance(
+        &self,
+        supplier_id: &str,
+    ) -> Result<Vec<SupplierCompliance>, sqlx::Error> {
         sqlx::query_as::<SupplierCompliance, _>(
             "SELECT id, supplier_id, compliance_type, certificate_number, issuing_authority, issue_date, expiry_date, status, document_url, verified_by, verified_at, verification_notes, created_at, updated_at FROM supplier_compliance WHERE supplier_id = $1 ORDER BY created_at DESC",
         )
@@ -283,7 +305,10 @@ impl SupplierService {
     }
 
     // Supplier Products
-    pub async fn add_supplier_product(&self, sp: NewSupplierProduct) -> Result<SupplierProduct, sqlx::Error> {
+    pub async fn add_supplier_product(
+        &self,
+        sp: NewSupplierProduct,
+    ) -> Result<SupplierProduct, sqlx::Error> {
         sqlx::query_as::<SupplierProduct, _>(
             r#"
             INSERT INTO supplier_products (
@@ -308,7 +333,10 @@ impl SupplierService {
         .await
     }
 
-    pub async fn get_supplier_products(&self, supplier_id: &str) -> Result<Vec<SupplierProduct>, sqlx::Error> {
+    pub async fn get_supplier_products(
+        &self,
+        supplier_id: &str,
+    ) -> Result<Vec<SupplierProduct>, sqlx::Error> {
         sqlx::query_as::<SupplierProduct, _>(
             "SELECT id, supplier_id, product_id, is_primary_supplier, supply_capacity, lead_time_days, unit_price, currency, min_order_quantity, contract_start_date, contract_end_date, created_at, updated_at FROM supplier_products WHERE supplier_id = $1",
         )
@@ -318,9 +346,12 @@ impl SupplierService {
     }
 
     // Supplier Summary
-    pub async fn get_supplier_summary(&self, supplier_id: &str) -> Result<Option<SupplierSummary>, sqlx::Error> {
+    pub async fn get_supplier_summary(
+        &self,
+        supplier_id: &str,
+    ) -> Result<Option<SupplierSummary>, sqlx::Error> {
         let supplier = self.get_supplier(supplier_id).await?;
-        
+
         if let Some(s) = supplier {
             let overall_rating = self.get_average_rating(supplier_id, None).await?;
             let total_ratings = sqlx::query_scalar::<_, i64>(
@@ -330,7 +361,7 @@ impl SupplierService {
             .fetch_one(&self.pool)
             .await?
             .unwrap_or(0);
-            
+
             let active_compliance_count = sqlx::query_scalar::<_, i64>(
                 "SELECT COUNT(*) FROM supplier_compliance WHERE supplier_id = $1 AND status = 'active'",
             )
@@ -338,7 +369,7 @@ impl SupplierService {
             .fetch_one(&self.pool)
             .await?
             .unwrap_or(0);
-            
+
             let total_products = sqlx::query_scalar::<_, i64>(
                 "SELECT COUNT(*) FROM supplier_products WHERE supplier_id = $1",
             )
@@ -394,7 +425,11 @@ impl SupplierService {
         .await
     }
 
-    pub async fn get_audit_trail(&self, supplier_id: &str, limit: i64) -> Result<Vec<SupplierAuditTrail>, sqlx::Error> {
+    pub async fn get_audit_trail(
+        &self,
+        supplier_id: &str,
+        limit: i64,
+    ) -> Result<Vec<SupplierAuditTrail>, sqlx::Error> {
         sqlx::query_as::<SupplierAuditTrail, _>(
             "SELECT id, supplier_id, action_type, previous_value, new_value, performed_at, performed_by, reason, ip_address FROM supplier_audit_trail WHERE supplier_id = $1 ORDER BY performed_at DESC LIMIT $2",
         )

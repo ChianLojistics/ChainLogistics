@@ -1,8 +1,8 @@
-use sqlx::PgPool;
-use crate::database::{ProductRepository, EventRepository};
-use crate::models::{Product, NewProduct, TrackingEvent, NewTrackingEvent};
-use super::product::ProductService;
 use super::event::EventService;
+use super::product::ProductService;
+use crate::database::{EventRepository, ProductRepository};
+use crate::models::{NewProduct, NewTrackingEvent, Product, TrackingEvent};
+use sqlx::PgPool;
 
 pub struct SyncService {
     pool: PgPool,
@@ -21,7 +21,10 @@ impl SyncService {
         }
     }
 
-    pub async fn sync_product_from_contract(&self, product: NewProduct) -> Result<Product, sqlx::Error> {
+    pub async fn sync_product_from_contract(
+        &self,
+        product: NewProduct,
+    ) -> Result<Product, sqlx::Error> {
         let existing = self.product_service.get_product(&product.id).await?;
 
         if let Some(mut existing_product) = existing {
@@ -36,17 +39,25 @@ impl SyncService {
             existing_product.owner_address = product.owner_address.clone();
             existing_product.updated_by = product.created_by.clone();
 
-            self.product_service.update_product(&product.id, existing_product).await
+            self.product_service
+                .update_product(&product.id, existing_product)
+                .await
         } else {
             self.product_service.create_product(product).await
         }
     }
 
-    pub async fn sync_event_from_contract(&self, event: NewTrackingEvent) -> Result<TrackingEvent, sqlx::Error> {
+    pub async fn sync_event_from_contract(
+        &self,
+        event: NewTrackingEvent,
+    ) -> Result<TrackingEvent, sqlx::Error> {
         self.event_service.create_event(event).await
     }
 
-    pub async fn sync_batch_products(&self, products: Vec<NewProduct>) -> Result<Vec<Product>, sqlx::Error> {
+    pub async fn sync_batch_products(
+        &self,
+        products: Vec<NewProduct>,
+    ) -> Result<Vec<Product>, sqlx::Error> {
         let mut results = Vec::new();
         for product in products {
             results.push(self.sync_product_from_contract(product).await?);
@@ -54,7 +65,10 @@ impl SyncService {
         Ok(results)
     }
 
-    pub async fn sync_batch_events(&self, events: Vec<NewTrackingEvent>) -> Result<Vec<TrackingEvent>, sqlx::Error> {
+    pub async fn sync_batch_events(
+        &self,
+        events: Vec<NewTrackingEvent>,
+    ) -> Result<Vec<TrackingEvent>, sqlx::Error> {
         let mut results = Vec::new();
         for event in events {
             results.push(self.sync_event_from_contract(event).await?);

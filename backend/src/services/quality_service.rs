@@ -1,7 +1,7 @@
-use sqlx::PgPool;
-use uuid::Uuid;
 use crate::models::quality::*;
 use rust_decimal::Decimal;
+use sqlx::PgPool;
+use uuid::Uuid;
 
 pub struct QualityService {
     pool: PgPool,
@@ -13,7 +13,10 @@ impl QualityService {
     }
 
     // QC Checkpoints
-    pub async fn create_checkpoint(&self, checkpoint: NewQCCheckpoint) -> Result<QCCheckpoint, sqlx::Error> {
+    pub async fn create_checkpoint(
+        &self,
+        checkpoint: NewQCCheckpoint,
+    ) -> Result<QCCheckpoint, sqlx::Error> {
         sqlx::query_as::<QCCheckpoint, _>(
             r#"
             INSERT INTO qc_checkpoints (
@@ -37,7 +40,10 @@ impl QualityService {
         .await
     }
 
-    pub async fn get_checkpoint(&self, checkpoint_id: &str) -> Result<Option<QCCheckpoint>, sqlx::Error> {
+    pub async fn get_checkpoint(
+        &self,
+        checkpoint_id: &str,
+    ) -> Result<Option<QCCheckpoint>, sqlx::Error> {
         sqlx::query_as::<QCCheckpoint, _>(
             "SELECT id, checkpoint_id, name, description, checkpoint_type, category, product_category, required_fields, acceptance_criteria, is_active, created_at, updated_at FROM qc_checkpoints WHERE checkpoint_id = $1",
         )
@@ -125,7 +131,10 @@ impl QualityService {
     }
 
     // QC Workflows
-    pub async fn create_workflow(&self, workflow: NewQCWorkflow) -> Result<QCWorkflow, sqlx::Error> {
+    pub async fn create_workflow(
+        &self,
+        workflow: NewQCWorkflow,
+    ) -> Result<QCWorkflow, sqlx::Error> {
         sqlx::query_as::<QCWorkflow, _>(
             r#"
             INSERT INTO qc_workflows (
@@ -154,7 +163,10 @@ impl QualityService {
         .await
     }
 
-    pub async fn list_workflows(&self, is_active: Option<bool>) -> Result<Vec<QCWorkflow>, sqlx::Error> {
+    pub async fn list_workflows(
+        &self,
+        is_active: Option<bool>,
+    ) -> Result<Vec<QCWorkflow>, sqlx::Error> {
         if let Some(active) = is_active {
             sqlx::query_as::<QCWorkflow, _>(
                 "SELECT id, workflow_id, name, description, product_category, checkpoint_ids, is_active, created_at, updated_at FROM qc_workflows WHERE is_active = $1 ORDER BY created_at DESC",
@@ -172,7 +184,10 @@ impl QualityService {
     }
 
     // QC Inspections
-    pub async fn create_inspection(&self, inspection: NewQCInspection) -> Result<QCInspection, sqlx::Error> {
+    pub async fn create_inspection(
+        &self,
+        inspection: NewQCInspection,
+    ) -> Result<QCInspection, sqlx::Error> {
         sqlx::query_as::<QCInspection, _>(
             r#"
             INSERT INTO qc_inspections (
@@ -228,7 +243,10 @@ impl QualityService {
         .await
     }
 
-    pub async fn get_inspection(&self, inspection_id: &str) -> Result<Option<QCInspection>, sqlx::Error> {
+    pub async fn get_inspection(
+        &self,
+        inspection_id: &str,
+    ) -> Result<Option<QCInspection>, sqlx::Error> {
         sqlx::query_as::<QCInspection, _>(
             "SELECT id, inspection_id, product_id, checkpoint_id, workflow_id, inspector_id, inspection_date, status, is_passed, failure_reason, location, results, quality_metrics, notes, evidence_documents, created_at FROM qc_inspections WHERE inspection_id = $1",
         )
@@ -325,8 +343,13 @@ impl QualityService {
     }
 
     // Execute Workflow
-    pub async fn execute_workflow(&self, request: WorkflowExecutionRequest) -> Result<WorkflowExecutionResult, Box<dyn std::error::Error>> {
-        let workflow = self.get_workflow(&request.workflow_id).await?
+    pub async fn execute_workflow(
+        &self,
+        request: WorkflowExecutionRequest,
+    ) -> Result<WorkflowExecutionResult, Box<dyn std::error::Error>> {
+        let workflow = self
+            .get_workflow(&request.workflow_id)
+            .await?
             .ok_or_else(|| "Workflow not found")?;
 
         let mut inspections = Vec::new();
@@ -336,19 +359,21 @@ impl QualityService {
 
         for checkpoint_id in &workflow.checkpoint_ids {
             let inspection_id = format!("INS-{}", Uuid::new_v4());
-            
-            let inspection = self.create_inspection(NewQCInspection {
-                inspection_id: inspection_id.clone(),
-                product_id: request.product_id.clone(),
-                checkpoint_id: checkpoint_id.clone(),
-                workflow_id: Some(request.workflow_id.clone()),
-                inspector_id: Some(request.inspector_id.clone()),
-                location: None,
-                results: serde_json::json!({}),
-                quality_metrics: serde_json::json!({}),
-                notes: None,
-                evidence_documents: vec![],
-            }).await?;
+
+            let inspection = self
+                .create_inspection(NewQCInspection {
+                    inspection_id: inspection_id.clone(),
+                    product_id: request.product_id.clone(),
+                    checkpoint_id: checkpoint_id.clone(),
+                    workflow_id: Some(request.workflow_id.clone()),
+                    inspector_id: Some(request.inspector_id.clone()),
+                    location: None,
+                    results: serde_json::json!({}),
+                    quality_metrics: serde_json::json!({}),
+                    notes: None,
+                    evidence_documents: vec![],
+                })
+                .await?;
 
             inspections.push(inspection);
         }
@@ -371,7 +396,10 @@ impl QualityService {
     }
 
     // Non-Conformances
-    pub async fn create_non_conformance(&self, nc: NewNonConformance) -> Result<NonConformance, sqlx::Error> {
+    pub async fn create_non_conformance(
+        &self,
+        nc: NewNonConformance,
+    ) -> Result<NonConformance, sqlx::Error> {
         sqlx::query_as::<NonConformance, _>(
             r#"
             INSERT INTO non_conformances (
@@ -546,17 +574,21 @@ impl QualityService {
     }
 
     // Quality Metrics
-    pub async fn create_metric(&self, metric: NewQualityMetric) -> Result<QualityMetric, sqlx::Error> {
+    pub async fn create_metric(
+        &self,
+        metric: NewQualityMetric,
+    ) -> Result<QualityMetric, sqlx::Error> {
         // Check if within threshold
-        let is_within_threshold = if let (Some(min), Some(max)) = (metric.threshold_min, metric.threshold_max) {
-            Some(metric.metric_value >= min && metric.metric_value <= max)
-        } else if let Some(min) = metric.threshold_min {
-            Some(metric.metric_value >= min)
-        } else if let Some(max) = metric.threshold_max {
-            Some(metric.metric_value <= max)
-        } else {
-            None
-        };
+        let is_within_threshold =
+            if let (Some(min), Some(max)) = (metric.threshold_min, metric.threshold_max) {
+                Some(metric.metric_value >= min && metric.metric_value <= max)
+            } else if let Some(min) = metric.threshold_min {
+                Some(metric.metric_value >= min)
+            } else if let Some(max) = metric.threshold_max {
+                Some(metric.metric_value <= max)
+            } else {
+                None
+            };
 
         sqlx::query_as::<QualityMetric, _>(
             r#"

@@ -1,5 +1,5 @@
-use crate::models::analytics::{EventTypeCount, TimeSeriesPoint, HourlyCount};
-use chrono::{DateTime, Utc, Datelike};
+use crate::models::analytics::{EventTypeCount, HourlyCount, TimeSeriesPoint};
+use chrono::{DateTime, Datelike, Utc};
 use std::collections::HashMap;
 
 /// Compute percentage breakdown for a list of (label, count) pairs.

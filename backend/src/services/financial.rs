@@ -1,7 +1,7 @@
+use decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use decimal::Decimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {

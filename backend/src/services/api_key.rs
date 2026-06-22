@@ -1,10 +1,10 @@
+use crate::database::ApiKeyRepository;
+use crate::models::{ApiKey, ApiKeyTier, NewApiKey};
 use async_trait::async_trait;
+use rand::Rng;
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
-use sha2::{Sha256, Digest};
-use rand::Rng;
-use crate::database::ApiKeyRepository;
-use crate::models::{ApiKey, NewApiKey, ApiKeyTier};
 
 pub struct ApiKeyService {
     pub(crate) pool: PgPool,

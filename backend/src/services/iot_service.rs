@@ -1,7 +1,7 @@
-use sqlx::PgPool;
-use uuid::Uuid;
 use crate::models::iot::*;
 use rust_decimal::Decimal;
+use sqlx::PgPool;
+use uuid::Uuid;
 
 pub struct IoTService {
     pool: PgPool,
@@ -84,9 +84,7 @@ impl IoTService {
             q = q.bind(binding);
         }
 
-        q.build_query_as::<IoTDevice>()
-            .fetch_all(&self.pool)
-            .await
+        q.build_query_as::<IoTDevice>().fetch_all(&self.pool).await
     }
 
     pub async fn update_device_last_seen(&self, device_id: &str) -> Result<(), sqlx::Error> {
@@ -98,13 +96,16 @@ impl IoTService {
     }
 
     // Temperature Readings
-    pub async fn create_reading(&self, reading: NewTemperatureReading) -> Result<TemperatureReading, sqlx::Error> {
+    pub async fn create_reading(
+        &self,
+        reading: NewTemperatureReading,
+    ) -> Result<TemperatureReading, sqlx::Error> {
         // Update device last seen
         let _ = self.update_device_last_seen(&reading.device_id).await;
 
         // Check for anomalies and thresholds
         let (is_anomaly, anomaly_reason) = self.check_anomaly(&reading).await;
-        
+
         let reading_with_anomaly = sqlx::query_as::<TemperatureReading, _>(
             r#"
             INSERT INTO temperature_readings (
@@ -134,7 +135,9 @@ impl IoTService {
 
         // Check thresholds and create alerts if needed
         if let Some(ref pid) = reading.product_id {
-            let _ = self.check_thresholds(&reading.device_id, pid, reading.temperature_celsius).await;
+            let _ = self
+                .check_thresholds(&reading.device_id, pid, reading.temperature_celsius)
+                .await;
         }
 
         Ok(reading_with_anomaly)
@@ -144,9 +147,12 @@ impl IoTService {
         // Simple anomaly detection: check if temperature is outside reasonable range
         // In production, this would use statistical methods or ML models
         let temp = reading.temperature_celsius;
-        
+
         if temp < Decimal::from(-50) || temp > Decimal::from(100) {
-            return (true, Some("Temperature outside reasonable range".to_string()));
+            return (
+                true,
+                Some("Temperature outside reasonable range".to_string()),
+            );
         }
 
         // Check quality score if provided
@@ -159,7 +165,12 @@ impl IoTService {
         (false, None)
     }
 
-    async fn check_thresholds(&self, device_id: &str, product_id: &str, temperature: Decimal) -> Result<(), sqlx::Error> {
+    async fn check_thresholds(
+        &self,
+        device_id: &str,
+        product_id: &str,
+        temperature: Decimal,
+    ) -> Result<(), sqlx::Error> {
         let thresholds = sqlx::query_as::<TemperatureThreshold, _>(
             r#"
             SELECT id, product_id, device_id, threshold_type, min_temperature_celsius, max_temperature_celsius, duration_minutes, alert_level, is_active, created_at, updated_at FROM temperature_thresholds
@@ -206,23 +217,25 @@ impl IoTService {
             };
 
             if breached {
-                let _ = self.create_alert(NewTemperatureAlert {
-                    device_id: device_id.to_string(),
-                    product_id: product_id.to_string(),
-                    threshold_id: Some(threshold.id),
-                    alert_type: "threshold_breach".to_string(),
-                    alert_level: threshold.alert_level.clone(),
-                    temperature_celsius: Some(temperature),
-                    threshold_value: if threshold.threshold_type.contains("min") {
-                        threshold.min_temperature_celsius
-                    } else {
-                        threshold.max_temperature_celsius
-                    },
-                    message: format!(
-                        "{} threshold breached: {}°C",
-                        threshold.threshold_type, temperature
-                    ),
-                }).await;
+                let _ = self
+                    .create_alert(NewTemperatureAlert {
+                        device_id: device_id.to_string(),
+                        product_id: product_id.to_string(),
+                        threshold_id: Some(threshold.id),
+                        alert_type: "threshold_breach".to_string(),
+                        alert_level: threshold.alert_level.clone(),
+                        temperature_celsius: Some(temperature),
+                        threshold_value: if threshold.threshold_type.contains("min") {
+                            threshold.min_temperature_celsius
+                        } else {
+                            threshold.max_temperature_celsius
+                        },
+                        message: format!(
+                            "{} threshold breached: {}°C",
+                            threshold.threshold_type, temperature
+                        ),
+                    })
+                    .await;
             }
         }
 
@@ -262,7 +275,10 @@ impl IoTService {
             bind_index += 1;
         }
 
-        query.push_str(&format!(" ORDER BY reading_timestamp DESC LIMIT ${}", bind_index));
+        query.push_str(&format!(
+            " ORDER BY reading_timestamp DESC LIMIT ${}",
+            bind_index
+        ));
         bindings.push(limit.to_string());
 
         let mut q = sqlx::QueryBuilder::new(query);
@@ -276,7 +292,10 @@ impl IoTService {
     }
 
     // Temperature Thresholds
-    pub async fn create_threshold(&self, threshold: NewTemperatureThreshold) -> Result<TemperatureThreshold, sqlx::Error> {
+    pub async fn create_threshold(
+        &self,
+        threshold: NewTemperatureThreshold,
+    ) -> Result<TemperatureThreshold, sqlx::Error> {
         sqlx::query_as::<TemperatureThreshold, _>(
             r#"
             INSERT INTO temperature_thresholds (
@@ -297,7 +316,10 @@ impl IoTService {
         .await
     }
 
-    pub async fn get_thresholds(&self, product_id: &str) -> Result<Vec<TemperatureThreshold>, sqlx::Error> {
+    pub async fn get_thresholds(
+        &self,
+        product_id: &str,
+    ) -> Result<Vec<TemperatureThreshold>, sqlx::Error> {
         sqlx::query_as::<TemperatureThreshold, _>(
             "SELECT id, product_id, device_id, threshold_type, min_temperature_celsius, max_temperature_celsius, duration_minutes, alert_level, is_active, created_at, updated_at FROM temperature_thresholds WHERE product_id = $1",
         )
@@ -307,7 +329,10 @@ impl IoTService {
     }
 
     // Temperature Alerts
-    pub async fn create_alert(&self, alert: NewTemperatureAlert) -> Result<TemperatureAlert, sqlx::Error> {
+    pub async fn create_alert(
+        &self,
+        alert: NewTemperatureAlert,
+    ) -> Result<TemperatureAlert, sqlx::Error> {
         sqlx::query_as::<TemperatureAlert, _>(
             r#"
             INSERT INTO temperature_alerts (
@@ -363,7 +388,11 @@ impl IoTService {
             .await
     }
 
-    pub async fn acknowledge_alert(&self, alert_id: Uuid, acknowledged_by: String) -> Result<TemperatureAlert, sqlx::Error> {
+    pub async fn acknowledge_alert(
+        &self,
+        alert_id: Uuid,
+        acknowledged_by: String,
+    ) -> Result<TemperatureAlert, sqlx::Error> {
         sqlx::query_as::<TemperatureAlert, _>(
             r#"
             UPDATE temperature_alerts SET
@@ -379,7 +408,11 @@ impl IoTService {
         .await
     }
 
-    pub async fn resolve_alert(&self, alert_id: Uuid, resolved_by: String) -> Result<TemperatureAlert, sqlx::Error> {
+    pub async fn resolve_alert(
+        &self,
+        alert_id: Uuid,
+        resolved_by: String,
+    ) -> Result<TemperatureAlert, sqlx::Error> {
         sqlx::query_as::<TemperatureAlert, _>(
             r#"
             UPDATE temperature_alerts SET

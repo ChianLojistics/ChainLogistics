@@ -1,9 +1,9 @@
+use crate::error::AppError;
 use aes_gcm::{
     aead::{Aead, KeyInit},
-    Aes256Gcm, Nonce, Key
+    Aes256Gcm, Key, Nonce,
 };
 use base64::{engine::general_purpose, Engine as _};
-use crate::error::AppError;
 
 pub fn encrypt(data: &str, key_str: &str) -> Result<String, AppError> {
     let key = Key::<Aes256Gcm>::from_slice(key_str.as_bytes());

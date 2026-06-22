@@ -1,7 +1,7 @@
-use sqlx::PgPool;
-use uuid::Uuid;
 use crate::error::AppError;
 use crate::models::collaboration::*;
+use sqlx::PgPool;
+use uuid::Uuid;
 
 pub struct CollaborationService {
     pool: PgPool,
@@ -73,8 +73,9 @@ impl CollaborationService {
             "create_collaboration_request",
             "product",
             &req.product_id,
-            serde_json::json!({})
-        ).await?;
+            serde_json::json!({}),
+        )
+        .await?;
 
         Ok(request)
     }
@@ -103,8 +104,9 @@ impl CollaborationService {
             "update_collaboration_request",
             "collaboration_request",
             &request_id.to_string(),
-            serde_json::json!({ "new_status": status })
-        ).await?;
+            serde_json::json!({ "new_status": status }),
+        )
+        .await?;
 
         Ok(updated)
     }

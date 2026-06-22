@@ -5,7 +5,8 @@ use sqlx::{PgPool, Row};
 use crate::error::AppError;
 use crate::models::analytics::{
     ActorCount, ApiKeyTierCount, CategoryCount, DashboardMetrics, EventAnalytics, EventTypeCount,
-    HourlyCount, LocationCount, ProductAnalytics, ProductEventCount, TimeSeriesPoint, UserAnalytics,
+    HourlyCount, LocationCount, ProductAnalytics, ProductEventCount, TimeSeriesPoint,
+    UserAnalytics,
 };
 use crate::utils::aggregation::{
     build_hourly_distribution, compute_percentages, fill_time_series_gaps, safe_average,
@@ -85,14 +86,19 @@ impl AnalyticsService {
             GROUP BY event_type
             ORDER BY count DESC
             LIMIT 10
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
 
         let raw_event_types: Vec<(String, i64)> = event_type_rows
             .into_iter()
-            .map(|r| (r.get("event_type"), r.get::<Option<i64>, _>("count").unwrap_or(0)))
+            .map(|r| {
+                (
+                    r.get("event_type"),
+                    r.get::<Option<i64>, _>("count").unwrap_or(0),
+                )
+            })
             .collect();
         let top_event_types = compute_percentages(raw_event_types);
 
@@ -107,7 +113,7 @@ impl AnalyticsService {
             GROUP BY category
             ORDER BY count DESC
             LIMIT 10
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -122,15 +128,42 @@ impl AnalyticsService {
             .collect();
 
         let metrics = DashboardMetrics {
-            total_products: counts.get::<Option<i64>, _>("total_products").unwrap_or(Some(0)).unwrap_or(0),
-            active_products: counts.get::<Option<i64>, _>("active_products").unwrap_or(Some(0)).unwrap_or(0),
-            inactive_products: counts.get::<Option<i64>, _>("inactive_products").unwrap_or(Some(0)).unwrap_or(0),
-            total_events: counts.get::<Option<i64>, _>("total_events").unwrap_or(Some(0)).unwrap_or(0),
-            total_users: counts.get::<Option<i64>, _>("total_users").unwrap_or(Some(0)).unwrap_or(0),
-            events_last_24h: counts.get::<Option<i64>, _>("events_last_24h").unwrap_or(Some(0)).unwrap_or(0),
-            events_last_7d: counts.get::<Option<i64>, _>("events_last_7d").unwrap_or(Some(0)).unwrap_or(0),
-            events_last_30d: counts.get::<Option<i64>, _>("events_last_30d").unwrap_or(Some(0)).unwrap_or(0),
-            products_registered_last_30d: counts.get::<Option<i64>, _>("products_last_30d").unwrap_or(Some(0)).unwrap_or(0),
+            total_products: counts
+                .get::<Option<i64>, _>("total_products")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            active_products: counts
+                .get::<Option<i64>, _>("active_products")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            inactive_products: counts
+                .get::<Option<i64>, _>("inactive_products")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            total_events: counts
+                .get::<Option<i64>, _>("total_events")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            total_users: counts
+                .get::<Option<i64>, _>("total_users")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            events_last_24h: counts
+                .get::<Option<i64>, _>("events_last_24h")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            events_last_7d: counts
+                .get::<Option<i64>, _>("events_last_7d")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            events_last_30d: counts
+                .get::<Option<i64>, _>("events_last_30d")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            products_registered_last_30d: counts
+                .get::<Option<i64>, _>("products_last_30d")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
             top_event_types,
             top_categories,
             generated_at: now,
@@ -196,7 +229,12 @@ impl AnalyticsService {
 
         let raw_types: Vec<(String, i64)> = type_rows
             .into_iter()
-            .map(|r| (r.get("event_type"), r.get::<Option<i64>, _>("count").unwrap_or(0)))
+            .map(|r| {
+                (
+                    r.get("event_type"),
+                    r.get::<Option<i64>, _>("count").unwrap_or(0),
+                )
+            })
             .collect();
         let event_type_breakdown = compute_percentages(raw_types);
 
@@ -234,9 +272,7 @@ impl AnalyticsService {
         let product_last_event_at: Option<DateTime<Utc>> = product_row.get("last_event_at");
 
         let lifecycle_days = match (product_first_event_at, product_last_event_at) {
-            (Some(first), Some(last)) => {
-                Some((last - first).num_days())
-            }
+            (Some(first), Some(last)) => Some((last - first).num_days()),
             _ => None,
         };
 
@@ -245,9 +281,15 @@ impl AnalyticsService {
             product_name: product_row.get("name"),
             category: product_row.get("category"),
             is_active: product_row.get("is_active"),
-            total_events: product_row.get::<Option<i64>, _>("total_events").unwrap_or(0),
-            unique_actors: product_row.get::<Option<i64>, _>("unique_actors").unwrap_or(0),
-            unique_locations: product_row.get::<Option<i64>, _>("unique_locations").unwrap_or(0),
+            total_events: product_row
+                .get::<Option<i64>, _>("total_events")
+                .unwrap_or(0),
+            unique_actors: product_row
+                .get::<Option<i64>, _>("unique_actors")
+                .unwrap_or(0),
+            unique_locations: product_row
+                .get::<Option<i64>, _>("unique_locations")
+                .unwrap_or(0),
             first_event_at: product_first_event_at,
             last_event_at: product_last_event_at,
             lifecycle_days,
@@ -309,7 +351,12 @@ impl AnalyticsService {
         .await?;
         let raw_types: Vec<(String, i64)> = type_rows
             .into_iter()
-            .map(|r| (r.get("event_type"), r.get::<Option<i64>, _>("count").unwrap_or(0)))
+            .map(|r| {
+                (
+                    r.get("event_type"),
+                    r.get::<Option<i64>, _>("count").unwrap_or(0),
+                )
+            })
             .collect();
         let events_by_type = compute_percentages(raw_types);
 
@@ -375,7 +422,10 @@ impl AnalyticsService {
         .await?;
         let raw_hourly: Vec<(i32, i64)> = hourly_rows
             .into_iter()
-            .filter_map(|r| r.get::<Option<i32>, _>("hour").map(|h| (h, r.get::<Option<i64>, _>("count").unwrap_or(0))))
+            .filter_map(|r| {
+                r.get::<Option<i32>, _>("hour")
+                    .map(|h| (h, r.get::<Option<i64>, _>("count").unwrap_or(0)))
+            })
             .collect();
         let hourly_distribution = build_hourly_distribution(raw_hourly);
 
@@ -414,7 +464,9 @@ impl AnalyticsService {
         .bind(end)
         .fetch_one(&self.pool)
         .await?;
-        let product_count = product_count_row.get::<Option<i64>, _>("count").unwrap_or(0);
+        let product_count = product_count_row
+            .get::<Option<i64>, _>("count")
+            .unwrap_or(0);
         let avg_events_per_product = safe_average(total_events, product_count);
 
         // Most active products
@@ -494,7 +546,7 @@ impl AnalyticsService {
             FROM api_keys
             GROUP BY tier
             ORDER BY count DESC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -531,16 +583,33 @@ impl AnalyticsService {
                 })
             })
             .collect();
-        let user_registration_series =
-            fill_time_series_gaps(raw_series, series_start, Utc::now());
+        let user_registration_series = fill_time_series_gaps(raw_series, series_start, Utc::now());
 
         let analytics = UserAnalytics {
-            total_users: counts.get::<Option<i64>, _>("total_users").unwrap_or(Some(0)).unwrap_or(0),
-            active_users: counts.get::<Option<i64>, _>("active_users").unwrap_or(Some(0)).unwrap_or(0),
-            users_with_stellar: counts.get::<Option<i64>, _>("users_with_stellar").unwrap_or(Some(0)).unwrap_or(0),
-            new_users_last_30d: counts.get::<Option<i64>, _>("new_users_last_30d").unwrap_or(Some(0)).unwrap_or(0),
-            total_api_keys: counts.get::<Option<i64>, _>("total_api_keys").unwrap_or(Some(0)).unwrap_or(0),
-            active_api_keys: counts.get::<Option<i64>, _>("active_api_keys").unwrap_or(Some(0)).unwrap_or(0),
+            total_users: counts
+                .get::<Option<i64>, _>("total_users")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            active_users: counts
+                .get::<Option<i64>, _>("active_users")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            users_with_stellar: counts
+                .get::<Option<i64>, _>("users_with_stellar")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            new_users_last_30d: counts
+                .get::<Option<i64>, _>("new_users_last_30d")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            total_api_keys: counts
+                .get::<Option<i64>, _>("total_api_keys")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            active_api_keys: counts
+                .get::<Option<i64>, _>("active_api_keys")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
             api_keys_by_tier,
             user_registration_series,
         };
@@ -611,7 +680,9 @@ impl AnalyticsService {
                     r.get::<DateTime<Utc>, _>("timestamp").to_rfc3339(),
                     r.get::<String, _>("event_type"),
                     crate::utils::aggregation::csv_escape(&r.get::<String, _>("location")),
-                    crate::utils::aggregation::csv_escape(r.get::<Option<String>, _>("note").as_deref().unwrap_or("")),
+                    crate::utils::aggregation::csv_escape(
+                        r.get::<Option<String>, _>("note").as_deref().unwrap_or(""),
+                    ),
                     r.get::<String, _>("data_hash"),
                 ]
             })

@@ -3,11 +3,11 @@ use axum::{
     middleware::Next,
     response::Response,
 };
+use chrono::{Timelike, Utc};
 use redis::AsyncCommands;
 use std::sync::Arc;
-use chrono::{Utc, Timelike};
 
-use crate::{AppState, error::AppError, models::ApiKeyTier};
+use crate::{error::AppError, models::ApiKeyTier, AppState};
 
 pub async fn rate_limit_middleware(
     State(state): State<AppState>,
@@ -36,34 +36,40 @@ pub async fn rate_limit_middleware(
     };
 
     // Use the custom rate limit if it's set and lower than the tier limit
-    let effective_limit = if api_key.rate_limit_per_minute > 0 && api_key.rate_limit_per_minute < tier_limit {
-        api_key.rate_limit_per_minute
-    } else {
-        tier_limit
-    };
+    let effective_limit =
+        if api_key.rate_limit_per_minute > 0 && api_key.rate_limit_per_minute < tier_limit {
+            api_key.rate_limit_per_minute
+        } else {
+            tier_limit
+        };
 
     // Redis rate limiting logic (Fixed Window)
-    let mut conn = state.redis_client.get_multiplexed_tokio_connection().await
+    let mut conn = state
+        .redis_client
+        .get_multiplexed_tokio_connection()
+        .await
         .map_err(|e| {
             tracing::error!("Redis connection error: {}", e);
             AppError::Internal(e.to_string())
         })?;
 
     let now = Utc::now();
-    let window_key = format!("ratelimit:{}:{}", auth_context.api_key_id, now.format("%Y%m%d%H%M"));
-    
-    let count: u32 = conn.incr(&window_key, 1).await
-        .map_err(|e| {
-            tracing::error!("Redis INCR error: {}", e);
-            AppError::Internal(e.to_string())
-        })?;
+    let window_key = format!(
+        "ratelimit:{}:{}",
+        auth_context.api_key_id,
+        now.format("%Y%m%d%H%M")
+    );
+
+    let count: u32 = conn.incr(&window_key, 1).await.map_err(|e| {
+        tracing::error!("Redis INCR error: {}", e);
+        AppError::Internal(e.to_string())
+    })?;
 
     if count == 1 {
-        let _: () = conn.expire(&window_key, 60).await
-            .map_err(|e| {
-                tracing::error!("Redis EXPIRE error: {}", e);
-                AppError::Internal(e.to_string())
-            })?;
+        let _: () = conn.expire(&window_key, 60).await.map_err(|e| {
+            tracing::error!("Redis EXPIRE error: {}", e);
+            AppError::Internal(e.to_string())
+        })?;
     }
 
     if count > effective_limit {
@@ -72,7 +78,7 @@ pub async fn rate_limit_middleware(
 
     // Add rate limit headers to response
     let response = next.run(request).await;
-    
+
     let (mut parts, body) = response.into_parts();
     parts.headers.insert(
         "X-RateLimit-Limit",
@@ -80,15 +86,23 @@ pub async fn rate_limit_middleware(
     );
     parts.headers.insert(
         "X-RateLimit-Remaining",
-        effective_limit.saturating_sub(count).to_string().parse().unwrap(),
-    );
-    parts.headers.insert(
-        "X-RateLimit-Reset",
-        ((now + chrono::Duration::minutes(1)).with_second(0).unwrap().with_nanosecond(0).unwrap())
-            .timestamp()
+        effective_limit
+            .saturating_sub(count)
             .to_string()
             .parse()
             .unwrap(),
+    );
+    parts.headers.insert(
+        "X-RateLimit-Reset",
+        ((now + chrono::Duration::minutes(1))
+            .with_second(0)
+            .unwrap()
+            .with_nanosecond(0)
+            .unwrap())
+        .timestamp()
+        .to_string()
+        .parse()
+        .unwrap(),
     );
 
     Ok(Response::from_parts(parts, body))

@@ -5,7 +5,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::{AppState, error::AppError};
+use crate::{error::AppError, AppState};
 
 /// Middleware to enforce HTTPS connections
 /// Redirects HTTP requests to HTTPS in production
@@ -39,7 +39,11 @@ pub async fn enforce_https(
             .and_then(|v| v.to_str().ok())
             .unwrap_or("localhost");
 
-        let https_url = format!("https://{}{}", host, uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/"));
+        let https_url = format!(
+            "https://{}{}",
+            host,
+            uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/")
+        );
 
         return Ok((
             StatusCode::MOVED_PERMANENTLY,
@@ -85,16 +89,13 @@ pub async fn security_headers(
              img-src 'self' data: https:; \
              font-src 'self' data:; \
              connect-src 'self' https:; \
-             frame-ancestors 'none';"
+             frame-ancestors 'none';",
         ),
     );
 
     // X-Frame-Options
     // Prevents clickjacking attacks
-    headers.insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
 
     // X-Content-Type-Options
     // Prevents MIME type sniffing
@@ -121,9 +122,7 @@ pub async fn security_headers(
     // Controls which browser features can be used
     headers.insert(
         HeaderValue::from_static("permissions-policy"),
-        HeaderValue::from_static(
-            "geolocation=(), microphone=(), camera=(), payment=()"
-        ),
+        HeaderValue::from_static("geolocation=(), microphone=(), camera=(), payment=()"),
     );
 
     Ok(response)
@@ -157,17 +156,41 @@ pub async fn cors_policy(
                 return Ok((
                     StatusCode::OK,
                     [
-                        (header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_str(origin_value).unwrap()),
-                        (header::ACCESS_CONTROL_ALLOW_CREDENTIALS, HeaderValue::from_static("true")),
-                        (header::ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, POST, PUT, DELETE, PATCH, OPTIONS")),
-                        (header::ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("Content-Type, Authorization, X-Requested-With, X-CSRF-Token")),
-                        (header::ACCESS_CONTROL_EXPOSE_HEADERS, HeaderValue::from_static("Content-Length, Content-Type")),
-                        (header::ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("86400")), // 24 hours
+                        (
+                            header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                            HeaderValue::from_str(origin_value).unwrap(),
+                        ),
+                        (
+                            header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                            HeaderValue::from_static("true"),
+                        ),
+                        (
+                            header::ACCESS_CONTROL_ALLOW_METHODS,
+                            HeaderValue::from_static("GET, POST, PUT, DELETE, PATCH, OPTIONS"),
+                        ),
+                        (
+                            header::ACCESS_CONTROL_ALLOW_HEADERS,
+                            HeaderValue::from_static(
+                                "Content-Type, Authorization, X-Requested-With, X-CSRF-Token",
+                            ),
+                        ),
+                        (
+                            header::ACCESS_CONTROL_EXPOSE_HEADERS,
+                            HeaderValue::from_static("Content-Length, Content-Type"),
+                        ),
+                        (
+                            header::ACCESS_CONTROL_MAX_AGE,
+                            HeaderValue::from_static("86400"),
+                        ), // 24 hours
                         (header::VARY, HeaderValue::from_static("Origin")),
-                    ]
-                ).into_response());
+                    ],
+                )
+                    .into_response());
             } else {
-                tracing::warn!("Blocked pre-flight request from unauthorized origin: {}", origin_value);
+                tracing::warn!(
+                    "Blocked pre-flight request from unauthorized origin: {}",
+                    origin_value
+                );
                 return Err(AppError::Forbidden);
             }
         }
@@ -222,10 +245,7 @@ pub async fn cors_policy(
             header::ACCESS_CONTROL_MAX_AGE,
             HeaderValue::from_static("86400"), // 24 hours
         );
-        headers.insert(
-            header::VARY,
-            HeaderValue::from_static("Origin"),
-        );
+        headers.insert(header::VARY, HeaderValue::from_static("Origin"));
     }
 
     Ok(response)

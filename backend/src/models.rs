@@ -1,15 +1,14 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 pub mod analytics;
 pub mod batch;
 pub mod carbon;
-pub mod digital_twin;
 pub mod collaboration;
-
+pub mod digital_twin;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Product {

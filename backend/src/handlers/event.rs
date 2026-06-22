@@ -1,20 +1,23 @@
 use axum::{
-    extract::{State, Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::{
-    AppState,
     error::AppError,
-    models::{TrackingEvent, NewTrackingEvent},
-    validation::{validate_string, validate_stellar_address, sanitize_input, validate_product_id, validate_location, sanitize_json_metadata},
+    models::{NewTrackingEvent, TrackingEvent},
+    validation::{
+        sanitize_input, sanitize_json_metadata, validate_location, validate_product_id,
+        validate_stellar_address, validate_string,
+    },
+    AppState,
 };
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct ListEventsQuery {
     pub offset: Option<i64>,
     pub limit: Option<i64>,
@@ -58,7 +61,11 @@ where
             let raw = n
                 .as_i64()
                 .ok_or_else(|| serde::de::Error::custom("timestamp must be an integer"))?;
-            let seconds = if raw > 10_000_000_000 { raw / 1000 } else { raw };
+            let seconds = if raw > 10_000_000_000 {
+                raw / 1000
+            } else {
+                raw
+            };
             Utc.timestamp_opt(seconds, 0)
                 .single()
                 .ok_or_else(|| serde::de::Error::custom("invalid timestamp"))
@@ -139,11 +146,18 @@ pub async fn list_events(
 
         let events = if let Some(event_type) = query.event_type {
             validate_string("event_type", &event_type, 64)?;
-            state.event_service
-                .list_events_by_type(&sanitized_product_id, &sanitize_input(&event_type), offset, limit)
+            state
+                .event_service
+                .list_events_by_type(
+                    &sanitized_product_id,
+                    &sanitize_input(&event_type),
+                    offset,
+                    limit,
+                )
                 .await?
         } else {
-            state.event_service
+            state
+                .event_service
                 .list_events_by_product(&sanitized_product_id, offset, limit)
                 .await?
         };
@@ -151,7 +165,8 @@ pub async fn list_events(
         let total = if query.event_type.is_some() {
             events.len() as i64
         } else {
-            state.event_service
+            state
+                .event_service
                 .count_events_by_product(&sanitized_product_id)
                 .await?
         };
@@ -170,8 +185,15 @@ pub async fn list_events(
 }
 
 const ALLOWED_EVENT_TYPES: &[&str] = &[
-    "HARVEST", "PROCESS", "PACKAGE", "SHIP", "RECEIVE",
-    "QUALITY_CHECK", "TRANSFER", "REGISTER", "CHECKPOINT",
+    "HARVEST",
+    "PROCESS",
+    "PACKAGE",
+    "SHIP",
+    "RECEIVE",
+    "QUALITY_CHECK",
+    "TRANSFER",
+    "REGISTER",
+    "CHECKPOINT",
 ];
 
 #[utoipa::path(
@@ -199,7 +221,9 @@ pub async fn create_event(
     validate_stellar_address(&request.actor_address)?;
     validate_location(&request.location)?;
     if request.note.len() > 256 {
-        return Err(AppError::Validation("note must not exceed 256 characters".to_string()));
+        return Err(AppError::Validation(
+            "note must not exceed 256 characters".to_string(),
+        ));
     }
     if !ALLOWED_EVENT_TYPES.contains(&request.event_type.as_str()) {
         return Err(AppError::Validation(format!(
@@ -210,7 +234,9 @@ pub async fn create_event(
     }
     // Reject future timestamps
     if request.timestamp > chrono::Utc::now() {
-        return Err(AppError::Validation("timestamp must not be in the future".to_string()));
+        return Err(AppError::Validation(
+            "timestamp must not be in the future".to_string(),
+        ));
     }
 
     let new_event = NewTrackingEvent {
@@ -232,16 +258,14 @@ pub async fn create_event(
 
     // Automated recall trigger: failed quality check creates a recall and queues notifications.
     if event.event_type == "QUALITY_CHECK" {
-        let passed = event
-            .metadata
-            .get("passed")
-            .and_then(|v| v.as_bool());
+        let passed = event.metadata.get("passed").and_then(|v| v.as_bool());
         let result = event
             .metadata
             .get("result")
             .and_then(|v| v.as_str())
             .map(|s| s.to_ascii_lowercase());
-        let is_failed = passed == Some(false) || matches!(result.as_deref(), Some("fail") | Some("failed"));
+        let is_failed =
+            passed == Some(false) || matches!(result.as_deref(), Some("fail") | Some("failed"));
 
         if is_failed {
             let batch_id = event
@@ -251,7 +275,10 @@ pub async fn create_event(
                 .map(|s| s.to_string());
 
             if let Some(product) = state.product_service.get_product(&event.product_id).await? {
-                let title = format!("Automated recall: failed quality check for {}", event.product_id);
+                let title = format!(
+                    "Automated recall: failed quality check for {}",
+                    event.product_id
+                );
                 let reason = "Quality check failed";
 
                 let recall = state

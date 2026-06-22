@@ -1,8 +1,8 @@
-use async_trait::async_trait;
-use sqlx::{PgPool, Row};
-use redis::AsyncCommands;
 use crate::database::{EventRepository, GlobalStats};
-use crate::models::{TrackingEvent, NewTrackingEvent, ProductStats, AppError};
+use crate::models::{AppError, NewTrackingEvent, ProductStats, TrackingEvent};
+use async_trait::async_trait;
+use redis::AsyncCommands;
+use sqlx::{PgPool, Row};
 
 pub struct EventService {
     pub(crate) pool: PgPool,
@@ -60,12 +60,14 @@ impl EventRepository for EventService {
         Ok(created)
     }
 
+    async fn get_event(&self, id: i64) -> Result<Option<TrackingEvent>, sqlx::Error> {
         sqlx::query_as::<TrackingEvent, _>(
             "SELECT id, product_id, actor_address, timestamp, event_type, location, data_hash, note, metadata, created_at FROM tracking_events WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
         .await
+    }
 
     async fn list_events_by_product(
         &self,
@@ -84,12 +86,10 @@ impl EventRepository for EventService {
     }
 
     async fn count_events_by_product(&self, product_id: &str) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar::<i64>(
-            "SELECT COUNT(*) FROM tracking_events WHERE product_id = $1",
-        )
-        .bind(product_id)
-        .fetch_one(&self.pool)
-        .await
+        sqlx::query_scalar::<i64>("SELECT COUNT(*) FROM tracking_events WHERE product_id = $1")
+            .bind(product_id)
+            .fetch_one(&self.pool)
+            .await
     }
 
     async fn list_events_by_type(
@@ -110,7 +110,10 @@ impl EventRepository for EventService {
         .await
     }
 
-    async fn get_product_stats(&self, product_id: &str) -> Result<Option<ProductStats>, sqlx::Error> {
+    async fn get_product_stats(
+        &self,
+        product_id: &str,
+    ) -> Result<Option<ProductStats>, sqlx::Error> {
         sqlx::query_as::<ProductStats, _>(
             r#"
             SELECT
@@ -147,17 +150,32 @@ impl EventRepository for EventService {
                 (SELECT COUNT(*) FROM tracking_events) as total_events,
                 (SELECT COUNT(*) FROM users) as total_users,
                 (SELECT COUNT(*) FROM api_keys WHERE is_active = true) as active_api_keys
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
 
         let global_stats = GlobalStats {
-            total_products: stats.get::<Option<i64>, _>("total_products").unwrap_or(Some(0)).unwrap_or(0),
-            active_products: stats.get::<Option<i64>, _>("active_products").unwrap_or(Some(0)).unwrap_or(0),
-            total_events: stats.get::<Option<i64>, _>("total_events").unwrap_or(Some(0)).unwrap_or(0),
-            total_users: stats.get::<Option<i64>, _>("total_users").unwrap_or(Some(0)).unwrap_or(0),
-            active_api_keys: stats.get::<Option<i64>, _>("active_api_keys").unwrap_or(Some(0)).unwrap_or(0),
+            total_products: stats
+                .get::<Option<i64>, _>("total_products")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            active_products: stats
+                .get::<Option<i64>, _>("active_products")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            total_events: stats
+                .get::<Option<i64>, _>("total_events")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            total_users: stats
+                .get::<Option<i64>, _>("total_users")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
+            active_api_keys: stats
+                .get::<Option<i64>, _>("active_api_keys")
+                .unwrap_or(Some(0))
+                .unwrap_or(0),
         };
 
         if let Ok(mut conn) = self.redis_client.get_multiplexed_tokio_connection().await {

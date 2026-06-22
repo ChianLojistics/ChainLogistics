@@ -1,8 +1,8 @@
+use crate::compliance::{ComplianceRule, ComplianceType, ComplianceValidator};
+use crate::models::regulatory::*;
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::models::regulatory::*;
-use crate::compliance::{ComplianceRule, ComplianceType, ComplianceValidator};
-use serde_json::json;
 
 pub struct RegulatoryService {
     pool: PgPool,
@@ -14,7 +14,10 @@ impl RegulatoryService {
     }
 
     // Regulatory Requirements Management
-    pub async fn create_requirement(&self, req: NewRegulatoryRequirement) -> Result<RegulatoryRequirement, sqlx::Error> {
+    pub async fn create_requirement(
+        &self,
+        req: NewRegulatoryRequirement,
+    ) -> Result<RegulatoryRequirement, sqlx::Error> {
         sqlx::query_as::<RegulatoryRequirement, _>(
             r#"
             INSERT INTO regulatory_requirements (
@@ -42,7 +45,10 @@ impl RegulatoryService {
         .await
     }
 
-    pub async fn get_requirement(&self, requirement_id: &str) -> Result<Option<RegulatoryRequirement>, sqlx::Error> {
+    pub async fn get_requirement(
+        &self,
+        requirement_id: &str,
+    ) -> Result<Option<RegulatoryRequirement>, sqlx::Error> {
         sqlx::query_as::<RegulatoryRequirement, _>(
             "SELECT id, requirement_id, name, description, regulation_type, category, severity, required_fields, validation_logic, is_active, effective_date, expiry_date, created_at, updated_at FROM regulatory_requirements WHERE requirement_id = $1",
         )
@@ -89,7 +95,11 @@ impl RegulatoryService {
             .await
     }
 
-    pub async fn update_requirement(&self, requirement_id: &str, req: NewRegulatoryRequirement) -> Result<RegulatoryRequirement, sqlx::Error> {
+    pub async fn update_requirement(
+        &self,
+        requirement_id: &str,
+        req: NewRegulatoryRequirement,
+    ) -> Result<RegulatoryRequirement, sqlx::Error> {
         sqlx::query_as::<RegulatoryRequirement, _>(
             r#"
             UPDATE regulatory_requirements SET
@@ -122,7 +132,10 @@ impl RegulatoryService {
     }
 
     // Product Compliance Management
-    pub async fn create_product_compliance(&self, compliance: NewProductCompliance) -> Result<ProductCompliance, sqlx::Error> {
+    pub async fn create_product_compliance(
+        &self,
+        compliance: NewProductCompliance,
+    ) -> Result<ProductCompliance, sqlx::Error> {
         sqlx::query_as::<ProductCompliance, _>(
             r#"
             INSERT INTO product_compliance (
@@ -142,7 +155,11 @@ impl RegulatoryService {
         .await
     }
 
-    pub async fn get_product_compliance(&self, product_id: &str, requirement_id: &str) -> Result<Option<ProductCompliance>, sqlx::Error> {
+    pub async fn get_product_compliance(
+        &self,
+        product_id: &str,
+        requirement_id: &str,
+    ) -> Result<Option<ProductCompliance>, sqlx::Error> {
         sqlx::query_as::<ProductCompliance, _>(
             "SELECT id, product_id, requirement_id, status, last_checked_at, last_check_result, violations, warnings, notes, checked_by, created_at FROM product_compliance WHERE product_id = $1 AND requirement_id = $2",
         )
@@ -152,7 +169,10 @@ impl RegulatoryService {
         .await
     }
 
-    pub async fn list_product_compliance(&self, product_id: &str) -> Result<Vec<ProductCompliance>, sqlx::Error> {
+    pub async fn list_product_compliance(
+        &self,
+        product_id: &str,
+    ) -> Result<Vec<ProductCompliance>, sqlx::Error> {
         sqlx::query_as::<ProductCompliance, _>(
             "SELECT id, product_id, requirement_id, status, last_checked_at, last_check_result, violations, warnings, notes, checked_by, created_at FROM product_compliance WHERE product_id = $1 ORDER BY created_at DESC",
         )
@@ -200,7 +220,10 @@ impl RegulatoryService {
     }
 
     // Automated Compliance Check
-    pub async fn run_compliance_check(&self, request: ComplianceCheckRequest) -> Result<ComplianceCheckResult, Box<dyn std::error::Error>> {
+    pub async fn run_compliance_check(
+        &self,
+        request: ComplianceCheckRequest,
+    ) -> Result<ComplianceCheckResult, Box<dyn std::error::Error>> {
         let requirement_ids = if let Some(ids) = request.requirement_ids {
             ids
         } else {
@@ -217,14 +240,16 @@ impl RegulatoryService {
         for req_id in &requirement_ids {
             if let Some(requirement) = self.get_requirement(req_id).await? {
                 // Get product data for validation
-                let product_data = self.get_product_data_for_validation(&request.product_id).await?;
-                
+                let product_data = self
+                    .get_product_data_for_validation(&request.product_id)
+                    .await?;
+
                 // Create compliance rule from requirement
                 let rule = self.requirement_to_rule(&requirement);
-                
+
                 // Validate
                 let validation_result = ComplianceValidator::validate(&rule, &product_data);
-                
+
                 let status = if validation_result.is_compliant {
                     "compliant".to_string()
                 } else {
@@ -232,31 +257,35 @@ impl RegulatoryService {
                 };
 
                 // Update product compliance
-                let _ = self.update_product_compliance(
-                    &request.product_id,
-                    req_id,
-                    status.clone(),
-                    validation_result.violations.clone(),
-                    validation_result.warnings.clone(),
-                    None,
-                    &request.performed_by,
-                ).await;
+                let _ = self
+                    .update_product_compliance(
+                        &request.product_id,
+                        req_id,
+                        status.clone(),
+                        validation_result.violations.clone(),
+                        validation_result.warnings.clone(),
+                        None,
+                        &request.performed_by,
+                    )
+                    .await;
 
                 // Log audit trail
-                let _ = self.create_audit_trail(NewComplianceAuditTrail {
-                    product_id: request.product_id.clone(),
-                    requirement_id: Some(req_id.clone()),
-                    action_type: "check".to_string(),
-                    previous_status: None,
-                    new_status: Some(status.clone()),
-                    action_details: json!({
-                        "violations": validation_result.violations,
-                        "warnings": validation_result.warnings
-                    }),
-                    performed_by: request.performed_by.clone(),
-                    ip_address: None,
-                    user_agent: None,
-                }).await;
+                let _ = self
+                    .create_audit_trail(NewComplianceAuditTrail {
+                        product_id: request.product_id.clone(),
+                        requirement_id: Some(req_id.clone()),
+                        action_type: "check".to_string(),
+                        previous_status: None,
+                        new_status: Some(status.clone()),
+                        action_details: json!({
+                            "violations": validation_result.violations,
+                            "warnings": validation_result.warnings
+                        }),
+                        performed_by: request.performed_by.clone(),
+                        ip_address: None,
+                        user_agent: None,
+                    })
+                    .await;
 
                 details.push(ComplianceDetail {
                     requirement_id: req_id.clone(),
@@ -287,7 +316,10 @@ impl RegulatoryService {
         })
     }
 
-    async fn get_product_data_for_validation(&self, product_id: &str) -> Result<serde_json::Value, sqlx::Error> {
+    async fn get_product_data_for_validation(
+        &self,
+        product_id: &str,
+    ) -> Result<serde_json::Value, sqlx::Error> {
         // Fetch product data from database
         let product = sqlx::query(
             "SELECT id, name, category, origin_location, certifications, custom_fields, tags FROM products WHERE id = $1",
@@ -318,12 +350,15 @@ impl RegulatoryService {
             compliance_type: self.map_regulation_type(&requirement.regulation_type),
             description: requirement.description.clone().unwrap_or_default(),
             validation_logic: requirement.validation_logic.clone().unwrap_or_default(),
-            required_fields: requirement.required_fields
+            required_fields: requirement
+                .required_fields
                 .as_array()
-                .map(|arr| arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .collect()
+                })
                 .unwrap_or_default(),
             is_active: requirement.is_active,
         }
@@ -343,7 +378,10 @@ impl RegulatoryService {
     }
 
     // Audit Trail
-    pub async fn create_audit_trail(&self, audit: NewComplianceAuditTrail) -> Result<ComplianceAuditTrail, sqlx::Error> {
+    pub async fn create_audit_trail(
+        &self,
+        audit: NewComplianceAuditTrail,
+    ) -> Result<ComplianceAuditTrail, sqlx::Error> {
         sqlx::query_as::<ComplianceAuditTrail, _>(
             r#"
             INSERT INTO compliance_audit_trail (
@@ -368,7 +406,11 @@ impl RegulatoryService {
         .await
     }
 
-    pub async fn get_audit_trail(&self, product_id: &str, limit: i64) -> Result<Vec<ComplianceAuditTrail>, sqlx::Error> {
+    pub async fn get_audit_trail(
+        &self,
+        product_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ComplianceAuditTrail>, sqlx::Error> {
         sqlx::query_as::<ComplianceAuditTrail, _>(
             "SELECT id, product_id, requirement_id, action_type, previous_status, new_status, action_details, performed_at, performed_by, ip_address, user_agent FROM compliance_audit_trail WHERE product_id = $1 ORDER BY performed_at DESC LIMIT $2",
         )
@@ -379,18 +421,21 @@ impl RegulatoryService {
     }
 
     // Compliance Reports
-    pub async fn generate_report(&self, report: NewComplianceReport) -> Result<ComplianceReport, sqlx::Error> {
+    pub async fn generate_report(
+        &self,
+        report: NewComplianceReport,
+    ) -> Result<ComplianceReport, sqlx::Error> {
         let report_id = format!("RPT-{}", Uuid::new_v4());
-        
+
         // Calculate report data based on scope
         let scope = &report.scope;
         let report_data = self.calculate_report_data(scope).await?;
-        
+
         let total = report_data["total_products"].as_i64().unwrap_or(0) as i32;
         let compliant = report_data["compliant"].as_i64().unwrap_or(0) as i32;
         let non_compliant = report_data["non_compliant"].as_i64().unwrap_or(0) as i32;
         let pending = report_data["pending"].as_i64().unwrap_or(0) as i32;
-        
+
         let compliance_rate = if total > 0 {
             Some((compliant as f64 / total as f64 * 100.0).into())
         } else {
@@ -426,7 +471,10 @@ impl RegulatoryService {
         .await
     }
 
-    async fn calculate_report_data(&self, scope: &serde_json::Value) -> Result<serde_json::Value, sqlx::Error> {
+    async fn calculate_report_data(
+        &self,
+        scope: &serde_json::Value,
+    ) -> Result<serde_json::Value, sqlx::Error> {
         // Simple aggregation based on scope
         let result = sqlx::query(
             r#"
@@ -437,7 +485,7 @@ impl RegulatoryService {
                 SUM(CASE WHEN pc.status = 'pending' THEN 1 ELSE 0 END) as pending
             FROM product_compliance pc
             WHERE pc.last_checked_at IS NOT NULL
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -451,7 +499,10 @@ impl RegulatoryService {
         }))
     }
 
-    pub async fn get_report(&self, report_id: &str) -> Result<Option<ComplianceReport>, sqlx::Error> {
+    pub async fn get_report(
+        &self,
+        report_id: &str,
+    ) -> Result<Option<ComplianceReport>, sqlx::Error> {
         sqlx::query_as::<ComplianceReport, _>(
             "SELECT id, report_id, report_type, scope, generated_at, generated_by, period_start, period_end, total_products_checked, compliant_count, non_compliant_count, pending_count, compliance_rate, report_data, status FROM compliance_reports WHERE report_id = $1",
         )

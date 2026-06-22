@@ -1,9 +1,9 @@
+use crate::database::UserRepository;
+use crate::models::{AppError, NewUser, User, UserRole};
 use async_trait::async_trait;
+use bcrypt::{hash, DEFAULT_COST};
 use sqlx::PgPool;
 use uuid::Uuid;
-use bcrypt::{hash, DEFAULT_COST};
-use crate::database::UserRepository;
-use crate::models::{User, NewUser, UserRole, AppError};
 
 pub struct UserService {
     pub(crate) pool: PgPool,
@@ -12,7 +12,10 @@ pub struct UserService {
 
 impl UserService {
     pub fn new(pool: PgPool, encryption_key: String) -> Self {
-        Self { pool, encryption_key }
+        Self {
+            pool,
+            encryption_key,
+        }
     }
 
     pub async fn hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
@@ -104,7 +107,10 @@ impl UserRepository for UserService {
         Ok(user)
     }
 
-    async fn get_user_by_stellar_address(&self, address: &str) -> Result<Option<User>, sqlx::Error> {
+    async fn get_user_by_stellar_address(
+        &self,
+        address: &str,
+    ) -> Result<Option<User>, sqlx::Error> {
         let encrypted_address = crate::utils::crypto::encrypt(address, &self.encryption_key)
             .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
 

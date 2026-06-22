@@ -6,8 +6,8 @@ use crate::error::AppError;
 use crate::models::carbon::{
     CalculateFootprintRequest, CarbonCredit, CarbonFootprint, CarbonReport, CarbonTrade,
     CarbonVerification, CreateTradeRequest, FootprintBreakdown, GenerateCreditRequest,
-    GenerateReportRequest, ListCreditsQuery, ListTradesQuery, MarketSummary,
-    PurchaseCreditRequest, RequestVerificationRequest, RetireCreditRequest,
+    GenerateReportRequest, ListCreditsQuery, ListTradesQuery, MarketSummary, PurchaseCreditRequest,
+    RequestVerificationRequest, RetireCreditRequest,
 };
 use crate::services::carbon_calculator;
 
@@ -289,10 +289,12 @@ impl CarbonService {
         .await?;
 
         // Mark credit as listed
-        sqlx::query("UPDATE carbon_credits SET status = 'listed', updated_at = NOW() WHERE id = $1")
-            .bind(req.credit_id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE carbon_credits SET status = 'listed', updated_at = NOW() WHERE id = $1",
+        )
+        .bind(req.credit_id)
+        .execute(&self.pool)
+        .await?;
 
         Ok(trade)
     }
@@ -312,10 +314,14 @@ impl CarbonService {
         .ok_or_else(|| AppError::NotFound("Trade not found".into()))?;
 
         if trade.status != "open" {
-            return Err(AppError::Validation("Trade is not open for purchase".into()));
+            return Err(AppError::Validation(
+                "Trade is not open for purchase".into(),
+            ));
         }
         if trade.seller_id == buyer_id {
-            return Err(AppError::Validation("Cannot purchase your own listing".into()));
+            return Err(AppError::Validation(
+                "Cannot purchase your own listing".into(),
+            ));
         }
         if req.quantity <= 0.0 || req.quantity > trade.quantity {
             return Err(AppError::Validation(
@@ -404,7 +410,7 @@ impl CarbonService {
                 COALESCE(SUM(total_amount), 0)       AS total_volume,
                 COUNT(*) FILTER (WHERE status = 'open') AS open_trades
             FROM carbon_trades
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -636,7 +642,7 @@ impl CarbonService {
                 COALESCE(SUM(emissions_reduction), 0) as total_reductions,
                 AVG(reduction_percentage) as avg_reduction
             FROM carbon_footprints
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -647,7 +653,7 @@ impl CarbonService {
                 COALESCE(SUM(quantity) FILTER (WHERE status = 'retired'), 0) AS retired_credits,
                 COALESCE(SUM(quantity) FILTER (WHERE status = 'listed'), 0) AS listed_credits
             FROM carbon_credits
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -660,7 +666,7 @@ impl CarbonService {
             GROUP BY p.owner_address
             ORDER BY avg_reduction DESC NULLS LAST
             LIMIT 5
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -677,12 +683,21 @@ impl CarbonService {
             }));
         }
 
-        let total_emissions: f64 = emissions.get::<sqlx::types::BigDecimal, _>("total_emissions").to_string().parse().unwrap_or(0.0);
-        let total_reductions: f64 = emissions.get::<sqlx::types::BigDecimal, _>("total_reductions").to_string().parse().unwrap_or(0.0);
-        let avg_reduction: f64 = match emissions.get::<Option<sqlx::types::BigDecimal>, _>("avg_reduction") {
-            Some(v) => v.to_string().parse().unwrap_or(0.0),
-            None => 0.0,
-        };
+        let total_emissions: f64 = emissions
+            .get::<sqlx::types::BigDecimal, _>("total_emissions")
+            .to_string()
+            .parse()
+            .unwrap_or(0.0);
+        let total_reductions: f64 = emissions
+            .get::<sqlx::types::BigDecimal, _>("total_reductions")
+            .to_string()
+            .parse()
+            .unwrap_or(0.0);
+        let avg_reduction: f64 =
+            match emissions.get::<Option<sqlx::types::BigDecimal>, _>("avg_reduction") {
+                Some(v) => v.to_string().parse().unwrap_or(0.0),
+                None => 0.0,
+            };
 
         Ok(serde_json::json!({
             "metrics": {
@@ -696,7 +711,6 @@ impl CarbonService {
         }))
     }
 }
-
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

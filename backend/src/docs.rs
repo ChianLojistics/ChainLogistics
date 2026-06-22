@@ -2,12 +2,14 @@ use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::handlers::{
-    product::{ProductResponse, PaginatedProductsResponse, CreateProductRequest, UpdateProductRequest},
-    event::{EventResponse, PaginatedEventsResponse, CreateEventRequest, ListEventsQuery},
-    auth::{LoginRequest, RegisterRequest, AuthResponse},
-    api_keys::{CreateApiKeyRequest, ApiKeyCreatedResponse, ApiKeyResponse},
-    financial::{CreateTransactionRequest, CreateInvoiceRequest, FinancingRequestBody},
+    api_keys::{ApiKeyCreatedResponse, ApiKeyResponse, CreateApiKeyRequest},
+    auth::{AuthResponse, LoginRequest, RegisterRequest},
     compliance::{ComplianceCheckRequest, ComplianceReportResponse},
+    event::{CreateEventRequest, EventResponse, ListEventsQuery, PaginatedEventsResponse},
+    financial::{CreateInvoiceRequest, CreateTransactionRequest, FinancingRequestBody},
+    product::{
+        CreateProductRequest, PaginatedProductsResponse, ProductResponse, UpdateProductRequest,
+    },
 };
 
 #[derive(OpenApi)]
@@ -135,13 +137,11 @@ use crate::handlers::{
 pub struct ApiDoc;
 
 pub fn create_swagger_ui() -> SwaggerUi {
-    SwaggerUi::new("/swagger-ui")
-        .url("/api-docs/openapi.json", ApiDoc::openapi())
+    SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi())
 }
 
 // API Key security scheme
 #[derive(utoipa::ToSchema)]
 pub struct ApiKeyAuth {
-    #[schema(description = "API key for authentication")]
     api_key: String,
 }

@@ -10,8 +10,8 @@ use uuid::Uuid;
 use crate::{
     error::AppError,
     models::digital_twin::*,
+    validation::{sanitize_input, validate_string},
     AppState,
-    validation::{validate_string, sanitize_input},
 };
 
 /// Create a new digital twin
@@ -21,14 +21,11 @@ pub async fn create_digital_twin(
 ) -> Result<impl IntoResponse, AppError> {
     validate_string("name", &request.name, 128)?;
     validate_string("description", &request.description, 1024)?;
-    
+
     request.name = sanitize_input(&request.name);
     request.description = sanitize_input(&request.description);
 
-    let twin = state
-        .digital_twin_service
-        .create_twin(request)
-        .await?;
+    let twin = state.digital_twin_service.create_twin(request).await?;
 
     Ok((StatusCode::CREATED, Json(twin)))
 }
@@ -38,10 +35,7 @@ pub async fn get_digital_twin(
     State(state): State<AppState>,
     Path(twin_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
-    let twin = state
-        .digital_twin_service
-        .get_twin(twin_id)
-        .await?;
+    let twin = state.digital_twin_service.get_twin(twin_id).await?;
 
     Ok(Json(twin))
 }
@@ -141,10 +135,7 @@ pub async fn list_simulations(
     State(state): State<AppState>,
     Path(twin_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
-    let simulations = state
-        .digital_twin_service
-        .list_simulations(twin_id)
-        .await?;
+    let simulations = state.digital_twin_service.list_simulations(twin_id).await?;
 
     Ok(Json(simulations))
 }

@@ -1,5 +1,5 @@
-use crate::models::digital_twin::*;
 use crate::error::AppError;
+use crate::models::digital_twin::*;
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -45,13 +45,11 @@ impl DigitalTwinService {
 
     /// Get digital twin by ID
     pub async fn get_twin(&self, twin_id: Uuid) -> Result<DigitalTwin, AppError> {
-        let twin = sqlx::query_as::<_, DigitalTwin>(
-            "SELECT * FROM digital_twins WHERE id = $1"
-        )
-        .bind(twin_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| AppError::NotFound(format!("Digital twin not found: {}", e)))?;
+        let twin = sqlx::query_as::<_, DigitalTwin>("SELECT * FROM digital_twins WHERE id = $1")
+            .bind(twin_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| AppError::NotFound(format!("Digital twin not found: {}", e)))?;
 
         Ok(twin)
     }
@@ -121,7 +119,7 @@ impl DigitalTwinService {
         limit: i64,
     ) -> Result<Vec<TwinState>, AppError> {
         let states = sqlx::query_as::<_, TwinState>(
-            "SELECT * FROM twin_states WHERE twin_id = $1 ORDER BY timestamp DESC LIMIT $2"
+            "SELECT * FROM twin_states WHERE twin_id = $1 ORDER BY timestamp DESC LIMIT $2",
         )
         .bind(twin_id)
         .bind(limit)
@@ -164,31 +162,24 @@ impl DigitalTwinService {
     }
 
     /// Run a simulation (simplified implementation)
-    pub async fn run_simulation(
-        &self,
-        simulation_id: Uuid,
-    ) -> Result<SimulationResult, AppError> {
+    pub async fn run_simulation(&self, simulation_id: Uuid) -> Result<SimulationResult, AppError> {
         let start_time = Utc::now();
 
         // Update status to running
-        sqlx::query(
-            "UPDATE simulations SET status = $1, started_at = $2 WHERE id = $3"
-        )
-        .bind(SimulationStatus::Running)
-        .bind(start_time)
-        .bind(simulation_id)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        sqlx::query("UPDATE simulations SET status = $1, started_at = $2 WHERE id = $3")
+            .bind(SimulationStatus::Running)
+            .bind(start_time)
+            .bind(simulation_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         // Get simulation details
-        let simulation = sqlx::query_as::<_, Simulation>(
-            "SELECT * FROM simulations WHERE id = $1"
-        )
-        .bind(simulation_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        let simulation = sqlx::query_as::<_, Simulation>("SELECT * FROM simulations WHERE id = $1")
+            .bind(simulation_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         // Perform simulation based on type
         let results = self.execute_simulation(&simulation).await?;
@@ -229,13 +220,16 @@ impl DigitalTwinService {
     ) -> Result<serde_json::Value, AppError> {
         match simulation.simulation_type {
             SimulationType::RouteOptimization => {
-                self.simulate_route_optimization(&simulation.parameters).await
+                self.simulate_route_optimization(&simulation.parameters)
+                    .await
             }
             SimulationType::DemandForecasting => {
-                self.simulate_demand_forecasting(&simulation.parameters).await
+                self.simulate_demand_forecasting(&simulation.parameters)
+                    .await
             }
             SimulationType::InventoryOptimization => {
-                self.simulate_inventory_optimization(&simulation.parameters).await
+                self.simulate_inventory_optimization(&simulation.parameters)
+                    .await
             }
             SimulationType::RiskAssessment => {
                 self.simulate_risk_assessment(&simulation.parameters).await
@@ -244,7 +238,8 @@ impl DigitalTwinService {
                 self.simulate_cost_analysis(&simulation.parameters).await
             }
             SimulationType::TimelineProjection => {
-                self.simulate_timeline_projection(&simulation.parameters).await
+                self.simulate_timeline_projection(&simulation.parameters)
+                    .await
             }
         }
     }
@@ -521,24 +516,19 @@ impl DigitalTwinService {
 
     /// Get simulation by ID
     pub async fn get_simulation(&self, simulation_id: Uuid) -> Result<Simulation, AppError> {
-        let simulation = sqlx::query_as::<_, Simulation>(
-            "SELECT * FROM simulations WHERE id = $1"
-        )
-        .bind(simulation_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| AppError::NotFound(format!("Simulation not found: {}", e)))?;
+        let simulation = sqlx::query_as::<_, Simulation>("SELECT * FROM simulations WHERE id = $1")
+            .bind(simulation_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| AppError::NotFound(format!("Simulation not found: {}", e)))?;
 
         Ok(simulation)
     }
 
     /// List simulations for a twin
-    pub async fn list_simulations(
-        &self,
-        twin_id: Uuid,
-    ) -> Result<Vec<Simulation>, AppError> {
+    pub async fn list_simulations(&self, twin_id: Uuid) -> Result<Vec<Simulation>, AppError> {
         let simulations = sqlx::query_as::<_, Simulation>(
-            "SELECT * FROM simulations WHERE twin_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM simulations WHERE twin_id = $1 ORDER BY created_at DESC",
         )
         .bind(twin_id)
         .fetch_all(&self.pool)
@@ -588,54 +578,39 @@ impl DigitalTwinService {
         request: &PredictionRequest,
     ) -> Result<serde_json::Value, AppError> {
         match request.prediction_type {
-            PredictionType::ArrivalTime => {
-                Ok(serde_json::json!({
-                    "estimated_arrival": "2024-03-20T14:30:00Z",
-                    "variance_hours": 2
-                }))
-            }
-            PredictionType::Delay => {
-                Ok(serde_json::json!({
-                    "delay_probability": 0.25,
-                    "expected_delay_hours": 3
-                }))
-            }
-            PredictionType::QualityIssue => {
-                Ok(serde_json::json!({
-                    "issue_probability": 0.15,
-                    "risk_factors": ["temperature", "humidity"]
-                }))
-            }
-            PredictionType::DemandSpike => {
-                Ok(serde_json::json!({
-                    "spike_probability": 0.60,
-                    "expected_increase_percent": 25
-                }))
-            }
-            PredictionType::SupplyDisruption => {
-                Ok(serde_json::json!({
-                    "disruption_probability": 0.20,
-                    "severity": "medium"
-                }))
-            }
-            PredictionType::CostOverrun => {
-                Ok(serde_json::json!({
-                    "overrun_probability": 0.30,
-                    "expected_overrun_percent": 10
-                }))
-            }
+            PredictionType::ArrivalTime => Ok(serde_json::json!({
+                "estimated_arrival": "2024-03-20T14:30:00Z",
+                "variance_hours": 2
+            })),
+            PredictionType::Delay => Ok(serde_json::json!({
+                "delay_probability": 0.25,
+                "expected_delay_hours": 3
+            })),
+            PredictionType::QualityIssue => Ok(serde_json::json!({
+                "issue_probability": 0.15,
+                "risk_factors": ["temperature", "humidity"]
+            })),
+            PredictionType::DemandSpike => Ok(serde_json::json!({
+                "spike_probability": 0.60,
+                "expected_increase_percent": 25
+            })),
+            PredictionType::SupplyDisruption => Ok(serde_json::json!({
+                "disruption_probability": 0.20,
+                "severity": "medium"
+            })),
+            PredictionType::CostOverrun => Ok(serde_json::json!({
+                "overrun_probability": 0.30,
+                "expected_overrun_percent": 10
+            })),
         }
     }
 
     /// Get twin analytics
-    pub async fn get_twin_analytics(
-        &self,
-        twin_id: Uuid,
-    ) -> Result<TwinAnalytics, AppError> {
+    pub async fn get_twin_analytics(&self, twin_id: Uuid) -> Result<TwinAnalytics, AppError> {
         let metrics = self.calculate_twin_metrics(twin_id).await?;
-        
+
         let recent_predictions = sqlx::query_as::<_, Prediction>(
-            "SELECT * FROM predictions WHERE twin_id = $1 ORDER BY created_at DESC LIMIT 5"
+            "SELECT * FROM predictions WHERE twin_id = $1 ORDER BY created_at DESC LIMIT 5",
         )
         .bind(twin_id)
         .fetch_all(&self.pool)
@@ -650,21 +625,19 @@ impl DigitalTwinService {
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let simulation_count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM simulations WHERE twin_id = $1"
-        )
-        .bind(twin_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        let simulation_count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM simulations WHERE twin_id = $1")
+                .bind(twin_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let state_history_count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM twin_states WHERE twin_id = $1"
-        )
-        .bind(twin_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        let state_history_count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM twin_states WHERE twin_id = $1")
+                .bind(twin_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         Ok(TwinAnalytics {
             twin_id,

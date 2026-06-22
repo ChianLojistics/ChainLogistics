@@ -1,20 +1,23 @@
 use axum::{
-    extract::{State, Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
-use utoipa::ToSchema;
 
 use crate::{
-    AppState,
     error::AppError,
-    models::{Product, NewProduct, ProductFilters},
-    validation::{validate_string, sanitize_input, validate_stellar_address, validate_product_id, validate_location, sanitize_json_metadata},
+    models::{NewProduct, Product, ProductFilters},
+    validation::{
+        sanitize_input, sanitize_json_metadata, validate_location, validate_product_id,
+        validate_stellar_address, validate_string,
+    },
+    AppState,
 };
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct ListProductsQuery {
     pub offset: Option<i64>,
     pub limit: Option<i64>,
@@ -141,7 +144,8 @@ pub async fn list_products(
     }
 
     let products = if let Some(search_query) = query.search {
-        state.product_service
+        state
+            .product_service
             .search_products(&sanitize_input(&search_query), limit)
             .await?
             .into_iter()
@@ -156,7 +160,8 @@ pub async fn list_products(
             created_before: None,
         };
 
-        state.product_service
+        state
+            .product_service
             .list_products(offset, limit, Some(filters))
             .await?
             .into_iter()
@@ -174,9 +179,7 @@ pub async fn list_products(
             created_after: None,
             created_before: None,
         };
-        state.product_service
-            .count_products(Some(filters))
-            .await?
+        state.product_service.count_products(Some(filters)).await?
     };
 
     Ok(Json(PaginatedProductsResponse {
@@ -213,11 +216,15 @@ pub async fn create_product(
     validate_string("category", &request.category, 64)?;
     validate_location(&request.origin_location)?;
     if request.description.len() > 2048 {
-        return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
+        return Err(AppError::Validation(
+            "description must not exceed 2048 characters".to_string(),
+        ));
     }
 
     // Get auth context
-    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
+    let auth_context = crate::middleware::auth::get_auth_context(
+        &axum::extract::Request::builder().uri("/").body(()).unwrap(),
+    )?;
 
     let new_product = NewProduct {
         id: sanitize_input(&request.id),
@@ -226,8 +233,16 @@ pub async fn create_product(
         origin_location: sanitize_input(&request.origin_location),
         category: sanitize_input(&request.category),
         tags: request.tags.iter().map(|t| sanitize_input(t)).collect(),
-        certifications: request.certifications.iter().map(|c| sanitize_input(c)).collect(),
-        media_hashes: request.media_hashes.iter().map(|m| sanitize_input(m)).collect(),
+        certifications: request
+            .certifications
+            .iter()
+            .map(|c| sanitize_input(c))
+            .collect(),
+        media_hashes: request
+            .media_hashes
+            .iter()
+            .map(|m| sanitize_input(m))
+            .collect(),
         custom_fields: {
             let mut fields = request.custom_fields;
             sanitize_json_metadata(&mut fields);
@@ -297,8 +312,10 @@ pub async fn update_product(
     Path(id): Path<String>,
     Json(request): Json<UpdateProductRequest>,
 ) -> Result<Json<ProductResponse>, AppError> {
-    let auth_context = crate::middleware::auth::get_auth_context(&axum::extract::Request::builder().uri("/").body(()).unwrap())?;
-    
+    let auth_context = crate::middleware::auth::get_auth_context(
+        &axum::extract::Request::builder().uri("/").body(()).unwrap(),
+    )?;
+
     validate_product_id(&id)?;
 
     let mut product = state
@@ -314,7 +331,9 @@ pub async fn update_product(
     }
     if let Some(description) = request.description {
         if description.len() > 2048 {
-            return Err(AppError::Validation("description must not exceed 2048 characters".to_string()));
+            return Err(AppError::Validation(
+                "description must not exceed 2048 characters".to_string(),
+            ));
         }
         product.description = sanitize_input(&description);
     }

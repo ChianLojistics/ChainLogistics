@@ -1,6 +1,6 @@
+use crate::models::{Recall, RecallAffectedItem, RecallEffectiveness, RecallNotification};
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::models::{Recall, RecallAffectedItem, RecallNotification, RecallEffectiveness};
 
 pub struct RecallService {
     pool: PgPool,
