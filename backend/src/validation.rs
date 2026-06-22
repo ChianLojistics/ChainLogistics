@@ -1,9 +1,12 @@
 use crate::error::AppError;
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 lazy_static! {
-    static ref SQL_INJECTION_REGEX: Regex = Regex::new(r"(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|EXECUTE|TRUNCATE|--|\*)").unwrap();
+    static ref SQL_INJECTION_REGEX: Regex = Regex::new(
+        r"(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC|EXECUTE|TRUNCATE|--|\*)"
+    )
+    .unwrap();
     static ref XSS_REGEX: Regex = Regex::new(r"(?i)<script.*?>.*?</script>|on\w+?\s*=").unwrap();
     static ref PRODUCT_ID_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9-_]+$").unwrap();
     static ref LOCATION_REGEX: Regex = Regex::new(r"^[\w\s,.\-']+$").unwrap();
@@ -36,26 +39,30 @@ pub fn validate_string(field: &str, value: &str, max_len: usize) -> Result<(), A
             field, max_len
         )));
     }
-    
+
     // Check for suspicious SQL injection patterns
     if SQL_INJECTION_REGEX.is_match(value) {
-        tracing::warn!("Suspicious SQL injection pattern detected in field {}: {}", field, value);
+        tracing::warn!(
+            "Suspicious SQL injection pattern detected in field {}: {}",
+            field,
+            value
+        );
         return Err(AppError::Validation(format!(
             "Input contains suspicious characters or patterns in field {}",
             field
         )));
     }
-    
+
     Ok(())
 }
 
 /// Robustly sanitizes user input to prevent XSS and other injection attacks.
 pub fn sanitize_input(input: &str) -> String {
     let mut sanitized = input.to_string();
-    
+
     // Remove scripts and event handlers
     sanitized = XSS_REGEX.replace_all(&sanitized, "").to_string();
-    
+
     // Remove HTML tags
     let mut result = String::with_capacity(sanitized.len());
     let mut in_tag = false;
@@ -67,7 +74,7 @@ pub fn sanitize_input(input: &str) -> String {
             _ => {}
         }
     }
-    
+
     // Trim and return
     result.trim().to_string()
 }
@@ -105,10 +112,14 @@ pub fn validate_uuid(uuid: &str) -> Result<(), AppError> {
 /// Validates a Product ID.
 pub fn validate_product_id(id: &str) -> Result<(), AppError> {
     if id.is_empty() || id.len() > 64 {
-        return Err(AppError::Validation("Product ID must be between 1 and 64 characters".to_string()));
+        return Err(AppError::Validation(
+            "Product ID must be between 1 and 64 characters".to_string(),
+        ));
     }
     if !PRODUCT_ID_REGEX.is_match(id) {
-        return Err(AppError::Validation("Product ID contains invalid characters".to_string()));
+        return Err(AppError::Validation(
+            "Product ID contains invalid characters".to_string(),
+        ));
     }
     Ok(())
 }
@@ -116,10 +127,14 @@ pub fn validate_product_id(id: &str) -> Result<(), AppError> {
 /// Validates a location string.
 pub fn validate_location(location: &str) -> Result<(), AppError> {
     if location.is_empty() || location.len() > 256 {
-        return Err(AppError::Validation("Location must be between 1 and 256 characters".to_string()));
+        return Err(AppError::Validation(
+            "Location must be between 1 and 256 characters".to_string(),
+        ));
     }
     if !LOCATION_REGEX.is_match(location) {
-        return Err(AppError::Validation("Location contains invalid characters".to_string()));
+        return Err(AppError::Validation(
+            "Location contains invalid characters".to_string(),
+        ));
     }
     Ok(())
 }

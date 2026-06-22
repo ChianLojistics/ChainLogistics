@@ -7,8 +7,13 @@ use axum::{
 use std::sync::Arc;
 use tower::ServiceExt;
 
-use crate::{AppState, database::{ApiKeyRepository, UserRepository}, error::AppError, models::UserRole};
 use crate::middleware::audit::{correlation_id_from_headers, spawn_http_audit};
+use crate::{
+    database::{ApiKeyRepository, UserRepository},
+    error::AppError,
+    models::UserRole,
+    AppState,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -55,10 +60,13 @@ pub async fn jwt_auth(
     )
     .map_err(|_| AppError::Unauthorized)?;
 
-    let user_id = uuid::Uuid::parse_str(&token_data.claims.sub)
-        .map_err(|_| AppError::Unauthorized)?;
+    let user_id =
+        uuid::Uuid::parse_str(&token_data.claims.sub).map_err(|_| AppError::Unauthorized)?;
 
-    let user = state.user_service.get_user(user_id).await?
+    let user = state
+        .user_service
+        .get_user(user_id)
+        .await?
         .ok_or_else(|| AppError::Unauthorized)?;
 
     if !user.is_active {
@@ -164,7 +172,14 @@ pub async fn api_key_auth(
     Ok(response)
 }
 
-pub fn require_role(roles: Vec<UserRole>) -> impl Fn(Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, AppError>> + Send>> + Clone {
+pub fn require_role(
+    roles: Vec<UserRole>,
+) -> impl Fn(
+    Request,
+    Next,
+)
+    -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, AppError>> + Send>>
+       + Clone {
     move |request: Request, next: Next| {
         let roles = roles.clone();
         Box::pin(async move {
@@ -173,7 +188,10 @@ pub fn require_role(roles: Vec<UserRole>) -> impl Fn(Request, Next) -> std::pin:
                 .get::<AuthContext>()
                 .ok_or_else(|| AppError::Unauthorized)?;
 
-            if !roles.iter().any(|r| std::mem::discriminant(r) == std::mem::discriminant(&auth_context.role)) {
+            if !roles
+                .iter()
+                .any(|r| std::mem::discriminant(r) == std::mem::discriminant(&auth_context.role))
+            {
                 return Err(AppError::Forbidden("Insufficient permissions".to_string()));
             }
 
@@ -182,10 +200,7 @@ pub fn require_role(roles: Vec<UserRole>) -> impl Fn(Request, Next) -> std::pin:
     }
 }
 
-pub async fn require_admin(
-    request: Request,
-    next: Next,
-) -> Result<Response, AppError> {
+pub async fn require_admin(request: Request, next: Next) -> Result<Response, AppError> {
     let auth_context = request
         .extensions()
         .get::<AuthContext>()

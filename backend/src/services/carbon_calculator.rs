@@ -58,10 +58,7 @@ pub fn calculate(req: &CalculateFootprintRequest) -> FootprintBreakdown {
     // Manufacturing: estimated from weight using a generic factor (0.5 kg CO2e/kg)
     let manufacturing = weight_kg * 0.5;
 
-    let packaging = calculate_packaging(
-        req.packaging_type.as_deref(),
-        weight_kg,
-    );
+    let packaging = calculate_packaging(req.packaging_type.as_deref(), weight_kg);
 
     let storage = calculate_storage(
         req.storage_hours.unwrap_or(0.0),

@@ -1,7 +1,7 @@
 pub mod config;
-pub mod types;
 pub mod provider;
+pub mod types;
 
 pub use config::BlockchainConfig;
-pub use types::{BlockchainNetwork, Transaction, SmartContractCall};
 pub use provider::BlockchainProvider;
+pub use types::{BlockchainNetwork, SmartContractCall, Transaction};

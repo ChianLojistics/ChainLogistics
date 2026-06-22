@@ -1,8 +1,8 @@
-use sqlx::{PgPool, Pool, Postgres};
-use std::time::Duration;
 use crate::config::DatabaseConfig;
 use crate::models::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use sqlx::{PgPool, Pool, Postgres};
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct Database {
@@ -14,8 +14,9 @@ impl Database {
         let pool = PgPool::connect_with(
             sqlx::postgres::PgConnectOptions::from_str(&config.url)?
                 .acquire_timeout(Duration::from_secs(config.connect_timeout))
-                .idle_timeout(Duration::from_secs(config.idle_timeout))
-        ).await?;
+                .idle_timeout(Duration::from_secs(config.idle_timeout)),
+        )
+        .await?;
 
         // Configure pool size
         pool.set_max_connections(config.max_connections);
@@ -34,9 +35,7 @@ impl Database {
 
     // Health check
     pub async fn health_check(&self) -> Result<(), sqlx::Error> {
-        sqlx::query("SELECT 1")
-            .fetch_one(&self.pool)
-            .await?;
+        sqlx::query("SELECT 1").fetch_one(&self.pool).await?;
         Ok(())
     }
 }
@@ -76,7 +75,10 @@ pub trait EventRepository {
         offset: i64,
         limit: i64,
     ) -> Result<Vec<TrackingEvent>, sqlx::Error>;
-    async fn get_product_stats(&self, product_id: &str) -> Result<Option<ProductStats>, sqlx::Error>;
+    async fn get_product_stats(
+        &self,
+        product_id: &str,
+    ) -> Result<Option<ProductStats>, sqlx::Error>;
     async fn get_global_stats(&self) -> Result<GlobalStats, sqlx::Error>;
 }
 
@@ -85,7 +87,8 @@ pub trait UserRepository {
     async fn create_user(&self, user: NewUser) -> Result<User, sqlx::Error>;
     async fn get_user(&self, id: Uuid) -> Result<Option<User>, sqlx::Error>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
-    async fn get_user_by_stellar_address(&self, address: &str) -> Result<Option<User>, sqlx::Error>;
+    async fn get_user_by_stellar_address(&self, address: &str)
+        -> Result<Option<User>, sqlx::Error>;
     async fn update_user(&self, id: Uuid, user: User) -> Result<User, sqlx::Error>;
     async fn update_last_login(&self, id: Uuid) -> Result<(), sqlx::Error>;
 }

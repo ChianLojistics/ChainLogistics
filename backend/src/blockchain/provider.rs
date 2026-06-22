@@ -1,4 +1,4 @@
-use crate::blockchain::{BlockchainNetwork, Transaction, SmartContractCall};
+use crate::blockchain::{BlockchainNetwork, SmartContractCall, Transaction};
 use async_trait::async_trait;
 
 #[async_trait]

@@ -13,6 +13,7 @@ mod storage_contract;
 mod types;
 mod validation;
 mod validation_contract;
+mod verifier;
 
 // Architecture: Modular Contract Design
 //

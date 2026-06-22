@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::IntoParams;
 use uuid::Uuid;
 
 // ── DB row types ──────────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ pub struct GenerateReportRequest {
     pub period_end: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct ListTradesQuery {
     pub status: Option<String>,
     pub trade_type: Option<String>,
@@ -182,7 +183,7 @@ pub struct ListTradesQuery {
     pub limit: Option<i64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct ListCreditsQuery {
     pub status: Option<String>,
     pub vintage_year: Option<i32>,

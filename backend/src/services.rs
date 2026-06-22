@@ -22,8 +22,8 @@ pub use financial::FinancialService;
 pub mod analytics_service;
 pub use analytics_service::AnalyticsService;
 
-pub mod carbon_calculator;
 pub mod carbon;
+pub mod carbon_calculator;
 pub use carbon::CarbonService;
 
 pub mod audit_service;
@@ -36,7 +36,7 @@ pub mod collaboration;
 pub use collaboration::CollaborationService;
 
 pub mod batch_service;
-pub use batch_service::{BatchService, BatchRepository};
+pub use batch_service::{BatchRepository, BatchService};
 
 pub mod supplier_service;
 pub use supplier_service::SupplierService;

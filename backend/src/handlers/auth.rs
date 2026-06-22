@@ -1,10 +1,21 @@
+use crate::{
+    database::UserRepository,
+    error::AppError,
+    middleware::{
+        audit::{client_ip_from_headers, correlation_id_from_headers, user_agent_from_headers},
+        auth::Claims,
+    },
+    models::{NewUser, User, UserRole},
+    services::audit_service::{AuditEventCategory, AuditSeverity, NewAuditEvent},
+    validation::{validate_email, validate_string},
+    AppState,
+};
 use axum::{extract::State, http::HeaderMap, Json};
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
-use crate::{AppState, database::UserRepository, error::AppError, models::{UserRole, NewUser, User}, middleware::{audit::{client_ip_from_headers, correlation_id_from_headers, user_agent_from_headers}, auth::Claims}, services::audit_service::{AuditEventCategory, AuditSeverity, NewAuditEvent}, validation::{validate_email, validate_string}};
 use bcrypt::verify;
-use jsonwebtoken::{encode, Header, EncodingKey};
+use jsonwebtoken::{encode, EncodingKey, Header};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -136,9 +147,17 @@ fn spawn_login_audit(
         correlation_id: correlation_id_from_headers(&headers),
         user_id,
         actor_api_key_id: None,
-        event_category: if success { AuditEventCategory::AuthEvent } else { AuditEventCategory::SecurityEvent },
+        event_category: if success {
+            AuditEventCategory::AuthEvent
+        } else {
+            AuditEventCategory::SecurityEvent
+        },
         event_type: "login".to_string(),
-        severity: if success { AuditSeverity::Info } else { AuditSeverity::Warn },
+        severity: if success {
+            AuditSeverity::Info
+        } else {
+            AuditSeverity::Warn
+        },
         action: "admin_login".to_string(),
         resource_type: Some("auth".to_string()),
         target_resource_id: user_id.map(|id| id.to_string()),
@@ -146,7 +165,11 @@ fn spawn_login_audit(
         http_path: Some("/api/v1/admin/auth/login".to_string()),
         http_status: Some(if success { 200 } else { 401 }),
         success,
-        error_code: if success { None } else { Some("UNAUTHORIZED".to_string()) },
+        error_code: if success {
+            None
+        } else {
+            Some("UNAUTHORIZED".to_string())
+        },
         business_context: None,
         changes: serde_json::json!({ "email_hash": hash_audit_email(&email) }),
         ip_address: client_ip_from_headers(&headers),
