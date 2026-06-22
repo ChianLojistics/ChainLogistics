@@ -11,6 +11,8 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 mod blockchain;
 mod compliance;
+#[cfg(test)]
+mod tests;
 mod config;
 mod database;
 mod docs;
@@ -31,8 +33,9 @@ use error::AppError;
 use monitoring::MonitoringSystem;
 use services::{
     AnalyticsService, ApiKeyService, AuditService, BatchService, CarbonService,
-    CollaborationService, EventService, FinancialService, IoTService, ProductService,
-    QualityService, RecallService, RegulatoryService, SupplierService, SyncService, UserService,
+    CollaborationService, EventService, FinancialService, IoTService, PredictiveRoutingService,
+    ProductService, QualityService, RecallService, RegulatoryService, SupplierService,
+    SyncService, UserService,
 };
 use utils::CronService;
 
@@ -55,6 +58,7 @@ pub struct AppState {
     pub iot_service: Arc<IoTService>,
     pub quality_service: Arc<QualityService>,
     pub supplier_service: Arc<SupplierService>,
+    pub predictive_routing_service: Arc<PredictiveRoutingService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -97,6 +101,8 @@ impl AppState {
         let iot_service = Arc::new(IoTService::new(db.pool().clone()));
         let quality_service = Arc::new(QualityService::new(db.pool().clone()));
         let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
+        let predictive_routing_service =
+            Arc::new(PredictiveRoutingService::new(db.pool().clone()));
 
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
@@ -119,6 +125,7 @@ impl AppState {
             iot_service,
             quality_service,
             supplier_service,
+            predictive_routing_service,
             redis_client,
             config,
             monitoring_system,

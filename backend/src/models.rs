@@ -9,6 +9,7 @@ pub mod batch;
 pub mod carbon;
 pub mod collaboration;
 pub mod digital_twin;
+pub mod predictive_routing;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Product {

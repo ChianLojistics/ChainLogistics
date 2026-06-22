@@ -18,6 +18,7 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/keys", key_management_routes())
         .nest("/api/v1/monitoring", monitoring_routes())
         .nest("/api/v1/collaboration", collaboration_routes())
+        .nest("/api/v1/routing", routing_routes())
 }
 
 fn public_api_routes() -> Router<AppState> {
@@ -298,6 +299,30 @@ fn collaboration_routes() -> Router<AppState> {
             get(crate::handlers::collaboration::list_audit_trail),
         )
         .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(
+            crate::middleware::rate_limit::rate_limit_middleware,
+        ))
+}
+
+fn routing_routes() -> Router<AppState> {
+    use crate::handlers::predictive_routing as pr;
+    Router::new()
+        // Shipment registration
+        .route("/shipments", post(pr::create_shipment_route))
+        // On-demand scoring
+        .route("/shipments/:id/score", get(pr::score_shipment))
+        .route("/shipments/:id/position", put(pr::update_position))
+        // Bulk scoring (for cron jobs)
+        .route("/score-all", post(pr::score_all))
+        // Latest scores across all shipments
+        .route("/scores", get(pr::list_anomaly_scores))
+        // Alert management
+        .route("/alerts", get(pr::list_alerts))
+        .route("/alerts/:id/acknowledge", post(pr::acknowledge_alert))
+        .route("/alerts/:id/resolve", post(pr::resolve_alert))
+        // Training data export (federated-learning compatible)
+        .route("/export", post(pr::export_training_data))
+        .layer(middleware::from_fn(api_key_auth))
         .layer(middleware::from_fn(
             crate::middleware::rate_limit::rate_limit_middleware,
         ))
