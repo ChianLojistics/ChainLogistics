@@ -29,8 +29,7 @@ impl CarbonService {
     ) -> Result<CarbonFootprint, AppError> {
         let breakdown = carbon_calculator::calculate(req);
 
-        let record = sqlx::query_as!(
-            CarbonFootprint,
+        let record = sqlx::query_as::<CarbonFootprint, _>(
             r#"
             INSERT INTO carbon_footprints (
                 product_id, tracking_event_id, calculation_method,
@@ -44,23 +43,28 @@ impl CarbonService {
                 $8, $9, $10,
                 $11, $12, $13, $14
             )
-            RETURNING *
+            RETURNING
+                id, product_id, tracking_event_id, calculation_method,
+                transport_emissions, manufacturing_emissions, packaging_emissions,
+                storage_emissions, total_emissions,
+                baseline_emissions, emissions_reduction, reduction_percentage,
+                distance_km, transport_mode, energy_source, raw_data, calculated_at
             "#,
-            req.product_id,
-            req.tracking_event_id,
-            breakdown.transport_emissions,
-            breakdown.manufacturing_emissions,
-            breakdown.packaging_emissions,
-            breakdown.storage_emissions,
-            breakdown.total_emissions,
-            req.baseline_emissions,
-            breakdown.emissions_reduction,
-            breakdown.reduction_percentage,
-            req.distance_km,
-            req.transport_mode,
-            req.energy_source,
-            serde_json::to_value(req).unwrap_or_default(),
         )
+        .bind(req.product_id.clone())
+        .bind(req.tracking_event_id)
+        .bind(breakdown.transport_emissions)
+        .bind(breakdown.manufacturing_emissions)
+        .bind(breakdown.packaging_emissions)
+        .bind(breakdown.storage_emissions)
+        .bind(breakdown.total_emissions)
+        .bind(req.baseline_emissions)
+        .bind(breakdown.emissions_reduction)
+        .bind(breakdown.reduction_percentage)
+        .bind(req.distance_km)
+        .bind(req.transport_mode.clone())
+        .bind(req.energy_source.clone())
+        .bind(serde_json::to_value(req).unwrap_or_default())
         .fetch_one(&self.pool)
         .await?;
 
@@ -72,11 +76,10 @@ impl CarbonService {
         &self,
         product_id: &str,
     ) -> Result<Vec<CarbonFootprint>, AppError> {
-        let records = sqlx::query_as!(
-            CarbonFootprint,
-            "SELECT * FROM carbon_footprints WHERE product_id = $1 ORDER BY calculated_at DESC",
-            product_id
+        let records = sqlx::query_as::<CarbonFootprint, _>(
+            "SELECT id, product_id, tracking_event_id, calculation_method, transport_emissions, manufacturing_emissions, packaging_emissions, storage_emissions, total_emissions, baseline_emissions, emissions_reduction, reduction_percentage, distance_km, transport_mode, energy_source, raw_data, calculated_at FROM carbon_footprints WHERE product_id = $1 ORDER BY calculated_at DESC",
         )
+        .bind(product_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(records)
@@ -96,11 +99,10 @@ impl CarbonService {
         req: &GenerateCreditRequest,
     ) -> Result<CarbonCredit, AppError> {
         // Fetch the footprint to validate eligible credits
-        let footprint = sqlx::query_as!(
-            CarbonFootprint,
-            "SELECT * FROM carbon_footprints WHERE id = $1",
-            req.footprint_id
+        let footprint = sqlx::query_as::<CarbonFootprint, _>(
+            "SELECT id, product_id, tracking_event_id, calculation_method, transport_emissions, manufacturing_emissions, packaging_emissions, storage_emissions, total_emissions, baseline_emissions, emissions_reduction, reduction_percentage, distance_km, transport_mode, energy_source, raw_data, calculated_at FROM carbon_footprints WHERE id = $1",
         )
+        .bind(req.footprint_id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| AppError::NotFound("Footprint record not found".into()))?;
@@ -127,8 +129,7 @@ impl CarbonService {
         let credit_type = req.credit_type.as_deref().unwrap_or("verified_reduction");
         let standard = req.standard.as_deref().unwrap_or("GHG_PROTOCOL");
 
-        let credit = sqlx::query_as!(
-            CarbonCredit,
+        let credit = sqlx::query_as::<CarbonCredit, _>(
             r#"
             INSERT INTO carbon_credits (
                 owner_id, product_id, serial_number, vintage_year,
@@ -139,19 +140,22 @@ impl CarbonService {
                 $5, $6, $7, $8,
                 'pending', $9, $10
             )
-            RETURNING *
+            RETURNING
+                id, owner_id, product_id, serial_number, vintage_year,
+                credit_type, standard, quantity, price_per_tonne,
+                status, registry_id, verification_body, retired_at, retirement_reason, created_at, updated_at
             "#,
-            owner_id,
-            req.product_id,
-            serial,
-            req.vintage_year,
-            credit_type,
-            standard,
-            breakdown.eligible_credits,
-            req.price_per_tonne,
-            req.registry_id,
-            req.verification_body,
         )
+        .bind(owner_id)
+        .bind(req.product_id.clone())
+        .bind(serial)
+        .bind(req.vintage_year)
+        .bind(credit_type)
+        .bind(standard)
+        .bind(breakdown.eligible_credits)
+        .bind(req.price_per_tonne)
+        .bind(req.registry_id.clone())
+        .bind(req.verification_body.clone())
         .fetch_one(&self.pool)
         .await?;
 
@@ -159,7 +163,8 @@ impl CarbonService {
     }
 
     pub async fn get_credit(&self, id: Uuid) -> Result<CarbonCredit, AppError> {
-        sqlx::query_as!(CarbonCredit, "SELECT * FROM carbon_credits WHERE id = $1", id)
+        sqlx::query_as::<CarbonCredit, _>("SELECT id, owner_id, product_id, serial_number, vintage_year, credit_type, standard, quantity, price_per_tonne, status, registry_id, verification_body, retired_at, retirement_reason, created_at, updated_at FROM carbon_credits WHERE id = $1")
+            .bind(id)
             .fetch_optional(&self.pool)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Credit {} not found", id)))
@@ -173,10 +178,9 @@ impl CarbonService {
         let offset = query.offset.unwrap_or(0);
         let limit = query.limit.unwrap_or(50).min(200);
 
-        let records = sqlx::query_as!(
-            CarbonCredit,
+        let records = sqlx::query_as::<CarbonCredit, _>(
             r#"
-            SELECT * FROM carbon_credits
+            SELECT id, owner_id, product_id, serial_number, vintage_year, credit_type, standard, quantity, price_per_tonne, status, registry_id, verification_body, retired_at, retirement_reason, created_at, updated_at FROM carbon_credits
             WHERE owner_id = $1
               AND ($2::TEXT IS NULL OR status = $2)
               AND ($3::INT IS NULL OR vintage_year = $3)
@@ -184,13 +188,13 @@ impl CarbonService {
             ORDER BY created_at DESC
             LIMIT $5 OFFSET $6
             "#,
-            owner_id,
-            query.status,
-            query.vintage_year,
-            query.standard,
-            limit,
-            offset,
         )
+        .bind(owner_id)
+        .bind(query.status.clone())
+        .bind(query.vintage_year)
+        .bind(query.standard.clone())
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await?;
 
@@ -212,17 +216,19 @@ impl CarbonService {
             return Err(AppError::Validation("Credit is already retired".into()));
         }
 
-        let updated = sqlx::query_as!(
-            CarbonCredit,
+        let updated = sqlx::query_as::<CarbonCredit, _>(
             r#"
             UPDATE carbon_credits
             SET status = 'retired', retired_at = NOW(), retirement_reason = $2, updated_at = NOW()
             WHERE id = $1
-            RETURNING *
+            RETURNING
+                id, owner_id, product_id, serial_number, vintage_year,
+                credit_type, standard, quantity, price_per_tonne,
+                status, registry_id, verification_body, retired_at, retirement_reason, created_at, updated_at
             "#,
-            req.credit_id,
-            req.reason,
         )
+        .bind(req.credit_id)
+        .bind(req.reason.clone())
         .fetch_one(&self.pool)
         .await?;
 
@@ -256,8 +262,7 @@ impl CarbonService {
         let total_amount = req.quantity * req.price_per_tonne;
         let trade_type = req.trade_type.as_deref().unwrap_or("spot");
 
-        let trade = sqlx::query_as!(
-            CarbonTrade,
+        let trade = sqlx::query_as::<CarbonTrade, _>(
             r#"
             INSERT INTO carbon_trades (
                 credit_id, seller_id, quantity, price_per_tonne,
@@ -266,27 +271,28 @@ impl CarbonService {
                 $1, $2, $3, $4,
                 $5, $6, 'open', $7, $8
             )
-            RETURNING *
+            RETURNING
+                id, credit_id, seller_id, buyer_id, quantity, price_per_tonne,
+                total_amount, platform_fee, status, trade_type,
+                settlement_date, notes, expires_at, created_at, updated_at
             "#,
-            req.credit_id,
-            seller_id,
-            req.quantity,
-            req.price_per_tonne,
-            total_amount,
-            trade_type,
-            req.notes,
-            req.expires_at,
         )
+        .bind(req.credit_id)
+        .bind(seller_id)
+        .bind(req.quantity)
+        .bind(req.price_per_tonne)
+        .bind(total_amount)
+        .bind(trade_type)
+        .bind(req.notes.clone())
+        .bind(req.expires_at)
         .fetch_one(&self.pool)
         .await?;
 
         // Mark credit as listed
-        sqlx::query!(
-            "UPDATE carbon_credits SET status = 'listed', updated_at = NOW() WHERE id = $1",
-            req.credit_id
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE carbon_credits SET status = 'listed', updated_at = NOW() WHERE id = $1")
+            .bind(req.credit_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(trade)
     }
@@ -297,11 +303,10 @@ impl CarbonService {
         buyer_id: Uuid,
         req: &PurchaseCreditRequest,
     ) -> Result<CarbonTrade, AppError> {
-        let trade = sqlx::query_as!(
-            CarbonTrade,
-            "SELECT * FROM carbon_trades WHERE id = $1",
-            req.trade_id
+        let trade = sqlx::query_as::<CarbonTrade, _>(
+            "SELECT id, credit_id, seller_id, buyer_id, quantity, price_per_tonne, total_amount, platform_fee, status, trade_type, settlement_date, notes, expires_at, created_at, updated_at FROM carbon_trades WHERE id = $1",
         )
+        .bind(req.trade_id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| AppError::NotFound("Trade not found".into()))?;
@@ -321,33 +326,33 @@ impl CarbonService {
         let total = req.quantity * trade.price_per_tonne;
         let platform_fee = total * 0.025; // 2.5% platform fee
 
-        let settled = sqlx::query_as!(
-            CarbonTrade,
+        let settled = sqlx::query_as::<CarbonTrade, _>(
             r#"
             UPDATE carbon_trades
             SET buyer_id = $2, status = 'settled', quantity = $3,
                 total_amount = $4, platform_fee = $5,
                 settlement_date = NOW(), updated_at = NOW()
             WHERE id = $1
-            RETURNING *
+            RETURNING
+                id, credit_id, seller_id, buyer_id, quantity, price_per_tonne,
+                total_amount, platform_fee, status, trade_type,
+                settlement_date, notes, expires_at, created_at, updated_at
             "#,
-            req.trade_id,
-            buyer_id,
-            req.quantity,
-            total,
-            platform_fee,
         )
+        .bind(req.trade_id)
+        .bind(buyer_id)
+        .bind(req.quantity)
+        .bind(total)
+        .bind(platform_fee)
         .fetch_one(&self.pool)
         .await?;
 
         // Transfer credit ownership
-        sqlx::query!(
-            "UPDATE carbon_credits SET owner_id = $1, status = 'sold', updated_at = NOW() WHERE id = $2",
-            buyer_id,
-            trade.credit_id,
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE carbon_credits SET owner_id = $1, status = 'sold', updated_at = NOW() WHERE id = $2")
+            .bind(buyer_id)
+            .bind(trade.credit_id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(settled)
     }
@@ -359,20 +364,19 @@ impl CarbonService {
         let offset = query.offset.unwrap_or(0);
         let limit = query.limit.unwrap_or(50).min(200);
 
-        let trades = sqlx::query_as!(
-            CarbonTrade,
+        let trades = sqlx::query_as::<CarbonTrade, _>(
             r#"
-            SELECT * FROM carbon_trades
+            SELECT id, credit_id, seller_id, buyer_id, quantity, price_per_tonne, total_amount, platform_fee, status, trade_type, settlement_date, notes, expires_at, created_at, updated_at FROM carbon_trades
             WHERE ($1::TEXT IS NULL OR status = $1)
               AND ($2::TEXT IS NULL OR trade_type = $2)
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
             "#,
-            query.status,
-            query.trade_type,
-            limit,
-            offset,
         )
+        .bind(query.status.clone())
+        .bind(query.trade_type.clone())
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await?;
 
@@ -380,7 +384,7 @@ impl CarbonService {
     }
 
     pub async fn get_market_summary(&self) -> Result<MarketSummary, AppError> {
-        let row = sqlx::query!(
+        let row = sqlx::query(
             r#"
             SELECT
                 COALESCE(SUM(quantity) FILTER (WHERE status NOT IN ('retired','cancelled')), 0) AS total_available,
@@ -393,7 +397,7 @@ impl CarbonService {
         .fetch_one(&self.pool)
         .await?;
 
-        let price_row = sqlx::query!(
+        let price_row = sqlx::query(
             r#"
             SELECT
                 COALESCE(AVG(price_per_tonne), 0)   AS avg_price,
@@ -405,21 +409,20 @@ impl CarbonService {
         .fetch_one(&self.pool)
         .await?;
 
-        let recent_trades = sqlx::query_as!(
-            CarbonTrade,
-            "SELECT * FROM carbon_trades WHERE status = 'settled' ORDER BY updated_at DESC LIMIT 5"
+        let recent_trades = sqlx::query_as::<CarbonTrade, _>(
+            "SELECT id, credit_id, seller_id, buyer_id, quantity, price_per_tonne, total_amount, platform_fee, status, trade_type, settlement_date, notes, expires_at, created_at, updated_at FROM carbon_trades WHERE status = 'settled' ORDER BY updated_at DESC LIMIT 5"
         )
         .fetch_all(&self.pool)
         .await?;
 
         Ok(MarketSummary {
-            total_credits_available: row.total_available.unwrap_or_default(),
-            total_credits_listed: row.total_listed.unwrap_or_default(),
-            total_credits_sold: row.total_sold.unwrap_or_default(),
-            total_credits_retired: row.total_retired.unwrap_or_default(),
-            avg_price_per_tonne: price_row.avg_price.unwrap_or_default(),
-            total_market_volume_usd: price_row.total_volume.unwrap_or_default(),
-            open_trades: price_row.open_trades.unwrap_or(0),
+            total_credits_available: row.get::<f64, _>("total_available"),
+            total_credits_listed: row.get::<f64, _>("total_listed"),
+            total_credits_sold: row.get::<f64, _>("total_sold"),
+            total_credits_retired: row.get::<f64, _>("total_retired"),
+            avg_price_per_tonne: price_row.get::<f64, _>("avg_price"),
+            total_market_volume_usd: price_row.get::<f64, _>("total_volume"),
+            open_trades: price_row.get::<i64, _>("open_trades"),
             recent_trades,
         })
     }
@@ -436,22 +439,24 @@ impl CarbonService {
             return Err(AppError::Forbidden("You do not own this credit".into()));
         }
 
-        let verification = sqlx::query_as!(
-            CarbonVerification,
+        let verification = sqlx::query_as::<CarbonVerification, _>(
             r#"
             INSERT INTO carbon_verifications (
                 credit_id, requested_by, verifier_name,
                 verifier_accreditation, status, methodology, scope
             ) VALUES ($1, $2, $3, $4, 'requested', $5, $6)
-            RETURNING *
+            RETURNING
+                id, credit_id, requested_by, verifier_name,
+                verifier_accreditation, status, verification_date,
+                report_hash, report_url, methodology, scope, created_at, updated_at
             "#,
-            req.credit_id,
-            requester_id,
-            req.verifier_name,
-            req.verifier_accreditation,
-            req.methodology,
-            req.scope,
         )
+        .bind(req.credit_id)
+        .bind(requester_id)
+        .bind(req.verifier_name.clone())
+        .bind(req.verifier_accreditation.clone())
+        .bind(req.methodology.clone())
+        .bind(req.scope.clone())
         .fetch_one(&self.pool)
         .await?;
 
@@ -462,11 +467,10 @@ impl CarbonService {
         &self,
         credit_id: Uuid,
     ) -> Result<Vec<CarbonVerification>, AppError> {
-        let records = sqlx::query_as!(
-            CarbonVerification,
-            "SELECT * FROM carbon_verifications WHERE credit_id = $1 ORDER BY created_at DESC",
-            credit_id
+        let records = sqlx::query_as::<CarbonVerification, _>(
+            "SELECT id, credit_id, requested_by, verifier_name, verifier_accreditation, status, verification_date, report_hash, report_url, methodology, scope, created_at, updated_at FROM carbon_verifications WHERE credit_id = $1 ORDER BY created_at DESC",
         )
+        .bind(credit_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(records)
@@ -480,7 +484,7 @@ impl CarbonService {
         req: &GenerateReportRequest,
     ) -> Result<CarbonReport, AppError> {
         // Aggregate emissions for the period
-        let emissions_row = sqlx::query!(
+        let emissions_row = sqlx::query(
             r#"
             SELECT
                 COALESCE(SUM(cf.total_emissions), 0)    AS total_emissions,
@@ -492,15 +496,15 @@ impl CarbonService {
             )
             AND cf.calculated_at BETWEEN $2 AND $3
             "#,
-            owner_id,
-            req.period_start,
-            req.period_end,
         )
+        .bind(owner_id)
+        .bind(req.period_start)
+        .bind(req.period_end)
         .fetch_one(&self.pool)
         .await?;
 
         // Aggregate credits for the period
-        let credits_row = sqlx::query!(
+        let credits_row = sqlx::query(
             r#"
             SELECT
                 COALESCE(SUM(quantity), 0)                                          AS generated,
@@ -510,14 +514,14 @@ impl CarbonService {
             WHERE owner_id = $1
               AND created_at BETWEEN $2 AND $3
             "#,
-            owner_id,
-            req.period_start,
-            req.period_end,
         )
+        .bind(owner_id)
+        .bind(req.period_start)
+        .bind(req.period_end)
         .fetch_one(&self.pool)
         .await?;
 
-        let revenue_row = sqlx::query!(
+        let revenue_row = sqlx::query(
             r#"
             SELECT COALESCE(SUM(total_amount), 0) AS revenue
             FROM carbon_trades
@@ -525,15 +529,15 @@ impl CarbonService {
               AND status = 'settled'
               AND settlement_date BETWEEN $2 AND $3
             "#,
-            owner_id,
-            req.period_start,
-            req.period_end,
         )
+        .bind(owner_id)
+        .bind(req.period_start)
+        .bind(req.period_end)
         .fetch_one(&self.pool)
         .await?;
 
-        let total_emissions = emissions_row.total_emissions.unwrap_or_default();
-        let total_reductions = emissions_row.total_reductions.unwrap_or_default();
+        let total_emissions: f64 = emissions_row.get::<f64, _>("total_emissions");
+        let total_reductions: f64 = emissions_row.get::<f64, _>("total_reductions");
         let net_emissions = total_emissions - total_reductions;
 
         let report_type = req.report_type.as_deref().unwrap_or("custom");
@@ -550,8 +554,7 @@ impl CarbonService {
             } else { 0.0 },
         });
 
-        let report = sqlx::query_as!(
-            CarbonReport,
+        let report = sqlx::query_as::<CarbonReport, _>(
             r#"
             INSERT INTO carbon_reports (
                 owner_id, report_type, period_start, period_end,
@@ -564,21 +567,25 @@ impl CarbonService {
                 $8, $9, $10,
                 $11, $12
             )
-            RETURNING *
+            RETURNING
+                id, owner_id, report_type, period_start, period_end,
+                total_emissions, total_reductions, net_emissions,
+                credits_generated, credits_retired, credits_sold,
+                revenue_from_credits, summary, generated_at
             "#,
-            owner_id,
-            report_type,
-            req.period_start,
-            req.period_end,
-            total_emissions,
-            total_reductions,
-            net_emissions,
-            credits_row.generated.unwrap_or_default(),
-            credits_row.retired.unwrap_or_default(),
-            credits_row.sold.unwrap_or_default(),
-            revenue_row.revenue.unwrap_or_default(),
-            summary,
         )
+        .bind(owner_id)
+        .bind(report_type)
+        .bind(req.period_start)
+        .bind(req.period_end)
+        .bind(total_emissions)
+        .bind(total_reductions)
+        .bind(net_emissions)
+        .bind(credits_row.get::<f64, _>("generated"))
+        .bind(credits_row.get::<f64, _>("retired"))
+        .bind(credits_row.get::<f64, _>("sold"))
+        .bind(revenue_row.get::<f64, _>("revenue"))
+        .bind(summary)
         .fetch_one(&self.pool)
         .await?;
 
@@ -586,11 +593,10 @@ impl CarbonService {
     }
 
     pub async fn list_reports(&self, owner_id: Uuid) -> Result<Vec<CarbonReport>, AppError> {
-        let reports = sqlx::query_as!(
-            CarbonReport,
-            "SELECT * FROM carbon_reports WHERE owner_id = $1 ORDER BY generated_at DESC",
-            owner_id
+        let reports = sqlx::query_as::<CarbonReport, _>(
+            "SELECT id, owner_id, report_type, period_start, period_end, total_emissions, total_reductions, net_emissions, credits_generated, credits_retired, credits_sold, revenue_from_credits, summary, generated_at FROM carbon_reports WHERE owner_id = $1 ORDER BY generated_at DESC",
         )
+        .bind(owner_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(reports)
@@ -598,20 +604,20 @@ impl CarbonService {
 
     /// Calculate the sustainability score for a supplier based on their products' emissions reductions.
     pub async fn get_supplier_score(&self, supplier_address: &str) -> Result<f64, AppError> {
-        let row = sqlx::query!(
+        let row = sqlx::query(
             r#"
             SELECT AVG(cf.reduction_percentage) as avg_reduction
             FROM carbon_footprints cf
             JOIN products p ON p.id = cf.product_id
             WHERE p.owner_address = $1
             "#,
-            supplier_address
         )
+        .bind(supplier_address)
         .fetch_one(&self.pool)
         .await?;
 
         // Score is base 50 + average reduction percentage, capped at 100
-        let score = match row.avg_reduction {
+        let score = match row.get::<Option<sqlx::types::BigDecimal>, _>("avg_reduction") {
             Some(reduction) => {
                 let r: f64 = reduction.to_string().parse().unwrap_or(0.0);
                 (50.0 + r).min(100.0)
@@ -623,7 +629,7 @@ impl CarbonService {
 
     /// Generates an overall sustainability metrics dashboard overview.
     pub async fn get_sustainability_dashboard(&self) -> Result<serde_json::Value, AppError> {
-        let emissions = sqlx::query!(
+        let emissions = sqlx::query(
             r#"
             SELECT 
                 COALESCE(SUM(total_emissions), 0) as total_emissions,
@@ -635,7 +641,7 @@ impl CarbonService {
         .fetch_one(&self.pool)
         .await?;
 
-        let credits = sqlx::query!(
+        let credits = sqlx::query(
             r#"
             SELECT
                 COALESCE(SUM(quantity) FILTER (WHERE status = 'retired'), 0) AS retired_credits,
@@ -646,7 +652,7 @@ impl CarbonService {
         .fetch_one(&self.pool)
         .await?;
 
-        let top_suppliers = sqlx::query!(
+        let top_suppliers = sqlx::query(
             r#"
             SELECT p.owner_address, AVG(cf.reduction_percentage) as avg_reduction
             FROM carbon_footprints cf
@@ -661,19 +667,19 @@ impl CarbonService {
 
         let mut suppliers_ranking = Vec::new();
         for s in top_suppliers {
-            let avg: f64 = match s.avg_reduction {
+            let avg: f64 = match s.get::<Option<sqlx::types::BigDecimal>, _>("avg_reduction") {
                 Some(v) => v.to_string().parse().unwrap_or(0.0),
                 None => 0.0,
             };
             suppliers_ranking.push(serde_json::json!({
-                "supplier": s.owner_address,
+                "supplier": s.get::<String, _>("owner_address"),
                 "sustainability_score": (50.0 + avg).min(100.0)
             }));
         }
 
-        let total_emissions: f64 = emissions.total_emissions.unwrap_or_default().to_string().parse().unwrap_or(0.0);
-        let total_reductions: f64 = emissions.total_reductions.unwrap_or_default().to_string().parse().unwrap_or(0.0);
-        let avg_reduction: f64 = match emissions.avg_reduction {
+        let total_emissions: f64 = emissions.get::<sqlx::types::BigDecimal, _>("total_emissions").to_string().parse().unwrap_or(0.0);
+        let total_reductions: f64 = emissions.get::<sqlx::types::BigDecimal, _>("total_reductions").to_string().parse().unwrap_or(0.0);
+        let avg_reduction: f64 = match emissions.get::<Option<sqlx::types::BigDecimal>, _>("avg_reduction") {
             Some(v) => v.to_string().parse().unwrap_or(0.0),
             None => 0.0,
         };
@@ -683,8 +689,8 @@ impl CarbonService {
                 "total_emissions_kg": total_emissions,
                 "total_reductions_kg": total_reductions,
                 "average_reduction_percentage": avg_reduction,
-                "credits_retired_tonnes": credits.retired_credits.unwrap_or_default().to_string().parse::<f64>().unwrap_or(0.0),
-                "credits_listed_tonnes": credits.listed_credits.unwrap_or_default().to_string().parse::<f64>().unwrap_or(0.0),
+                "credits_retired_tonnes": credits.get::<sqlx::types::BigDecimal, _>("retired_credits").to_string().parse::<f64>().unwrap_or(0.0),
+                "credits_listed_tonnes": credits.get::<sqlx::types::BigDecimal, _>("listed_credits").to_string().parse::<f64>().unwrap_or(0.0),
             },
             "top_sustainable_suppliers": suppliers_ranking
         }))

@@ -63,30 +63,33 @@ pub trait BatchRepository {
 #[async_trait]
 impl BatchRepository for BatchService {
     async fn create_batch(&self, batch: NewBatch) -> Result<Batch, sqlx::Error> {
-        let created = sqlx::query_as!(
-            Batch,
+        let created = sqlx::query_as::<Batch, _>(
             r#"
             INSERT INTO batches (
                 batch_number, product_id, lot_number, production_date, expiry_date,
                 quantity_produced, quantity_available, status, production_location,
                 quality_grade, quality_score, metadata, created_by, updated_by
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
-            RETURNING *
+            RETURNING
+                id, batch_number, product_id, lot_number, production_date, expiry_date,
+                quantity_produced, quantity_available, status as "status: BatchStatus",
+                production_location, quality_grade, quality_score, metadata,
+                created_by, updated_by, created_at, updated_at
             "#,
-            batch.batch_number,
-            batch.product_id,
-            batch.lot_number,
-            batch.production_date,
-            batch.expiry_date,
-            batch.quantity_produced,
-            batch.quantity_available,
-            batch.status as BatchStatus,
-            batch.production_location,
-            batch.quality_grade,
-            batch.quality_score,
-            batch.metadata,
-            batch.created_by
         )
+        .bind(batch.batch_number)
+        .bind(batch.product_id)
+        .bind(batch.lot_number)
+        .bind(batch.production_date)
+        .bind(batch.expiry_date)
+        .bind(batch.quantity_produced)
+        .bind(batch.quantity_available)
+        .bind(batch.status as BatchStatus)
+        .bind(batch.production_location)
+        .bind(batch.quality_grade)
+        .bind(batch.quality_score)
+        .bind(batch.metadata)
+        .bind(batch.created_by)
         .fetch_one(&self.pool)
         .await?;
 
@@ -104,11 +107,10 @@ impl BatchRepository for BatchService {
             }
         }
 
-        let batch = sqlx::query_as!(
-            Batch,
-            "SELECT * FROM batches WHERE id = $1",
-            id
+        let batch = sqlx::query_as::<Batch, _>(
+            "SELECT id, batch_number, product_id, lot_number, production_date, expiry_date, quantity_produced, quantity_available, status as \"status: BatchStatus\", production_location, quality_grade, quality_score, metadata, created_by, updated_by, created_at, updated_at FROM batches WHERE id = $1",
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -124,18 +126,16 @@ impl BatchRepository for BatchService {
     }
 
     async fn get_batch_by_number(&self, batch_number: &str) -> Result<Option<Batch>, sqlx::Error> {
-        sqlx::query_as!(
-            Batch,
-            "SELECT * FROM batches WHERE batch_number = $1",
-            batch_number
+        sqlx::query_as::<Batch, _>(
+            "SELECT id, batch_number, product_id, lot_number, production_date, expiry_date, quantity_produced, quantity_available, status as \"status: BatchStatus\", production_location, quality_grade, quality_score, metadata, created_by, updated_by, created_at, updated_at FROM batches WHERE batch_number = $1",
         )
+        .bind(batch_number)
         .fetch_optional(&self.pool)
         .await
     }
 
     async fn update_batch(&self, id: Uuid, batch: Batch) -> Result<Batch, sqlx::Error> {
-        let updated = sqlx::query_as!(
-            Batch,
+        let updated = sqlx::query_as::<Batch, _>(
             r#"
             UPDATE batches SET
                 batch_number = $2,
@@ -152,23 +152,27 @@ impl BatchRepository for BatchService {
                 metadata = $13,
                 updated_by = $14
             WHERE id = $1
-            RETURNING *
+            RETURNING
+                id, batch_number, product_id, lot_number, production_date, expiry_date,
+                quantity_produced, quantity_available, status as "status: BatchStatus",
+                production_location, quality_grade, quality_score, metadata,
+                created_by, updated_by, created_at, updated_at
             "#,
-            id,
-            batch.batch_number,
-            batch.product_id,
-            batch.lot_number,
-            batch.production_date,
-            batch.expiry_date,
-            batch.quantity_produced,
-            batch.quantity_available,
-            batch.status as BatchStatus,
-            batch.production_location,
-            batch.quality_grade,
-            batch.quality_score,
-            batch.metadata,
-            batch.updated_by
         )
+        .bind(id)
+        .bind(batch.batch_number)
+        .bind(batch.product_id)
+        .bind(batch.lot_number)
+        .bind(batch.production_date)
+        .bind(batch.expiry_date)
+        .bind(batch.quantity_produced)
+        .bind(batch.quantity_available)
+        .bind(batch.status as BatchStatus)
+        .bind(batch.production_location)
+        .bind(batch.quality_grade)
+        .bind(batch.quality_score)
+        .bind(batch.metadata)
+        .bind(batch.updated_by)
         .fetch_one(&self.pool)
         .await?;
 
@@ -178,7 +182,8 @@ impl BatchRepository for BatchService {
     }
 
     async fn delete_batch(&self, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!("DELETE FROM batches WHERE id = $1", id)
+        sqlx::query("DELETE FROM batches WHERE id = $1")
+            .bind(id)
             .execute(&self.pool)
             .await?;
         
@@ -313,22 +318,21 @@ impl BatchRepository for BatchService {
     }
 
     async fn create_genealogy(&self, genealogy: NewBatchGenealogy) -> Result<BatchGenealogy, sqlx::Error> {
-        let created = sqlx::query_as!(
-            BatchGenealogy,
+        let created = sqlx::query_as::<BatchGenealogy, _>(
             r#"
             INSERT INTO batch_genealogy (
                 parent_batch_id, child_batch_id, relationship_type,
                 quantity_transferred, notes, metadata
             ) VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
+            RETURNING id, parent_batch_id, child_batch_id, relationship_type, quantity_transferred, notes, metadata, created_at
             "#,
-            genealogy.parent_batch_id,
-            genealogy.child_batch_id,
-            genealogy.relationship_type,
-            genealogy.quantity_transferred,
-            genealogy.notes,
-            genealogy.metadata
         )
+        .bind(genealogy.parent_batch_id)
+        .bind(genealogy.child_batch_id)
+        .bind(genealogy.relationship_type)
+        .bind(genealogy.quantity_transferred)
+        .bind(genealogy.notes)
+        .bind(genealogy.metadata)
         .fetch_one(&self.pool)
         .await?;
 
@@ -350,11 +354,10 @@ impl BatchRepository for BatchService {
     }
 
     async fn get_batch_parents(&self, batch_id: Uuid) -> Result<Vec<BatchGenealogyNode>, sqlx::Error> {
-        let genealogies = sqlx::query_as!(
-            BatchGenealogy,
-            "SELECT * FROM batch_genealogy WHERE child_batch_id = $1",
-            batch_id
+        let genealogies = sqlx::query_as::<BatchGenealogy, _>(
+            "SELECT id, parent_batch_id, child_batch_id, relationship_type, quantity_transferred, notes, metadata, created_at FROM batch_genealogy WHERE child_batch_id = $1",
         )
+        .bind(batch_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -372,11 +375,10 @@ impl BatchRepository for BatchService {
     }
 
     async fn get_batch_children(&self, batch_id: Uuid) -> Result<Vec<BatchGenealogyNode>, sqlx::Error> {
-        let genealogies = sqlx::query_as!(
-            BatchGenealogy,
-            "SELECT * FROM batch_genealogy WHERE parent_batch_id = $1",
-            batch_id
+        let genealogies = sqlx::query_as::<BatchGenealogy, _>(
+            "SELECT id, parent_batch_id, child_batch_id, relationship_type, quantity_transferred, notes, metadata, created_at FROM batch_genealogy WHERE parent_batch_id = $1",
         )
+        .bind(batch_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -408,25 +410,24 @@ impl BatchRepository for BatchService {
             true
         };
 
-        let created = sqlx::query_as!(
-            BatchQualityAttribute,
+        let created = sqlx::query_as::<BatchQualityAttribute, _>(
             r#"
             INSERT INTO batch_quality_attributes (
                 batch_id, attribute_name, attribute_value, measurement_unit,
                 tolerance_min, tolerance_max, measured_by, notes, is_within_tolerance
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING *
+            RETURNING id, batch_id, attribute_name, attribute_value, measurement_unit, tolerance_min, tolerance_max, measured_at, measured_by, notes, is_within_tolerance
             "#,
-            attribute.batch_id,
-            attribute.attribute_name,
-            attribute.attribute_value,
-            attribute.measurement_unit,
-            attribute.tolerance_min,
-            attribute.tolerance_max,
-            attribute.measured_by,
-            attribute.notes,
-            is_within_tolerance
         )
+        .bind(attribute.batch_id)
+        .bind(attribute.attribute_name)
+        .bind(attribute.attribute_value)
+        .bind(attribute.measurement_unit)
+        .bind(attribute.tolerance_min)
+        .bind(attribute.tolerance_max)
+        .bind(attribute.measured_by)
+        .bind(attribute.notes)
+        .bind(is_within_tolerance)
         .fetch_one(&self.pool)
         .await?;
 
@@ -434,18 +435,16 @@ impl BatchRepository for BatchService {
     }
 
     async fn get_quality_attributes(&self, batch_id: Uuid) -> Result<Vec<BatchQualityAttribute>, sqlx::Error> {
-        sqlx::query_as!(
-            BatchQualityAttribute,
-            "SELECT * FROM batch_quality_attributes WHERE batch_id = $1 ORDER BY measured_at DESC",
-            batch_id
+        sqlx::query_as::<BatchQualityAttribute, _>(
+            "SELECT id, batch_id, attribute_name, attribute_value, measurement_unit, tolerance_min, tolerance_max, measured_at, measured_by, notes, is_within_tolerance FROM batch_quality_attributes WHERE batch_id = $1 ORDER BY measured_at DESC",
         )
+        .bind(batch_id)
         .fetch_all(&self.pool)
         .await
     }
 
     async fn update_quality_attribute(&self, id: Uuid, attribute: BatchQualityAttribute) -> Result<BatchQualityAttribute, sqlx::Error> {
-        sqlx::query_as!(
-            BatchQualityAttribute,
+        sqlx::query_as::<BatchQualityAttribute, _>(
             r#"
             UPDATE batch_quality_attributes SET
                 attribute_name = $2,
@@ -457,40 +456,39 @@ impl BatchRepository for BatchService {
                 notes = $8,
                 is_within_tolerance = $9
             WHERE id = $1
-            RETURNING *
+            RETURNING id, batch_id, attribute_name, attribute_value, measurement_unit, tolerance_min, tolerance_max, measured_at, measured_by, notes, is_within_tolerance
             "#,
-            id,
-            attribute.attribute_name,
-            attribute.attribute_value,
-            attribute.measurement_unit,
-            attribute.tolerance_min,
-            attribute.tolerance_max,
-            attribute.measured_by,
-            attribute.notes,
-            attribute.is_within_tolerance
         )
+        .bind(id)
+        .bind(attribute.attribute_name)
+        .bind(attribute.attribute_value)
+        .bind(attribute.measurement_unit)
+        .bind(attribute.tolerance_min)
+        .bind(attribute.tolerance_max)
+        .bind(attribute.measured_by)
+        .bind(attribute.notes)
+        .bind(attribute.is_within_tolerance)
         .fetch_one(&self.pool)
         .await
     }
 
     async fn create_recall(&self, recall: NewBatchRecall) -> Result<BatchRecall, sqlx::Error> {
-        let created = sqlx::query_as!(
-            BatchRecall,
+        let created = sqlx::query_as::<BatchRecall, _>(
             r#"
             INSERT INTO batch_recalls (
                 batch_id, recall_type, recall_reason, initiated_by,
                 severity, affected_quantity, metadata
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *
+            RETURNING id, batch_id, recall_date, recall_type, recall_reason, initiated_by, severity, affected_quantity, recovered_quantity, status as "status: RecallStatus", notification_sent, public_announcement, metadata, created_at, updated_at
             "#,
-            recall.batch_id,
-            recall.recall_type,
-            recall.recall_reason,
-            recall.initiated_by,
-            recall.severity,
-            recall.affected_quantity,
-            recall.metadata
         )
+        .bind(recall.batch_id)
+        .bind(recall.recall_type)
+        .bind(recall.recall_reason)
+        .bind(recall.initiated_by)
+        .bind(recall.severity)
+        .bind(recall.affected_quantity)
+        .bind(recall.metadata)
         .fetch_one(&self.pool)
         .await?;
 
@@ -498,28 +496,25 @@ impl BatchRepository for BatchService {
     }
 
     async fn get_recall(&self, id: Uuid) -> Result<Option<BatchRecall>, sqlx::Error> {
-        sqlx::query_as!(
-            BatchRecall,
-            "SELECT * FROM batch_recalls WHERE id = $1",
-            id
+        sqlx::query_as::<BatchRecall, _>(
+            "SELECT id, batch_id, recall_date, recall_type, recall_reason, initiated_by, severity, affected_quantity, recovered_quantity, status as \"status: RecallStatus\", notification_sent, public_announcement, metadata, created_at, updated_at FROM batch_recalls WHERE id = $1",
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
     }
 
     async fn get_batch_recalls(&self, batch_id: Uuid) -> Result<Vec<BatchRecall>, sqlx::Error> {
-        sqlx::query_as!(
-            BatchRecall,
-            "SELECT * FROM batch_recalls WHERE batch_id = $1 ORDER BY recall_date DESC",
-            batch_id
+        sqlx::query_as::<BatchRecall, _>(
+            "SELECT id, batch_id, recall_date, recall_type, recall_reason, initiated_by, severity, affected_quantity, recovered_quantity, status as \"status: RecallStatus\", notification_sent, public_announcement, metadata, created_at, updated_at FROM batch_recalls WHERE batch_id = $1 ORDER BY recall_date DESC",
         )
+        .bind(batch_id)
         .fetch_all(&self.pool)
         .await
     }
 
     async fn update_recall(&self, id: Uuid, recall: BatchRecall) -> Result<BatchRecall, sqlx::Error> {
-        sqlx::query_as!(
-            BatchRecall,
+        sqlx::query_as::<BatchRecall, _>(
             r#"
             UPDATE batch_recalls SET
                 status = $2,
@@ -527,47 +522,45 @@ impl BatchRepository for BatchService {
                 notification_sent = $4,
                 public_announcement = $5
             WHERE id = $1
-            RETURNING *
+            RETURNING id, batch_id, recall_date, recall_type, recall_reason, initiated_by, severity, affected_quantity, recovered_quantity, status as "status: RecallStatus", notification_sent, public_announcement, metadata, created_at, updated_at
             "#,
-            id,
-            recall.status,
-            recall.recovered_quantity,
-            recall.notification_sent,
-            recall.public_announcement
         )
+        .bind(id)
+        .bind(recall.status)
+        .bind(recall.recovered_quantity)
+        .bind(recall.notification_sent)
+        .bind(recall.public_announcement)
         .fetch_one(&self.pool)
         .await
     }
 
     async fn list_active_recalls(&self, offset: i64, limit: i64) -> Result<Vec<BatchRecall>, sqlx::Error> {
-        sqlx::query_as!(
-            BatchRecall,
-            "SELECT * FROM batch_recalls WHERE status = 'active' ORDER BY recall_date DESC LIMIT $1 OFFSET $2",
-            limit,
-            offset
+        sqlx::query_as::<BatchRecall, _>(
+            "SELECT id, batch_id, recall_date, recall_type, recall_reason, initiated_by, severity, affected_quantity, recovered_quantity, status as \"status: RecallStatus\", notification_sent, public_announcement, metadata, created_at, updated_at FROM batch_recalls WHERE status = 'active' ORDER BY recall_date DESC LIMIT $1 OFFSET $2",
         )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
     }
 
     async fn create_inventory_transaction(&self, inventory: NewBatchInventory) -> Result<BatchInventory, sqlx::Error> {
-        let created = sqlx::query_as!(
-            BatchInventory,
+        let created = sqlx::query_as::<BatchInventory, _>(
             r#"
             INSERT INTO batch_inventory (
                 batch_id, location_id, quantity, transaction_type,
                 reference_id, performed_by, notes
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *
+            RETURNING id, batch_id, location_id, quantity, transaction_type, transaction_date, reference_id, performed_by, notes, created_at
             "#,
-            inventory.batch_id,
-            inventory.location_id,
-            inventory.quantity,
-            inventory.transaction_type,
-            inventory.reference_id,
-            inventory.performed_by,
-            inventory.notes
         )
+        .bind(inventory.batch_id)
+        .bind(inventory.location_id)
+        .bind(inventory.quantity)
+        .bind(inventory.transaction_type)
+        .bind(inventory.reference_id)
+        .bind(inventory.performed_by)
+        .bind(inventory.notes)
         .fetch_one(&self.pool)
         .await?;
 
@@ -575,23 +568,21 @@ impl BatchRepository for BatchService {
     }
 
     async fn get_batch_inventory(&self, batch_id: Uuid) -> Result<Vec<BatchInventory>, sqlx::Error> {
-        sqlx::query_as!(
-            BatchInventory,
-            "SELECT * FROM batch_inventory WHERE batch_id = $1 ORDER BY transaction_date DESC",
-            batch_id
+        sqlx::query_as::<BatchInventory, _>(
+            "SELECT id, batch_id, location_id, quantity, transaction_type, transaction_date, reference_id, performed_by, notes, created_at FROM batch_inventory WHERE batch_id = $1 ORDER BY transaction_date DESC",
         )
+        .bind(batch_id)
         .fetch_all(&self.pool)
         .await
     }
 
     async fn get_inventory_by_location(&self, location_id: &str, offset: i64, limit: i64) -> Result<Vec<BatchInventory>, sqlx::Error> {
-        sqlx::query_as!(
-            BatchInventory,
-            "SELECT * FROM batch_inventory WHERE location_id = $1 ORDER BY transaction_date DESC LIMIT $2 OFFSET $3",
-            location_id,
-            limit,
-            offset
+        sqlx::query_as::<BatchInventory, _>(
+            "SELECT id, batch_id, location_id, quantity, transaction_type, transaction_date, reference_id, performed_by, notes, created_at FROM batch_inventory WHERE location_id = $1 ORDER BY transaction_date DESC LIMIT $2 OFFSET $3",
         )
+        .bind(location_id)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
     }

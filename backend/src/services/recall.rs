@@ -23,8 +23,7 @@ impl RecallService {
         triggered_event_id: Option<i64>,
         metadata: serde_json::Value,
     ) -> Result<Recall, sqlx::Error> {
-        let recall = sqlx::query_as!(
-            Recall,
+        let recall = sqlx::query_as::<Recall, _>(
             r#"
             INSERT INTO recalls (
                 product_id, batch_id, title, reason, severity, status,
@@ -47,27 +46,27 @@ impl RecallService {
                 created_at,
                 updated_at
             "#,
-            product_id,
-            batch_id,
-            title,
-            reason,
-            severity,
-            trigger_type,
-            triggered_by,
-            triggered_event_id,
-            metadata
         )
+        .bind(product_id)
+        .bind(batch_id)
+        .bind(title)
+        .bind(reason)
+        .bind(severity)
+        .bind(trigger_type)
+        .bind(triggered_by)
+        .bind(triggered_event_id)
+        .bind(metadata)
         .fetch_one(&self.pool)
         .await?;
 
-        let _ = sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO recall_effectiveness (recall_id)
             VALUES ($1)
             ON CONFLICT (recall_id) DO NOTHING
             "#,
-            recall.id
         )
+        .bind(recall.id)
         .execute(&self.pool)
         .await?;
 
@@ -80,7 +79,7 @@ impl RecallService {
         product_id: &str,
         batch_id: Option<&str>,
     ) -> Result<Vec<RecallAffectedItem>, sqlx::Error> {
-        let _rows = sqlx::query!(
+        sqlx::query(
             r#"
             WITH affected_products AS (
                 SELECT DISTINCT p.id AS product_id
@@ -109,15 +108,14 @@ impl RecallService {
             ON CONFLICT DO NOTHING
             RETURNING id
             "#,
-            recall_id,
-            batch_id,
-            product_id
         )
+        .bind(recall_id)
+        .bind(batch_id)
+        .bind(product_id)
         .fetch_all(&self.pool)
         .await?;
 
-        let items = sqlx::query_as!(
-            RecallAffectedItem,
+        let items = sqlx::query_as::<RecallAffectedItem, _>(
             r#"
             SELECT
                 id,
@@ -132,22 +130,22 @@ impl RecallService {
             WHERE recall_id = $1
             ORDER BY created_at ASC
             "#,
-            recall_id
         )
+        .bind(recall_id)
         .fetch_all(&self.pool)
         .await?;
 
         let affected_count = items.len() as i32;
-        let _ = sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE recall_effectiveness
             SET affected_count = $2,
                 last_updated_at = NOW()
             WHERE recall_id = $1
             "#,
-            recall_id,
-            affected_count
         )
+        .bind(recall_id)
+        .bind(affected_count)
         .execute(&self.pool)
         .await?;
 
@@ -162,22 +160,21 @@ impl RecallService {
         payload: serde_json::Value,
     ) -> Result<Vec<RecallNotification>, sqlx::Error> {
         for recipient in &recipients {
-            let _ = sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO recall_notifications (recall_id, recipient, channel, status, payload)
                 VALUES ($1, $2, $3, 'queued', $4)
                 "#,
-                recall_id,
-                recipient,
-                channel,
-                payload
             )
+            .bind(recall_id)
+            .bind(recipient)
+            .bind(channel)
+            .bind(&payload)
             .execute(&self.pool)
             .await?;
         }
 
-        let notifications = sqlx::query_as!(
-            RecallNotification,
+        let notifications = sqlx::query_as::<RecallNotification, _>(
             r#"
             SELECT
                 id,
@@ -194,22 +191,22 @@ impl RecallService {
             WHERE recall_id = $1
             ORDER BY created_at ASC
             "#,
-            recall_id
         )
+        .bind(recall_id)
         .fetch_all(&self.pool)
         .await?;
 
         let notified_count = notifications.len() as i32;
-        let _ = sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE recall_effectiveness
             SET notified_count = $2,
                 last_updated_at = NOW()
             WHERE recall_id = $1
             "#,
-            recall_id,
-            notified_count
         )
+        .bind(recall_id)
+        .bind(notified_count)
         .execute(&self.pool)
         .await?;
 
@@ -222,8 +219,7 @@ impl RecallService {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Recall>, sqlx::Error> {
-        sqlx::query_as!(
-            Recall,
+        sqlx::query_as::<Recall, _>(
             r#"
             SELECT
                 id,
@@ -246,17 +242,16 @@ impl RecallService {
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
             "#,
-            product_id,
-            limit,
-            offset
         )
+        .bind(product_id)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
     }
 
     pub async fn get_recall(&self, recall_id: Uuid) -> Result<Option<Recall>, sqlx::Error> {
-        sqlx::query_as!(
-            Recall,
+        sqlx::query_as::<Recall, _>(
             r#"
             SELECT
                 id,
@@ -277,8 +272,8 @@ impl RecallService {
             FROM recalls
             WHERE id = $1
             "#,
-            recall_id
         )
+        .bind(recall_id)
         .fetch_optional(&self.pool)
         .await
     }
@@ -287,8 +282,7 @@ impl RecallService {
         &self,
         recall_id: Uuid,
     ) -> Result<Option<RecallEffectiveness>, sqlx::Error> {
-        sqlx::query_as!(
-            RecallEffectiveness,
+        sqlx::query_as::<RecallEffectiveness, _>(
             r#"
             SELECT
                 recall_id,
@@ -301,8 +295,8 @@ impl RecallService {
             FROM recall_effectiveness
             WHERE recall_id = $1
             "#,
-            recall_id
         )
+        .bind(recall_id)
         .fetch_optional(&self.pool)
         .await
     }
@@ -314,8 +308,7 @@ impl RecallService {
         recovered_delta: i32,
         disposed_delta: i32,
     ) -> Result<RecallEffectiveness, sqlx::Error> {
-        sqlx::query_as!(
-            RecallEffectiveness,
+        sqlx::query_as::<RecallEffectiveness, _>(
             r#"
             UPDATE recall_effectiveness
             SET acknowledged_count = GREATEST(0, acknowledged_count + $2),
@@ -332,11 +325,11 @@ impl RecallService {
                 disposed_count,
                 last_updated_at
             "#,
-            recall_id,
-            acknowledged_delta,
-            recovered_delta,
-            disposed_delta
         )
+        .bind(recall_id)
+        .bind(acknowledged_delta)
+        .bind(recovered_delta)
+        .bind(disposed_delta)
         .fetch_one(&self.pool)
         .await
     }
