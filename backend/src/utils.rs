@@ -28,12 +28,12 @@ impl BackupService {
             .map_err(|e| sqlx::Error::Io(e.into()))?;
 
         // Export products
-        let products = sqlx::query!("SELECT * FROM products")
+        let products = sqlx::query("SELECT * FROM products")
             .fetch_all(&self.pool)
             .await?;
 
         // Export events
-        let events = sqlx::query!("SELECT * FROM tracking_events")
+        let events = sqlx::query("SELECT * FROM tracking_events")
             .fetch_all(&self.pool)
             .await?;
 
