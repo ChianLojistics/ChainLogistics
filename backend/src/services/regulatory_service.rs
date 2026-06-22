@@ -15,37 +15,38 @@ impl RegulatoryService {
 
     // Regulatory Requirements Management
     pub async fn create_requirement(&self, req: NewRegulatoryRequirement) -> Result<RegulatoryRequirement, sqlx::Error> {
-        sqlx::query_as!(
-            RegulatoryRequirement,
+        sqlx::query_as::<RegulatoryRequirement, _>(
             r#"
             INSERT INTO regulatory_requirements (
                 requirement_id, name, description, regulation_type, category,
                 severity, required_fields, validation_logic, is_active,
                 effective_date, expiry_date
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, $10)
-            RETURNING *
+            RETURNING
+                id, requirement_id, name, description, regulation_type, category,
+                severity, required_fields, validation_logic, is_active,
+                effective_date, expiry_date, created_at, updated_at
             "#,
-            req.requirement_id,
-            req.name,
-            req.description,
-            req.regulation_type,
-            req.category,
-            req.severity,
-            req.required_fields,
-            req.validation_logic,
-            req.effective_date.unwrap_or(chrono::Utc::now()),
-            req.expiry_date
         )
+        .bind(req.requirement_id)
+        .bind(req.name)
+        .bind(req.description)
+        .bind(req.regulation_type)
+        .bind(req.category)
+        .bind(req.severity)
+        .bind(req.required_fields)
+        .bind(req.validation_logic)
+        .bind(req.effective_date.unwrap_or(chrono::Utc::now()))
+        .bind(req.expiry_date)
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn get_requirement(&self, requirement_id: &str) -> Result<Option<RegulatoryRequirement>, sqlx::Error> {
-        sqlx::query_as!(
-            RegulatoryRequirement,
-            "SELECT * FROM regulatory_requirements WHERE requirement_id = $1",
-            requirement_id
+        sqlx::query_as::<RegulatoryRequirement, _>(
+            "SELECT id, requirement_id, name, description, regulation_type, category, severity, required_fields, validation_logic, is_active, effective_date, expiry_date, created_at, updated_at FROM regulatory_requirements WHERE requirement_id = $1",
         )
+        .bind(requirement_id)
         .fetch_optional(&self.pool)
         .await
     }
@@ -89,8 +90,7 @@ impl RegulatoryService {
     }
 
     pub async fn update_requirement(&self, requirement_id: &str, req: NewRegulatoryRequirement) -> Result<RegulatoryRequirement, sqlx::Error> {
-        sqlx::query_as!(
-            RegulatoryRequirement,
+        sqlx::query_as::<RegulatoryRequirement, _>(
             r#"
             UPDATE regulatory_requirements SET
                 name = $2,
@@ -102,59 +102,61 @@ impl RegulatoryService {
                 validation_logic = $8,
                 expiry_date = $9
             WHERE requirement_id = $1
-            RETURNING *
+            RETURNING
+                id, requirement_id, name, description, regulation_type, category,
+                severity, required_fields, validation_logic, is_active,
+                effective_date, expiry_date, created_at, updated_at
             "#,
-            requirement_id,
-            req.name,
-            req.description,
-            req.regulation_type,
-            req.category,
-            req.severity,
-            req.required_fields,
-            req.validation_logic,
-            req.expiry_date
         )
+        .bind(requirement_id)
+        .bind(req.name)
+        .bind(req.description)
+        .bind(req.regulation_type)
+        .bind(req.category)
+        .bind(req.severity)
+        .bind(req.required_fields)
+        .bind(req.validation_logic)
+        .bind(req.expiry_date)
         .fetch_one(&self.pool)
         .await
     }
 
     // Product Compliance Management
     pub async fn create_product_compliance(&self, compliance: NewProductCompliance) -> Result<ProductCompliance, sqlx::Error> {
-        sqlx::query_as!(
-            ProductCompliance,
+        sqlx::query_as::<ProductCompliance, _>(
             r#"
             INSERT INTO product_compliance (
                 product_id, requirement_id, status, notes, checked_by
             ) VALUES ($1, $2, $3, $4, $5)
-            RETURNING *
+            RETURNING
+                id, product_id, requirement_id, status, last_checked_at,
+                last_check_result, violations, warnings, notes, checked_by, created_at
             "#,
-            compliance.product_id,
-            compliance.requirement_id,
-            compliance.status,
-            compliance.notes,
-            compliance.checked_by
         )
+        .bind(compliance.product_id)
+        .bind(compliance.requirement_id)
+        .bind(compliance.status)
+        .bind(compliance.notes)
+        .bind(compliance.checked_by)
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn get_product_compliance(&self, product_id: &str, requirement_id: &str) -> Result<Option<ProductCompliance>, sqlx::Error> {
-        sqlx::query_as!(
-            ProductCompliance,
-            "SELECT * FROM product_compliance WHERE product_id = $1 AND requirement_id = $2",
-            product_id,
-            requirement_id
+        sqlx::query_as::<ProductCompliance, _>(
+            "SELECT id, product_id, requirement_id, status, last_checked_at, last_check_result, violations, warnings, notes, checked_by, created_at FROM product_compliance WHERE product_id = $1 AND requirement_id = $2",
         )
+        .bind(product_id)
+        .bind(requirement_id)
         .fetch_optional(&self.pool)
         .await
     }
 
     pub async fn list_product_compliance(&self, product_id: &str) -> Result<Vec<ProductCompliance>, sqlx::Error> {
-        sqlx::query_as!(
-            ProductCompliance,
-            "SELECT * FROM product_compliance WHERE product_id = $1 ORDER BY created_at DESC",
-            product_id
+        sqlx::query_as::<ProductCompliance, _>(
+            "SELECT id, product_id, requirement_id, status, last_checked_at, last_check_result, violations, warnings, notes, checked_by, created_at FROM product_compliance WHERE product_id = $1 ORDER BY created_at DESC",
         )
+        .bind(product_id)
         .fetch_all(&self.pool)
         .await
     }
@@ -169,8 +171,7 @@ impl RegulatoryService {
         notes: Option<String>,
         checked_by: String,
     ) -> Result<ProductCompliance, sqlx::Error> {
-        sqlx::query_as!(
-            ProductCompliance,
+        sqlx::query_as::<ProductCompliance, _>(
             r#"
             UPDATE product_compliance SET
                 status = $3,
@@ -181,17 +182,19 @@ impl RegulatoryService {
                 notes = $7,
                 checked_by = $8
             WHERE product_id = $1 AND requirement_id = $2
-            RETURNING *
+            RETURNING
+                id, product_id, requirement_id, status, last_checked_at,
+                last_check_result, violations, warnings, notes, checked_by, created_at
             "#,
-            product_id,
-            requirement_id,
-            status,
-            json!({"checked_at": chrono::Utc::now().to_rfc3339()}),
-            json!(violations),
-            json!(warnings),
-            notes,
-            checked_by
         )
+        .bind(product_id)
+        .bind(requirement_id)
+        .bind(status)
+        .bind(json!({"checked_at": chrono::Utc::now().to_rfc3339()}))
+        .bind(json!(violations))
+        .bind(json!(warnings))
+        .bind(notes)
+        .bind(checked_by)
         .fetch_one(&self.pool)
         .await
     }
@@ -286,22 +289,23 @@ impl RegulatoryService {
 
     async fn get_product_data_for_validation(&self, product_id: &str) -> Result<serde_json::Value, sqlx::Error> {
         // Fetch product data from database
-        let product = sqlx::query!(
-            "SELECT * FROM products WHERE id = $1",
-            product_id
+        let product = sqlx::query(
+            "SELECT id, name, category, origin_location, certifications, custom_fields, tags FROM products WHERE id = $1",
         )
+        .bind(product_id)
         .fetch_optional(&self.pool)
         .await?;
 
         if let Some(p) = product {
+            use sqlx::Row;
             Ok(json!({
-                "id": p.id,
-                "name": p.name,
-                "category": p.category,
-                "origin_location": p.origin_location,
-                "certifications": p.certifications,
-                "custom_fields": p.custom_fields,
-                "tags": p.tags
+                "id": p.get::<String, _>("id"),
+                "name": p.get::<String, _>("name"),
+                "category": p.get::<String, _>("category"),
+                "origin_location": p.get::<Option<String>, _>("origin_location"),
+                "certifications": p.get::<serde_json::Value, _>("certifications"),
+                "custom_fields": p.get::<serde_json::Value, _>("custom_fields"),
+                "tags": p.get::<serde_json::Value, _>("tags")
             }))
         } else {
             Ok(json!({}))
@@ -340,36 +344,36 @@ impl RegulatoryService {
 
     // Audit Trail
     pub async fn create_audit_trail(&self, audit: NewComplianceAuditTrail) -> Result<ComplianceAuditTrail, sqlx::Error> {
-        sqlx::query_as!(
-            ComplianceAuditTrail,
+        sqlx::query_as::<ComplianceAuditTrail, _>(
             r#"
             INSERT INTO compliance_audit_trail (
                 product_id, requirement_id, action_type, previous_status,
                 new_status, action_details, performed_by, ip_address, user_agent
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING *
+            RETURNING
+                id, product_id, requirement_id, action_type, previous_status,
+                new_status, action_details, performed_at, performed_by, ip_address, user_agent
             "#,
-            audit.product_id,
-            audit.requirement_id,
-            audit.action_type,
-            audit.previous_status,
-            audit.new_status,
-            audit.action_details,
-            audit.performed_by,
-            audit.ip_address,
-            audit.user_agent
         )
+        .bind(audit.product_id)
+        .bind(audit.requirement_id)
+        .bind(audit.action_type)
+        .bind(audit.previous_status)
+        .bind(audit.new_status)
+        .bind(audit.action_details)
+        .bind(audit.performed_by)
+        .bind(audit.ip_address)
+        .bind(audit.user_agent)
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn get_audit_trail(&self, product_id: &str, limit: i64) -> Result<Vec<ComplianceAuditTrail>, sqlx::Error> {
-        sqlx::query_as!(
-            ComplianceAuditTrail,
-            "SELECT * FROM compliance_audit_trail WHERE product_id = $1 ORDER BY performed_at DESC LIMIT $2",
-            product_id,
-            limit
+        sqlx::query_as::<ComplianceAuditTrail, _>(
+            "SELECT id, product_id, requirement_id, action_type, previous_status, new_status, action_details, performed_at, performed_by, ip_address, user_agent FROM compliance_audit_trail WHERE product_id = $1 ORDER BY performed_at DESC LIMIT $2",
         )
+        .bind(product_id)
+        .bind(limit)
         .fetch_all(&self.pool)
         .await
     }
@@ -393,36 +397,38 @@ impl RegulatoryService {
             None
         };
 
-        sqlx::query_as!(
-            ComplianceReport,
+        sqlx::query_as::<ComplianceReport, _>(
             r#"
             INSERT INTO compliance_reports (
                 report_id, report_type, scope, generated_by, period_start,
                 period_end, total_products_checked, compliant_count,
                 non_compliant_count, pending_count, compliance_rate, report_data, status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'completed')
-            RETURNING *
+            RETURNING
+                id, report_id, report_type, scope, generated_at, generated_by,
+                period_start, period_end, total_products_checked, compliant_count,
+                non_compliant_count, pending_count, compliance_rate, report_data, status
             "#,
-            report_id,
-            report.report_type,
-            report.scope,
-            report.generated_by,
-            report.period_start,
-            report.period_end,
-            total,
-            compliant,
-            non_compliant,
-            pending,
-            compliance_rate,
-            report_data
         )
+        .bind(report_id)
+        .bind(report.report_type)
+        .bind(report.scope)
+        .bind(report.generated_by)
+        .bind(report.period_start)
+        .bind(report.period_end)
+        .bind(total)
+        .bind(compliant)
+        .bind(non_compliant)
+        .bind(pending)
+        .bind(compliance_rate)
+        .bind(report_data)
         .fetch_one(&self.pool)
         .await
     }
 
     async fn calculate_report_data(&self, scope: &serde_json::Value) -> Result<serde_json::Value, sqlx::Error> {
         // Simple aggregation based on scope
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             SELECT 
                 COUNT(DISTINCT pc.product_id) as total_products,
@@ -436,30 +442,29 @@ impl RegulatoryService {
         .fetch_one(&self.pool)
         .await?;
 
+        use sqlx::Row;
         Ok(json!({
-            "total_products": result.total_products.unwrap_or(0),
-            "compliant": result.compliant.unwrap_or(0),
-            "non_compliant": result.non_compliant.unwrap_or(0),
-            "pending": result.pending.unwrap_or(0)
+            "total_products": result.get::<Option<i64>, _>("total_products").unwrap_or(0),
+            "compliant": result.get::<Option<i64>, _>("compliant").unwrap_or(0),
+            "non_compliant": result.get::<Option<i64>, _>("non_compliant").unwrap_or(0),
+            "pending": result.get::<Option<i64>, _>("pending").unwrap_or(0)
         }))
     }
 
     pub async fn get_report(&self, report_id: &str) -> Result<Option<ComplianceReport>, sqlx::Error> {
-        sqlx::query_as!(
-            ComplianceReport,
-            "SELECT * FROM compliance_reports WHERE report_id = $1",
-            report_id
+        sqlx::query_as::<ComplianceReport, _>(
+            "SELECT id, report_id, report_type, scope, generated_at, generated_by, period_start, period_end, total_products_checked, compliant_count, non_compliant_count, pending_count, compliance_rate, report_data, status FROM compliance_reports WHERE report_id = $1",
         )
+        .bind(report_id)
         .fetch_optional(&self.pool)
         .await
     }
 
     pub async fn list_reports(&self, limit: i64) -> Result<Vec<ComplianceReport>, sqlx::Error> {
-        sqlx::query_as!(
-            ComplianceReport,
-            "SELECT * FROM compliance_reports ORDER BY generated_at DESC LIMIT $1",
-            limit
+        sqlx::query_as::<ComplianceReport, _>(
+            "SELECT id, report_id, report_type, scope, generated_at, generated_by, period_start, period_end, total_products_checked, compliant_count, non_compliant_count, pending_count, compliance_rate, report_data, status FROM compliance_reports ORDER BY generated_at DESC LIMIT $1",
         )
+        .bind(limit)
         .fetch_all(&self.pool)
         .await
     }
