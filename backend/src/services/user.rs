@@ -53,18 +53,19 @@ impl UserRepository for UserService {
             None
         };
 
-        let mut created = sqlx::query_as!(
-            User,
+        let mut created = sqlx::query_as::<User, _>(
             r#"
             INSERT INTO users (email, password_hash, stellar_address, role)
             VALUES ($1, $2, $3, $4)
-            RETURNING *
+            RETURNING
+                id, email, password_hash, stellar_address, role,
+                api_key, api_key_hash, is_active, created_at, updated_at, last_login_at
             "#,
-            encrypted_email,
-            user.password_hash,
-            encrypted_address,
-            user.role as UserRole
         )
+        .bind(encrypted_email)
+        .bind(user.password_hash)
+        .bind(encrypted_address)
+        .bind(user.role)
         .fetch_one(&self.pool)
         .await?;
 
@@ -73,11 +74,10 @@ impl UserRepository for UserService {
     }
 
     async fn get_user(&self, id: Uuid) -> Result<Option<User>, sqlx::Error> {
-        let mut user = sqlx::query_as!(
-            User,
-            "SELECT * FROM users WHERE id = $1",
-            id
+        let mut user = sqlx::query_as::<User, _>(
+            "SELECT id, email, password_hash, stellar_address, role, api_key, api_key_hash, is_active, created_at, updated_at, last_login_at FROM users WHERE id = $1",
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -91,11 +91,10 @@ impl UserRepository for UserService {
         let encrypted_email = crate::utils::crypto::encrypt(email, &self.encryption_key)
             .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
 
-        let mut user = sqlx::query_as!(
-            User,
-            "SELECT * FROM users WHERE email = $1",
-            encrypted_email
+        let mut user = sqlx::query_as::<User, _>(
+            "SELECT id, email, password_hash, stellar_address, role, api_key, api_key_hash, is_active, created_at, updated_at, last_login_at FROM users WHERE email = $1",
         )
+        .bind(encrypted_email)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -109,11 +108,10 @@ impl UserRepository for UserService {
         let encrypted_address = crate::utils::crypto::encrypt(address, &self.encryption_key)
             .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
 
-        let mut user = sqlx::query_as!(
-            User,
-            "SELECT * FROM users WHERE stellar_address = $1",
-            encrypted_address
+        let mut user = sqlx::query_as::<User, _>(
+            "SELECT id, email, password_hash, stellar_address, role, api_key, api_key_hash, is_active, created_at, updated_at, last_login_at FROM users WHERE stellar_address = $1",
         )
+        .bind(encrypted_address)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -136,8 +134,7 @@ impl UserRepository for UserService {
             None
         };
 
-        let mut updated = sqlx::query_as!(
-            User,
+        let mut updated = sqlx::query_as::<User, _>(
             r#"
             UPDATE users SET
                 email = $2,
@@ -148,17 +145,19 @@ impl UserRepository for UserService {
                 api_key_hash = $7,
                 is_active = $8
             WHERE id = $1
-            RETURNING *
+            RETURNING
+                id, email, password_hash, stellar_address, role,
+                api_key, api_key_hash, is_active, created_at, updated_at, last_login_at
             "#,
-            id,
-            encrypted_email,
-            user.password_hash,
-            encrypted_address,
-            user.role as UserRole,
-            user.api_key,
-            user.api_key_hash,
-            user.is_active
         )
+        .bind(id)
+        .bind(encrypted_email)
+        .bind(user.password_hash)
+        .bind(encrypted_address)
+        .bind(user.role)
+        .bind(user.api_key)
+        .bind(user.api_key_hash)
+        .bind(user.is_active)
         .fetch_one(&self.pool)
         .await?;
 
@@ -167,12 +166,10 @@ impl UserRepository for UserService {
     }
 
     async fn update_last_login(&self, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            "UPDATE users SET last_login_at = NOW() WHERE id = $1",
-            id
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE users SET last_login_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }
