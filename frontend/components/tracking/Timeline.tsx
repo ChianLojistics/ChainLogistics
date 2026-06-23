@@ -76,7 +76,11 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+      <div
+        className="rounded-lg border border-red-200 bg-red-50 p-6 text-center"
+        role="alert"
+        aria-live="assertive"
+      >
         <p className="text-sm font-medium text-red-800">
           Failed to load events
         </p>
@@ -86,6 +90,7 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
             type="button"
             onClick={loadEvents}
             disabled={loading}
+            aria-label="Retry loading events"
             className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
           >
             Retry
@@ -125,7 +130,7 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
 
   return (
     <div>
-      <div className="space-y-0">
+      <div className="space-y-0" role="list" aria-label="Product timeline events">
         {events.map((event, index) => (
           <EventCard
             key={event.event_id}
@@ -141,6 +146,7 @@ export function Timeline({ productId }: Readonly<TimelineProps>) {
             type="button"
             onClick={loadMore}
             disabled={loadingMore}
+            aria-label={loadingMore ? "Loading more events" : "Load more events"}
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loadingMore ? "Loading..." : "Load more"}
