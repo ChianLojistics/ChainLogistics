@@ -293,7 +293,7 @@ jobs:
             ${{ runner.os }}-cargo-build-
 
       - name: Run performance benchmarks
-        run: cargo test --release --test-threads=1 test_benchmarks load_tests::test_performance_benchmark
+        run: cargo test --release -- --test-threads=1 test_benchmarks load_tests::test_performance_benchmark
 
       - name: Upload benchmark results
         if: always()
