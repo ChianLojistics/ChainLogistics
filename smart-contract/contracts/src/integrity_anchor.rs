@@ -5,10 +5,10 @@ use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
 use crate::error::Error;
 use crate::events::{ContentAnchored, ContentTamperDetected};
+use crate::product_registry::ProductRegistryContractClient;
 use crate::storage;
 use crate::types::{ContentAnchor, StorageScheme};
 use crate::validation_contract::ValidationContract;
-use crate::product_registry::ProductRegistryContractClient;
 
 /// Maximum file size: 50 MB
 pub const MAX_CONTENT_SIZE: u64 = 52_428_800;
