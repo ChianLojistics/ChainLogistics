@@ -6,6 +6,7 @@ mod authorization;
 mod contract;
 mod error;
 mod events;
+mod integrity_anchor;
 mod multisig;
 mod quality_control;
 mod storage;
@@ -66,6 +67,8 @@ mod test_circuit_breaker;
 mod test_error_coverage;
 #[cfg(test)]
 mod test_integration;
+#[cfg(test)]
+mod test_integrity_anchor;
 
 // Public API Surface
 //
@@ -80,6 +83,8 @@ mod test_integration;
 pub use authorization::*;
 pub use contract::*;
 pub use error::*;
+pub use events::*;
+pub use integrity_anchor::*;
 pub use multisig::*;
 pub use quality_control::*;
 pub use types::*;

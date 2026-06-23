@@ -29,12 +29,16 @@ pub mod models;
 pub mod products;
 pub mod events;
 pub mod stats;
+pub mod storage;
+pub mod storage_service;
 
 // Re-export main types for convenience
 pub use client::ChainLogisticsClient;
 pub use config::Config;
 pub use error::{Error, Result};
 pub use models::*;
+pub use storage::{ContentStore, StorageBackend, StorageBridge, StorageBridgeConfig, StorageUploadResult, hash_content, MAX_CONTENT_SIZE};
+pub use storage_service::StorageService;
 
 /// SDK version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

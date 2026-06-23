@@ -43,6 +43,13 @@ pub struct SecurityConfig {
     pub allowed_origins: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditConfig {
+    pub enabled: bool,
+    pub hmac_key: String,
+    pub retention_days: i64,
+}
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

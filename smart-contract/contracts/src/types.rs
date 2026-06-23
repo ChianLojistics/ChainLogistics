@@ -591,6 +591,43 @@ pub struct PauseApproval {
     pub executed: bool,
 }
 
+// ─── Integrity Anchor Types ──────────────────────────────────────────────────
+
+/// Decentralized storage backend for anchored content.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StorageScheme {
+    Ipfs,
+    Arweave,
+}
+
+/// On-chain record linking product content to a decentralized storage CID.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContentAnchor {
+    pub anchor_id: u64,
+    pub product_id: String,
+    /// SHA-256 digest of the raw file bytes
+    pub content_hash: BytesN<32>,
+    /// IPFS CID (Qm…/bafy…) or Arweave transaction ID
+    pub cid: String,
+    pub storage_scheme: StorageScheme,
+    pub byte_size: u64,
+    pub anchored_at: u64,
+    pub anchored_by: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IntegrityDataKey {
+    Anchor(u64),
+    ProductAnchors(String),
+    AnchorByHash(BytesN<32>),
+    NextAnchorId,
+    IntegrityAdmin,
+    IntegrityRegistry,
+}
+
 // Extend DataKey for quality control
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

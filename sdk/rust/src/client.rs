@@ -5,13 +5,14 @@ use serde::Serialize;
 use crate::{Config, Error, Result};
 
 /// Main ChainLogistics API client
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ChainLogisticsClient {
     config: Config,
     client: Client,
     products: crate::products::ProductsService,
     events: crate::events::EventsService,
     stats: crate::stats::StatsService,
+    storage: crate::storage_service::StorageService,
 }
 
 impl ChainLogisticsClient {
@@ -27,6 +28,11 @@ impl ChainLogisticsClient {
         let products = crate::products::ProductsService::new(client.clone(), config.clone());
         let events = crate::events::EventsService::new(client.clone(), config.clone());
         let stats = crate::stats::StatsService::new(client.clone(), config.clone());
+        let storage = crate::storage_service::StorageService::new(
+            client.clone(),
+            config.clone(),
+            crate::storage::StorageBridgeConfig::default(),
+        )?;
 
         Ok(Self {
             config,
@@ -34,6 +40,7 @@ impl ChainLogisticsClient {
             products,
             events,
             stats,
+            storage,
         })
     }
 
@@ -55,6 +62,11 @@ impl ChainLogisticsClient {
     /// Get the stats service
     pub fn stats(&self) -> &crate::stats::StatsService {
         &self.stats
+    }
+
+    /// Get the decentralized storage service
+    pub fn storage(&self) -> &crate::storage_service::StorageService {
+        &self.storage
     }
 
     /// Perform a health check

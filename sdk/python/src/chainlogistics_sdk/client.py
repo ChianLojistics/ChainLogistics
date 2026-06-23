@@ -33,6 +33,7 @@ from .models import (
 from .services.events import EventsService
 from .services.products import ProductsService
 from .services.stats import StatsService
+from .storage import StorageService
 
 T = TypeVar("T")
 
@@ -61,6 +62,7 @@ class ChainLogisticsClient:
         self.products = ProductsService(self)
         self.events = EventsService(self)
         self.stats = StatsService(self)
+        self.storage = StorageService(self)
     
     def _build_url(self, path: str) -> str:
         """Build full URL from path."""

@@ -110,4 +110,10 @@ pub enum Error {
     CertificationNotFound = 103,
     InvalidCertification = 104,
     ReadingNotFound = 105,
+
+    // --- Integrity Anchor (130-140) ---
+    AnchorNotFound = 130,
+    InvalidContentSize = 131,
+    TooManyAnchors = 132,
+    CidTooLong = 133,
 }

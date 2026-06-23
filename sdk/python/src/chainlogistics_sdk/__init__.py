@@ -5,6 +5,15 @@ This SDK provides a convenient interface for interacting with the ChainLogistics
 
 from .client import ChainLogisticsClient
 from .config import Config
+from .storage import (
+    ContentStore,
+    StorageBackend,
+    StorageBridgeConfig,
+    StorageService,
+    StorageUploadResult,
+    hash_content,
+    MAX_CONTENT_SIZE,
+)
 from .exceptions import (
     ChainLogisticsError,
     ApiError,
@@ -41,6 +50,14 @@ __all__ = [
     # Main client
     "ChainLogisticsClient",
     "Config",
+    # Storage
+    "StorageService",
+    "StorageBackend",
+    "StorageBridgeConfig",
+    "ContentStore",
+    "StorageUploadResult",
+    "hash_content",
+    "MAX_CONTENT_SIZE",
     # Exceptions
     "ChainLogisticsError",
     "ApiError",

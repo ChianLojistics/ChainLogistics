@@ -27,7 +27,12 @@ mod websocket;
 
 use config::Config;
 use database::Database;
-use services::{ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService, AnalyticsService, CarbonService, RecallService, AuditService, BatchService, RegulatoryService, IoTService, QualityService, SupplierService};
+use services::{
+    ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService,
+    AnalyticsService, CarbonService, RecallService, AuditService, BatchService, RegulatoryService,
+    IoTService, QualityService, SupplierService, CollaborationService, ContentAnchorService,
+    StorageConfig, StorageVerificationService,
+};
 use utils::CronService;
 use error::AppError;
 use monitoring::MonitoringSystem;
@@ -44,6 +49,8 @@ pub struct AppState {
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
     pub collaboration_service: Arc<CollaborationService>,
+    pub content_anchor_service: Arc<ContentAnchorService>,
+    pub storage_verification_service: Arc<StorageVerificationService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -80,6 +87,18 @@ impl AppState {
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
         let collaboration_service = Arc::new(CollaborationService::new(db.pool().clone()));
+        let content_anchor_service = Arc::new(ContentAnchorService::new(db.pool().clone()));
+        let audit_service = AuditService::new(
+            db.pool().clone(),
+            config.audit.enabled,
+            config.audit.hmac_key.clone(),
+            config.audit.retention_days,
+        );
+        let storage_verification_service = Arc::new(StorageVerificationService::new(
+            db.pool().clone(),
+            StorageConfig::default(),
+            audit_service,
+        ));
         
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
@@ -95,6 +114,8 @@ impl AppState {
             analytics_service,
             carbon_service,
             collaboration_service,
+            content_anchor_service,
+            storage_verification_service,
             redis_client,
             config,
             monitoring_system,
@@ -122,8 +143,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = AppState::new().await?;
 
     // Start background services
-    let cron_service =
-        CronService::new(app_state.db.pool().clone(), app_state.redis_client.clone());
+    let cron_service = CronService::new(
+        app_state.db.pool().clone(),
+        app_state.redis_client.clone(),
+        app_state.storage_verification_service.clone(),
+    );
     cron_service.start_scheduler().await;
 
     // Build router with security middleware

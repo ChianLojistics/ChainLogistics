@@ -92,15 +92,21 @@ pub struct CronService {
     redis_client: redis::Client,
     backup_service: BackupService,
     sync_service: SyncService,
+    storage_verification_service: std::sync::Arc<crate::services::StorageVerificationService>,
 }
 
 impl CronService {
-    pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
+    pub fn new(
+        pool: PgPool,
+        redis_client: redis::Client,
+        storage_verification_service: std::sync::Arc<crate::services::StorageVerificationService>,
+    ) -> Self {
         Self {
             pool: pool.clone(),
             redis_client: redis_client.clone(),
             backup_service: BackupService::new(pool.clone()),
             sync_service: SyncService::new(pool, redis_client),
+            storage_verification_service,
         }
     }
 
@@ -158,6 +164,29 @@ impl CronService {
                     Ok(n) if n > 0 => tracing::info!("Disabled {} inactive API keys", n),
                     Ok(_) => {}
                     Err(e) => tracing::error!("Failed to disable inactive API keys: {}", e),
+                }
+            }
+        });
+
+        // Periodic decentralized storage integrity verification
+        let verification_service = self.storage_verification_service.clone();
+        let interval_secs = verification_service.config().verification_interval_secs;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
+            loop {
+                interval.tick().await;
+                match verification_service.verify_due_anchors().await {
+                    Ok(summary) if summary.checked > 0 => {
+                        tracing::info!(
+                            "Storage verification: checked={} verified={} tampered={} unavailable={}",
+                            summary.checked,
+                            summary.verified,
+                            summary.tampered,
+                            summary.unavailable
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => tracing::error!("Storage verification worker failed: {}", e),
                 }
             }
         });

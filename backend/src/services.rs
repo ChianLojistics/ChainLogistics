@@ -27,7 +27,10 @@ pub use digital_twin_service::DigitalTwinService;
 pub mod collaboration;
 pub use collaboration::CollaborationService;
 
-
+pub mod storage_service;
+pub use storage_service::{
+    ContentAnchorService, StorageConfig, StorageVerificationService,
+};
 /// Service layer for managing product operations and database interactions.
 /// Provides a clean abstraction over database operations for products.
 pub struct ProductService {

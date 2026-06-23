@@ -380,3 +380,95 @@ pub fn is_authorized_sensor(env: &Env, product_id: &String, sensor_address: &Add
         .map(|info| info.authorized)
         .unwrap_or(false)
 }
+
+// ─── Integrity Anchor ────────────────────────────────────────────────────────
+
+use crate::types::{ContentAnchor, IntegrityDataKey};
+
+pub fn set_integrity_admin(env: &Env, admin: &Address) {
+    env.storage()
+        .persistent()
+        .set(&IntegrityDataKey::IntegrityAdmin, admin);
+}
+
+pub fn get_integrity_admin(env: &Env) -> Option<Address> {
+    env.storage()
+        .persistent()
+        .get(&IntegrityDataKey::IntegrityAdmin)
+}
+
+pub fn set_integrity_registry(env: &Env, registry: &Address) {
+    env.storage()
+        .persistent()
+        .set(&IntegrityDataKey::IntegrityRegistry, registry);
+}
+
+pub fn get_integrity_registry(env: &Env) -> Option<Address> {
+    env.storage()
+        .persistent()
+        .get(&IntegrityDataKey::IntegrityRegistry)
+}
+
+pub fn next_anchor_id(env: &Env) -> Result<u64, Error> {
+    let key = IntegrityDataKey::NextAnchorId;
+    let current: u64 = env.storage().persistent().get(&key).unwrap_or(0);
+    let next = current.checked_add(1).ok_or(Error::ArithmeticOverflow)?;
+    env.storage().persistent().set(&key, &next);
+    Ok(next)
+}
+
+pub fn put_content_anchor(env: &Env, anchor: &ContentAnchor) {
+    env.storage()
+        .persistent()
+        .set(&IntegrityDataKey::Anchor(anchor.anchor_id), anchor);
+}
+
+pub fn get_content_anchor(env: &Env, anchor_id: u64) -> Option<ContentAnchor> {
+    env.storage()
+        .persistent()
+        .get(&IntegrityDataKey::Anchor(anchor_id))
+}
+
+pub fn set_anchor_id_by_hash(env: &Env, hash: &soroban_sdk::BytesN<32>, anchor_id: u64) {
+    env.storage()
+        .persistent()
+        .set(&IntegrityDataKey::AnchorByHash(hash.clone()), &anchor_id);
+}
+
+pub fn get_anchor_id_by_hash(env: &Env, hash: &soroban_sdk::BytesN<32>) -> Option<u64> {
+    env.storage()
+        .persistent()
+        .get(&IntegrityDataKey::AnchorByHash(hash.clone()))
+}
+
+pub fn add_product_anchor(env: &Env, product_id: &String, anchor_id: u64) -> Result<(), Error> {
+    let key = IntegrityDataKey::ProductAnchors(product_id.clone());
+    let mut ids: Vec<u64> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+
+    if ids.len() >= crate::integrity_anchor::MAX_ANCHORS_PER_PRODUCT as u32 {
+        return Err(Error::TooManyAnchors);
+    }
+
+    ids.push_back(anchor_id);
+    env.storage().persistent().set(&key, &ids);
+    Ok(())
+}
+
+pub fn get_product_anchors(env: &Env, product_id: &String) -> Vec<ContentAnchor> {
+    let key = IntegrityDataKey::ProductAnchors(product_id.clone());
+    let ids: Vec<u64> = env
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| Vec::new(env));
+
+    let mut anchors = Vec::new(env);
+    for i in 0..ids.len() {
+        if let Some(id) = ids.get(i) {
+            if let Some(anchor) = get_content_anchor(env, id) {
+                anchors.push_back(anchor);
+            }
+        }
+    }
+    anchors
+}

@@ -158,3 +158,57 @@ println!("{} {}", health.status, stats.total_products);
 # Ok(())
 # }
 ```
+
+## 5. Decentralized Storage (Manuals / PDFs)
+
+Upload directly to IPFS or Arweave (no central file broker), then register an integrity anchor.
+
+### Python
+
+```python
+from chainlogistics_sdk import ChainLogisticsClient, Config
+from chainlogistics_sdk.storage import StorageBackend
+
+client = ChainLogisticsClient(Config("YOUR_API_KEY"))
+
+with open("manual.pdf", "rb") as f:
+    content = f.read()
+
+upload, anchor = client.storage.anchor_manual(
+    product_id="PROD-9001",
+    content=content,
+    backend=StorageBackend.IPFS,
+)
+
+print(upload.cid, upload.content_hash, anchor["deduplicated"])
+```
+
+### Rust
+
+```rust
+use chainlogistics_sdk::{ChainLogisticsClient, Config};
+use chainlogistics_sdk::StorageBackend;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = ChainLogisticsClient::new(Config::new("YOUR_API_KEY"))?;
+    let content = std::fs::read("manual.pdf")?;
+
+    let (upload, anchor) = client
+        .storage()
+        .anchor_manual("PROD-9001", &content, StorageBackend::Ipfs)
+        .await?;
+
+    println!("{} {} dedup={}", upload.cid, upload.content_hash, anchor.deduplicated);
+    Ok(())
+}
+```
+
+### Environment
+
+```bash
+IPFS_API_URL=http://127.0.0.1:5001
+IPFS_GATEWAY=https://ipfs.io/ipfs/
+ARWEAVE_GATEWAY=https://arweave.net/
+STORAGE_VERIFICATION_INTERVAL_SECS=900
+```

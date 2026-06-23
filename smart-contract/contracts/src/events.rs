@@ -16,9 +16,9 @@
 // Note: Some events include `_unused: u32` fields because the soroban-sdk 25.3.0
 // `#[contractevent]` macro requires at least one field and doesn't support unit structs.
 
-use soroban_sdk::{contractevent, Address, Symbol, Val, Vec};
+use soroban_sdk::{contractevent, Address, BytesN, Symbol, Val, Vec};
 
-use crate::types::{ContractVersion, Product, TrackingEvent};
+use crate::types::{ContractVersion, Product, StorageScheme, TrackingEvent};
 
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -193,4 +193,25 @@ pub struct ProposalExecuted {
     pub executor: Address,
     pub kind: Symbol,
     pub args: Vec<Val>,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContentAnchored {
+    pub anchor_id: u64,
+    pub product_id: soroban_sdk::String,
+    pub content_hash: BytesN<32>,
+    pub cid: soroban_sdk::String,
+    pub storage_scheme: StorageScheme,
+    pub byte_size: u64,
+    pub anchored_by: Address,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContentTamperDetected {
+    pub anchor_id: u64,
+    pub product_id: soroban_sdk::String,
+    pub expected_hash: BytesN<32>,
+    pub supplied_hash: BytesN<32>,
 }
