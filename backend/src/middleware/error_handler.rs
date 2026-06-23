@@ -8,32 +8,29 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::middleware::audit::{correlation_id_from_headers, CORRELATION_ID_HEADER};
 use crate::error::{ErrorCode, ErrorResponse};
+use crate::middleware::audit::{correlation_id_from_headers, CORRELATION_ID_HEADER};
 
 /// Global error handler middleware
 /// Catches any unhandled errors and panics, ensuring consistent error responses
-pub async fn global_error_handler(
-    request: Request,
-    next: Next,
-) -> Result<Response, Response> {
+pub async fn global_error_handler(request: Request, next: Next) -> Result<Response, Response> {
     let correlation_id = request
         .extensions()
         .get::<String>()
         .cloned()
         .or_else(|| correlation_id_from_headers(request.headers()))
         .unwrap_or_else(|| Uuid::new_v4().to_string());
-    
+
     // Add correlation ID to request extensions for tracking
     let mut request = request;
     request.extensions_mut().insert(correlation_id.clone());
-    
+
     // Execute the request
     let response = next.run(request).await;
-    
+
     // Check if the response is an error status
     let status = response.status();
-    
+
     if status.is_client_error() || status.is_server_error() {
         // Log the error with correlation ID
         if status.is_server_error() {
@@ -50,14 +47,14 @@ pub async fn global_error_handler(
             );
         }
     }
-    
+
     Ok(response)
 }
 
 /// Panic handler that converts panics to proper error responses
 pub fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
     let correlation_id = Uuid::new_v4().to_string();
-    
+
     let details = if let Some(s) = err.downcast_ref::<String>() {
         s.clone()
     } else if let Some(s) = err.downcast_ref::<&str>() {
@@ -83,35 +80,32 @@ pub fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
 }
 
 /// Request logging middleware with correlation ID
-pub async fn request_logger(
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn request_logger(request: Request, next: Next) -> Response {
     let correlation_id = request
         .extensions()
         .get::<String>()
         .cloned()
         .or_else(|| correlation_id_from_headers(request.headers()))
         .unwrap_or_else(|| Uuid::new_v4().to_string());
-    
+
     let method = request.method().clone();
     let uri = request.uri().clone();
     let start = std::time::Instant::now();
     let mut request = request;
     request.extensions_mut().insert(correlation_id.clone());
-    
+
     tracing::info!(
         correlation_id = %correlation_id,
         method = %method,
         uri = %uri,
         "Request started"
     );
-    
+
     let mut response = next.run(request).await;
-    
+
     let duration = start.elapsed();
     let status = response.status();
-    
+
     let log_level = if status.is_server_error() {
         tracing::Level::ERROR
     } else if status.is_client_error() {
@@ -119,7 +113,7 @@ pub async fn request_logger(
     } else {
         tracing::Level::INFO
     };
-    
+
     tracing::event!(
         log_level,
         correlation_id = %correlation_id,
@@ -131,12 +125,11 @@ pub async fn request_logger(
     );
 
     if let Ok(header_value) = HeaderValue::from_str(&correlation_id) {
-        response.headers_mut().insert(
-            HeaderName::from_static(CORRELATION_ID_HEADER),
-            header_value,
-        );
+        response
+            .headers_mut()
+            .insert(HeaderName::from_static(CORRELATION_ID_HEADER), header_value);
     }
-    
+
     response
 }
 
@@ -182,7 +175,12 @@ mod tests {
             .layer(middleware::from_fn(request_logger));
 
         let response = app
-            .oneshot(Request::builder().uri("/error").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/error")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 

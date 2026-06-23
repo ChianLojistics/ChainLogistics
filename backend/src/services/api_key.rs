@@ -1,10 +1,10 @@
+use crate::database::ApiKeyRepository;
+use crate::models::{ApiKey, ApiKeyTier, NewApiKey};
 use async_trait::async_trait;
+use rand::Rng;
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
-use sha2::{Sha256, Digest};
-use rand::Rng;
-use crate::database::ApiKeyRepository;
-use crate::models::{ApiKey, NewApiKey, ApiKeyTier};
 
 pub struct ApiKeyService {
     pub(crate) pool: PgPool,
@@ -30,7 +30,7 @@ impl ApiKeyService {
     }
 
     pub async fn disable_inactive_keys(&self, inactive_days: i64) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             UPDATE api_keys
             SET is_active = false
@@ -38,8 +38,8 @@ impl ApiKeyService {
               AND last_used_at IS NOT NULL
               AND last_used_at < NOW() - INTERVAL '1 day' * $1
             "#,
-            inactive_days
         )
+        .bind(inactive_days)
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected())
@@ -49,57 +49,54 @@ impl ApiKeyService {
 #[async_trait]
 impl ApiKeyRepository for ApiKeyService {
     async fn create_api_key(&self, api_key: NewApiKey) -> Result<ApiKey, sqlx::Error> {
-        sqlx::query_as!(
-            ApiKey,
+        sqlx::query_as::<ApiKey, _>(
             r#"
             INSERT INTO api_keys (user_id, key_hash, name, tier, rate_limit_per_minute, expires_at)
             VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
+            RETURNING
+                id, user_id, key_hash, name, tier, rate_limit_per_minute,
+                is_active, expires_at, last_used_at, created_at
             "#,
-            api_key.user_id,
-            api_key.key_hash,
-            api_key.name,
-            api_key.tier as ApiKeyTier,
-            api_key.rate_limit_per_minute,
-            api_key.expires_at
         )
+        .bind(api_key.user_id)
+        .bind(api_key.key_hash)
+        .bind(api_key.name)
+        .bind(api_key.tier)
+        .bind(api_key.rate_limit_per_minute)
+        .bind(api_key.expires_at)
         .fetch_one(&self.pool)
         .await
     }
 
     async fn get_api_key(&self, id: Uuid) -> Result<Option<ApiKey>, sqlx::Error> {
-        sqlx::query_as!(
-            ApiKey,
-            "SELECT * FROM api_keys WHERE id = $1",
-            id
+        sqlx::query_as::<ApiKey, _>(
+            "SELECT id, user_id, key_hash, name, tier, rate_limit_per_minute, is_active, expires_at, last_used_at, created_at FROM api_keys WHERE id = $1",
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
     }
 
     async fn get_api_key_by_hash(&self, key_hash: &str) -> Result<Option<ApiKey>, sqlx::Error> {
-        sqlx::query_as!(
-            ApiKey,
-            "SELECT * FROM api_keys WHERE key_hash = $1 AND is_active = true",
-            key_hash
+        sqlx::query_as::<ApiKey, _>(
+            "SELECT id, user_id, key_hash, name, tier, rate_limit_per_minute, is_active, expires_at, last_used_at, created_at FROM api_keys WHERE key_hash = $1 AND is_active = true",
         )
+        .bind(key_hash)
         .fetch_optional(&self.pool)
         .await
     }
 
     async fn list_api_keys(&self, user_id: Uuid) -> Result<Vec<ApiKey>, sqlx::Error> {
-        sqlx::query_as!(
-            ApiKey,
-            "SELECT * FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC",
-            user_id
+        sqlx::query_as::<ApiKey, _>(
+            "SELECT id, user_id, key_hash, name, tier, rate_limit_per_minute, is_active, expires_at, last_used_at, created_at FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC",
         )
+        .bind(user_id)
         .fetch_all(&self.pool)
         .await
     }
 
     async fn update_api_key(&self, id: Uuid, api_key: ApiKey) -> Result<ApiKey, sqlx::Error> {
-        sqlx::query_as!(
-            ApiKey,
+        sqlx::query_as::<ApiKey, _>(
             r#"
             UPDATE api_keys SET
                 name = $2,
@@ -108,36 +105,34 @@ impl ApiKeyRepository for ApiKeyService {
                 is_active = $5,
                 expires_at = $6
             WHERE id = $1
-            RETURNING *
+            RETURNING
+                id, user_id, key_hash, name, tier, rate_limit_per_minute,
+                is_active, expires_at, last_used_at, created_at
             "#,
-            id,
-            api_key.name,
-            api_key.tier as ApiKeyTier,
-            api_key.rate_limit_per_minute,
-            api_key.is_active,
-            api_key.expires_at
         )
+        .bind(id)
+        .bind(api_key.name)
+        .bind(api_key.tier)
+        .bind(api_key.rate_limit_per_minute)
+        .bind(api_key.is_active)
+        .bind(api_key.expires_at)
         .fetch_one(&self.pool)
         .await
     }
 
     async fn update_last_used(&self, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            "UPDATE api_keys SET last_used_at = NOW() WHERE id = $1",
-            id
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE api_keys SET last_used_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
     async fn revoke_api_key(&self, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            "UPDATE api_keys SET is_active = false WHERE id = $1",
-            id
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE api_keys SET is_active = false WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }

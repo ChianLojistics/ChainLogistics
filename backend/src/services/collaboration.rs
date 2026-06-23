@@ -1,7 +1,7 @@
-use sqlx::PgPool;
-use uuid::Uuid;
 use crate::error::AppError;
 use crate::models::collaboration::*;
+use sqlx::PgPool;
+use uuid::Uuid;
 
 pub struct CollaborationService {
     pool: PgPool,
@@ -17,17 +17,16 @@ impl CollaborationService {
         actor_id: Uuid,
         req: ShareProductRequest,
     ) -> Result<ProductShare, AppError> {
-        let share = sqlx::query_as!(
-            ProductShare,
+        let share = sqlx::query_as::<ProductShare, _>(
             r#"
             INSERT INTO product_shares (product_id, shared_with_user_id, permission_level)
             VALUES ($1, $2, $3)
-            RETURNING *
+            RETURNING id, product_id, shared_with_user_id, permission_level, created_at, updated_at
             "#,
-            req.product_id,
-            req.shared_with_user_id,
-            req.permission_level
         )
+        .bind(req.product_id)
+        .bind(req.shared_with_user_id)
+        .bind(req.permission_level)
         .fetch_one(&self.pool)
         .await?;
 
@@ -43,11 +42,10 @@ impl CollaborationService {
     }
 
     pub async fn list_shares(&self, product_id: &str) -> Result<Vec<ProductShare>, AppError> {
-        let shares = sqlx::query_as!(
-            ProductShare,
-            "SELECT * FROM product_shares WHERE product_id = $1",
-            product_id
+        let shares = sqlx::query_as::<ProductShare, _>(
+            "SELECT id, product_id, shared_with_user_id, permission_level, created_at, updated_at FROM product_shares WHERE product_id = $1",
         )
+        .bind(product_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(shares)
@@ -58,16 +56,15 @@ impl CollaborationService {
         requester_id: Uuid,
         req: CreateCollaborationRequest,
     ) -> Result<CollaborationRequest, AppError> {
-        let request = sqlx::query_as!(
-            CollaborationRequest,
+        let request = sqlx::query_as::<CollaborationRequest, _>(
             r#"
             INSERT INTO collaboration_requests (product_id, requester_id, status)
             VALUES ($1, $2, 'pending')
-            RETURNING *
+            RETURNING id, product_id, requester_id, status, created_at, updated_at
             "#,
-            req.product_id,
-            requester_id
         )
+        .bind(req.product_id)
+        .bind(requester_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -76,8 +73,9 @@ impl CollaborationService {
             "create_collaboration_request",
             "product",
             &req.product_id,
-            serde_json::json!({})
-        ).await?;
+            serde_json::json!({}),
+        )
+        .await?;
 
         Ok(request)
     }
@@ -88,17 +86,16 @@ impl CollaborationService {
         request_id: Uuid,
         status: &str,
     ) -> Result<CollaborationRequest, AppError> {
-        let updated = sqlx::query_as!(
-            CollaborationRequest,
+        let updated = sqlx::query_as::<CollaborationRequest, _>(
             r#"
             UPDATE collaboration_requests
             SET status = $2, updated_at = NOW()
             WHERE id = $1
-            RETURNING *
+            RETURNING id, product_id, requester_id, status, created_at, updated_at
             "#,
-            request_id,
-            status
         )
+        .bind(request_id)
+        .bind(status)
         .fetch_one(&self.pool)
         .await?;
 
@@ -107,8 +104,9 @@ impl CollaborationService {
             "update_collaboration_request",
             "collaboration_request",
             &request_id.to_string(),
-            serde_json::json!({ "new_status": status })
-        ).await?;
+            serde_json::json!({ "new_status": status }),
+        )
+        .await?;
 
         Ok(updated)
     }
@@ -118,12 +116,11 @@ impl CollaborationService {
         entity_type: &str,
         entity_id: &str,
     ) -> Result<Vec<CollaborationAuditTrail>, AppError> {
-        let trails = sqlx::query_as!(
-            CollaborationAuditTrail,
-            "SELECT * FROM collaboration_audit_trails WHERE entity_type = $1 AND entity_id = $2 ORDER BY created_at DESC",
-            entity_type,
-            entity_id
+        let trails = sqlx::query_as::<CollaborationAuditTrail, _>(
+            "SELECT id, actor_id, action, entity_type, entity_id, details, created_at FROM collaboration_audit_trails WHERE entity_type = $1 AND entity_id = $2 ORDER BY created_at DESC",
         )
+        .bind(entity_type)
+        .bind(entity_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(trails)
@@ -137,17 +134,17 @@ impl CollaborationService {
         entity_id: &str,
         details: serde_json::Value,
     ) -> Result<(), AppError> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO collaboration_audit_trails (actor_id, action, entity_type, entity_id, details)
             VALUES ($1, $2, $3, $4, $5)
             "#,
-            actor_id,
-            action,
-            entity_type,
-            entity_id,
-            details
         )
+        .bind(actor_id)
+        .bind(action)
+        .bind(entity_type)
+        .bind(entity_id)
+        .bind(details)
         .execute(&self.pool)
         .await?;
         Ok(())

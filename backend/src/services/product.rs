@@ -1,8 +1,8 @@
+use crate::database::{ProductFilters, ProductRepository};
+use crate::models::{AppError, NewProduct, Product};
 use async_trait::async_trait;
-use sqlx::PgPool;
 use redis::AsyncCommands;
-use crate::database::{ProductRepository, ProductFilters};
-use crate::models::{Product, NewProduct, AppError};
+use sqlx::PgPool;
 
 pub struct ProductService {
     pub(crate) pool: PgPool,
@@ -32,28 +32,29 @@ impl ProductService {
 #[async_trait]
 impl ProductRepository for ProductService {
     async fn create_product(&self, product: NewProduct) -> Result<Product, sqlx::Error> {
-        let created = sqlx::query_as!(
-            Product,
+        let created = sqlx::query_as::<Product, _>(
             r#"
             INSERT INTO products (
                 id, name, description, origin_location, category, tags,
                 certifications, media_hashes, custom_fields, owner_address,
                 is_active, created_by, updated_by
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, $11, $11)
-            RETURNING *
+            RETURNING id, name, description, origin_location, category, tags,
+                certifications, media_hashes, custom_fields, owner_address,
+                is_active, created_at, updated_at, created_by, updated_by
             "#,
-            product.id,
-            product.name,
-            product.description,
-            product.origin_location,
-            product.category,
-            &product.tags,
-            &product.certifications,
-            &product.media_hashes,
-            product.custom_fields,
-            product.owner_address,
-            product.created_by
         )
+        .bind(product.id)
+        .bind(product.name)
+        .bind(product.description)
+        .bind(product.origin_location)
+        .bind(product.category)
+        .bind(&product.tags)
+        .bind(&product.certifications)
+        .bind(&product.media_hashes)
+        .bind(product.custom_fields)
+        .bind(product.owner_address)
+        .bind(product.created_by)
         .fetch_one(&self.pool)
         .await?;
 
@@ -73,11 +74,13 @@ impl ProductRepository for ProductService {
             }
         }
 
-        let product = sqlx::query_as!(
-            Product,
-            "SELECT * FROM products WHERE id = $1",
-            id
+        let product = sqlx::query_as::<Product, _>(
+            "SELECT id, name, description, origin_location, category, tags,
+                certifications, media_hashes, custom_fields, owner_address,
+                is_active, created_at, updated_at, created_by, updated_by 
+             FROM products WHERE id = $1",
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -93,8 +96,7 @@ impl ProductRepository for ProductService {
     }
 
     async fn update_product(&self, id: &str, product: Product) -> Result<Product, sqlx::Error> {
-        let updated = sqlx::query_as!(
-            Product,
+        let updated = sqlx::query_as::<Product, _>(
             r#"
             UPDATE products SET
                 name = $2,
@@ -109,21 +111,23 @@ impl ProductRepository for ProductService {
                 is_active = $11,
                 updated_by = $12
             WHERE id = $1
-            RETURNING *
+            RETURNING id, name, description, origin_location, category, tags,
+                certifications, media_hashes, custom_fields, owner_address,
+                is_active, created_at, updated_at, created_by, updated_by
             "#,
-            id,
-            product.name,
-            product.description,
-            product.origin_location,
-            product.category,
-            &product.tags,
-            &product.certifications,
-            &product.media_hashes,
-            product.custom_fields,
-            product.owner_address,
-            product.is_active,
-            product.updated_by
         )
+        .bind(id)
+        .bind(product.name)
+        .bind(product.description)
+        .bind(product.origin_location)
+        .bind(product.category)
+        .bind(&product.tags)
+        .bind(&product.certifications)
+        .bind(&product.media_hashes)
+        .bind(product.custom_fields)
+        .bind(product.owner_address)
+        .bind(product.is_active)
+        .bind(product.updated_by)
         .fetch_one(&self.pool)
         .await?;
 
@@ -134,7 +138,8 @@ impl ProductRepository for ProductService {
     }
 
     async fn delete_product(&self, id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query!("DELETE FROM products WHERE id = $1", id)
+        sqlx::query("DELETE FROM products WHERE id = $1")
+            .bind(id)
             .execute(&self.pool)
             .await?;
 
@@ -195,9 +200,7 @@ impl ProductRepository for ProductService {
             q = q.bind(binding);
         }
 
-        q.build_query_as::<Product>()
-            .fetch_all(&self.pool)
-            .await
+        q.build_query_as::<Product>().fetch_all(&self.pool).await
     }
 
     async fn count_products(&self, filters: Option<ProductFilters>) -> Result<i64, sqlx::Error> {
@@ -238,16 +241,16 @@ impl ProductRepository for ProductService {
             q = q.bind(binding);
         }
 
-        q.build_scalar::<i64>()
-            .fetch_one(&self.pool)
-            .await
+        q.build_scalar::<i64>().fetch_one(&self.pool).await
     }
 
     async fn search_products(&self, query: &str, limit: i64) -> Result<Vec<Product>, sqlx::Error> {
-        sqlx::query_as!(
-            Product,
+        sqlx::query_as::<Product, _>(
             r#"
-            SELECT * FROM products
+            SELECT id, name, description, origin_location, category, tags,
+                certifications, media_hashes, custom_fields, owner_address,
+                is_active, created_at, updated_at, created_by, updated_by
+            FROM products
             WHERE
                 to_tsvector('english', name || ' ' || COALESCE(description, '') || ' ' || category)
                 @@ plainto_tsquery('english', $1)
@@ -256,10 +259,10 @@ impl ProductRepository for ProductService {
             ORDER BY ts_rank(to_tsvector('english', name || ' ' || COALESCE(description, '') || ' ' || category), plainto_tsquery('english', $1)) DESC
             LIMIT $3
             "#,
-            query,
-            format!("%{}%", query),
-            limit
         )
+        .bind(query)
+        .bind(format!("%{}%", query))
+        .bind(limit)
         .fetch_all(&self.pool)
         .await
     }

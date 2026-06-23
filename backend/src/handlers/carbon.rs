@@ -85,7 +85,9 @@ pub async fn list_footprints(
     Path(product_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let records = state.carbon_service.list_footprints(&product_id).await?;
-    Ok(Json(serde_json::json!({ "footprints": records, "total": records.len() })))
+    Ok(Json(
+        serde_json::json!({ "footprints": records, "total": records.len() }),
+    ))
 }
 
 // ── Credits ───────────────────────────────────────────────────────────────────
@@ -137,7 +139,9 @@ pub async fn list_credits(
     // TODO: extract real owner_id from auth context
     let owner_id = Uuid::nil();
     let credits = state.carbon_service.list_credits(owner_id, &query).await?;
-    Ok(Json(serde_json::json!({ "credits": credits, "total": credits.len() })))
+    Ok(Json(
+        serde_json::json!({ "credits": credits, "total": credits.len() }),
+    ))
 }
 
 #[utoipa::path(
@@ -234,7 +238,9 @@ pub async fn list_trades(
     Query(query): Query<ListTradesQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let trades = state.carbon_service.list_marketplace(&query).await?;
-    Ok(Json(serde_json::json!({ "trades": trades, "total": trades.len() })))
+    Ok(Json(
+        serde_json::json!({ "trades": trades, "total": trades.len() }),
+    ))
 }
 
 #[utoipa::path(
@@ -391,7 +397,9 @@ pub async fn list_reports(
     // TODO: extract real owner_id from auth context
     let owner_id = Uuid::nil();
     let reports = state.carbon_service.list_reports(owner_id).await?;
-    Ok(Json(serde_json::json!({ "reports": reports, "total": reports.len() })))
+    Ok(Json(
+        serde_json::json!({ "reports": reports, "total": reports.len() }),
+    ))
 }
 
 #[utoipa::path(
@@ -432,7 +440,11 @@ pub async fn get_supplier_score(
     State(state): State<AppState>,
     Path(supplier_address): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let score = state.carbon_service.get_supplier_score(&supplier_address).await?;
-    Ok(Json(serde_json::json!({ "supplier_address": supplier_address, "sustainability_score": score })))
+    let score = state
+        .carbon_service
+        .get_supplier_score(&supplier_address)
+        .await?;
+    Ok(Json(
+        serde_json::json!({ "supplier_address": supplier_address, "sustainability_score": score }),
+    ))
 }
-

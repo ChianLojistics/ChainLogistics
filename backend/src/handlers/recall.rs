@@ -4,7 +4,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{ToSchema, IntoParams};
 
 use crate::{
     AppState,
@@ -13,7 +13,7 @@ use crate::{
     validation::{sanitize_input, validate_product_id, validate_string, validate_uuid},
 };
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct ListRecallsQuery {
     #[serde(alias = "productId")]
     pub product_id: String,
@@ -208,8 +208,7 @@ pub async fn list_affected_items(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Recall {} not found", id)))?;
 
-    let items = sqlx::query_as!(
-        RecallAffectedItem,
+    let items = sqlx::query_as::<RecallAffectedItem, _>(
         r#"
         SELECT
             id,
@@ -224,8 +223,8 @@ pub async fn list_affected_items(
         WHERE recall_id = $1
         ORDER BY created_at ASC
         "#,
-        recall_id
     )
+    .bind(recall_id)
     .fetch_all(state.db.pool())
     .await?;
 
