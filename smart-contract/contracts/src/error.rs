@@ -124,4 +124,15 @@ pub enum Error {
     DisputePeriodExpired = 139,
     NotChannelParticipant = 140,
     InvalidSignature = 141,
+
+    // --- Ring Signature / Privacy Audit Trail (150-160) ---
+    RingTooSmall = 150,
+    RingTooLarge = 151,
+    RingSizeMismatch = 152,
+    InvalidRingMember = 153,
+    DuplicateRingMember = 154,
+    RingSignatureInvalid = 155,
+    AuditTrailNotInitialized = 156,
+    // Reserved for the linkable (LSAG) variant; see RING_SIGNATURE.md §5.
+    KeyImageAlreadyUsed = 157,
 }
