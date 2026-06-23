@@ -216,10 +216,192 @@ jobs:
           path: frontend/test-results/
           retention-days: 7
 
+  backend-tests:
+    name: Backend Tests & Quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: backend/target
+          key: ${{ runner.os }}-cargo-build-backend-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-backend-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --release --all-features
+
+      - name: Build
+        run: cargo build --release
+
+  sdk-tests:
+    name: SDK Tests & Quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sdk/rust
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: sdk/rust/target
+          key: ${{ runner.os }}-cargo-build-sdk-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-sdk-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --release --all-features
+
+      - name: Build
+        run: cargo build --release
+
+  performance-benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./smart-contract
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown, wasm32v1-none
+
+      - name: Ensure wasm32v1-none target is available
+        run: rustup target add wasm32v1-none
+
+      - name: Install Stellar CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$HOME/.local/bin"
+
+          arch="$(uname -m)"
+          case "$arch" in
+            x86_64) asset_arch="x86_64" ;;
+            aarch64|arm64) asset_arch="aarch64" ;;
+            *) echo "Unsupported architecture: $arch"; exit 1 ;;
+          esac
+
+          version="23.4.0"
+          base_url="https://github.com/stellar/stellar-cli/releases/download/v${version}"
+
+          urls=(
+            "${base_url}/stellar-cli-${version}-${asset_arch}-unknown-linux-gnu.tar.gz"
+            "${base_url}/stellar-cli-${version}-${asset_arch}-unknown-linux-musl.tar.gz"
+          )
+
+          success="false"
+          for url in "${urls[@]}"; do
+            echo "Attempting download: ${url}"
+            if curl -fL --retry 6 --retry-all-errors --retry-delay 5 -o stellar-cli.tar.gz "${url}"; then
+              success="true"
+              break
+            fi
+          done
+
+          if [ "$success" != "true" ]; then
+            echo "Failed to download stellar-cli v${version} from GitHub releases."
+            exit 1
+          fi
+
+          tmpdir="$(mktemp -d)"
+          tar -xzf stellar-cli.tar.gz -C "$tmpdir"
+          stellar_path="$(find "$tmpdir" -type f -name stellar | head -n 1)"
+          if [ -z "$stellar_path" ]; then
+            echo "Could not find 'stellar' binary in downloaded archive."
+            exit 1
+          fi
+          mv "$stellar_path" "$HOME/.local/bin/stellar"
+          chmod +x "$HOME/.local/bin/stellar"
+
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          stellar --version
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: smart-contract/target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
+      - name: Run performance benchmarks
+        run: cargo test --release benchmark_batch_transfer_chunks_of_100 -- --ignored
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: smart-contract/target/
+          retention-days: 30
+
   build-verification:
     name: Build Verification
     runs-on: ubuntu-latest
-    needs: [ rust-tests, frontend-tests, frontend-e2e ]
+    needs: [ rust-tests, frontend-tests, frontend-e2e, backend-tests, sdk-tests, performance-benchmarks ]
     steps:
       - name: All builds passed
         run: echo "All upstream jobs completed successfully"
