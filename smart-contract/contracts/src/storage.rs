@@ -437,7 +437,11 @@ pub fn get_anchor_id_by_hash(env: &Env, hash: &soroban_sdk::BytesN<32>) -> Optio
 
 pub fn add_product_anchor(env: &Env, product_id: &String, anchor_id: u64) -> Result<(), Error> {
     let key = IntegrityDataKey::ProductAnchors(product_id.clone());
-    let mut ids: Vec<u64> = env.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(env));
+    let mut ids: Vec<u64> = env
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| Vec::new(env));
 
     if ids.len() >= crate::integrity_anchor::MAX_ANCHORS_PER_PRODUCT as u32 {
         return Err(Error::TooManyAnchors);

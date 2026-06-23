@@ -107,7 +107,10 @@ impl IntegrityAnchorContract {
     }
 
     /// List all content anchors for a product.
-    pub fn get_anchors_for_product(env: Env, product_id: String) -> Result<Vec<ContentAnchor>, Error> {
+    pub fn get_anchors_for_product(
+        env: Env,
+        product_id: String,
+    ) -> Result<Vec<ContentAnchor>, Error> {
         ValidationContract::non_empty(&product_id)?;
         Ok(storage::get_product_anchors(&env, &product_id))
     }

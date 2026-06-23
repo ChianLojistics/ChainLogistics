@@ -2,12 +2,14 @@
 
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Map, String, Vec};
 
-use crate::integrity_anchor::{IntegrityAnchorContract, IntegrityAnchorContractClient, MAX_CONTENT_SIZE};
-use crate::{
-    AuthorizationContract, AuthorizationContractClient, ProductConfig,
-    ProductRegistryContract, ProductRegistryContractClient,
+use crate::integrity_anchor::{
+    IntegrityAnchorContract, IntegrityAnchorContractClient, MAX_CONTENT_SIZE,
 };
 use crate::types::StorageScheme;
+use crate::{
+    AuthorizationContract, AuthorizationContractClient, ProductConfig, ProductRegistryContract,
+    ProductRegistryContractClient,
+};
 
 fn setup_registry(env: &Env) -> (ProductRegistryContractClient<'_>, Address) {
     let auth_id = env.register_contract(None, AuthorizationContract);
@@ -53,7 +55,10 @@ fn test_anchor_content_and_cas_dedup() {
     client.init_integrity_anchor(&admin, &registry_id);
 
     let hash = BytesN::from_array(&env, &[0xAB; 32]);
-    let cid = String::from_str(&env, "bafybeigdyrzt5sfp7udm7uhgt24nszaw6u7am6lkryaag3f2ptxt7pudzu");
+    let cid = String::from_str(
+        &env,
+        "bafybeigdyrzt5sfp7udm7uhgt24nszaw6u7am6lkryaag3f2ptxt7pudzu",
+    );
 
     let anchor1 = client.anchor_content(
         &admin,
