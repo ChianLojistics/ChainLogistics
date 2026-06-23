@@ -443,7 +443,7 @@ pub fn add_product_anchor(env: &Env, product_id: &String, anchor_id: u64) -> Res
         .get(&key)
         .unwrap_or_else(|| Vec::new(env));
 
-    if ids.len() >= crate::integrity_anchor::MAX_ANCHORS_PER_PRODUCT as u32 {
+    if ids.len() >= crate::integrity_anchor::MAX_ANCHORS_PER_PRODUCT {
         return Err(Error::TooManyAnchors);
     }
 

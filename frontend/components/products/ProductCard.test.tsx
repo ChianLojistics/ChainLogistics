@@ -5,6 +5,7 @@ import { ProductCard } from './ProductCard';
 const mockProduct = {
   id: 'prod-123',
   name: 'Test Product',
+  description: 'Premium single-origin test product',
   category: 'Coffee',
   owner: 'GCFXHS5DRCQZ4QZ7Z4X7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7',
   origin: { location: 'Ethiopia' },
