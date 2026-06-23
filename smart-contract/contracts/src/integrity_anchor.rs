@@ -8,7 +8,7 @@ use crate::events::{ContentAnchored, ContentTamperDetected};
 use crate::storage;
 use crate::types::{ContentAnchor, StorageScheme};
 use crate::validation_contract::ValidationContract;
-use crate::ProductRegistryContractClient;
+use crate::product_registry::ProductRegistryContractClient;
 
 /// Maximum file size: 50 MB
 pub const MAX_CONTENT_SIZE: u64 = 52_428_800;
