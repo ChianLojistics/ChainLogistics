@@ -24,7 +24,7 @@
     "html5-qrcode": "^2.3.8",
     "i18next": "^25.10.10",
     "lucide-react": "^0.575.0",
-    "next": "16.2.4",
+    "next": "16.2.9",
     "next-themes": "^0.4.6",
     "qrcode": "^1.5.4",
     "react": "19.2.3",
@@ -70,6 +70,14 @@
     "picomatch": "^4.0.2",
     "postcss": "^8.5.10",
     "vite": "^7.3.2",
-    "rollup": "^4.20.0"
+    "rollup": "^4.20.0",
+    "@babel/core": "^7.25.0",
+    "esbuild": "^0.28.1",
+    "form-data": "^4.0.1",
+    "js-yaml": "^4.1.2",
+    "vitest": "^3.2.6",
+    "@vitest/ui": "^3.2.6",
+    "@vitest/coverage-v8": "^3.2.6",
+    "ws": "^8.20.2"
   }
 }
