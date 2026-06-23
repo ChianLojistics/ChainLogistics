@@ -5,13 +5,13 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::{
-    AppState,
     error::AppError,
     models::{ApiKey, ApiKeyTier, NewApiKey},
+    AppState,
 };
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -173,7 +173,9 @@ pub async fn revoke_key(
         .ok_or_else(|| AppError::NotFound(format!("API key {} not found", id)))?;
 
     if key.user_id != auth.user_id {
-        return Err(AppError::Forbidden("Cannot revoke another user's key".into()));
+        return Err(AppError::Forbidden(
+            "Cannot revoke another user's key".into(),
+        ));
     }
 
     state.api_key_service.revoke_api_key(id).await?;
@@ -210,7 +212,9 @@ pub async fn rotate_key(
         .ok_or_else(|| AppError::NotFound(format!("API key {} not found", id)))?;
 
     if old_key.user_id != auth.user_id {
-        return Err(AppError::Forbidden("Cannot rotate another user's key".into()));
+        return Err(AppError::Forbidden(
+            "Cannot rotate another user's key".into(),
+        ));
     }
 
     state.api_key_service.revoke_api_key(id).await?;

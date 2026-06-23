@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
 
 pub type ConnectionId = String;
@@ -53,7 +53,11 @@ impl ConnectionManager {
         }
     }
 
-    pub async fn subscribe(&self, connection_id: &ConnectionId, channel: &Channel) -> Result<(), String> {
+    pub async fn subscribe(
+        &self,
+        connection_id: &ConnectionId,
+        channel: &Channel,
+    ) -> Result<(), String> {
         let mut connections = self.connections.write().await;
         if let Some(conn) = connections.get_mut(connection_id) {
             conn.subscribed_channels.insert(channel.clone());
@@ -70,7 +74,11 @@ impl ConnectionManager {
         Ok(())
     }
 
-    pub async fn unsubscribe(&self, connection_id: &ConnectionId, channel: &Channel) -> Result<(), String> {
+    pub async fn unsubscribe(
+        &self,
+        connection_id: &ConnectionId,
+        channel: &Channel,
+    ) -> Result<(), String> {
         let mut connections = self.connections.write().await;
         if let Some(conn) = connections.get_mut(connection_id) {
             conn.subscribed_channels.remove(channel);
@@ -96,7 +104,11 @@ impl ConnectionManager {
         }
     }
 
-    pub async fn send_to_connection(&self, connection_id: &ConnectionId, message: String) -> Result<(), String> {
+    pub async fn send_to_connection(
+        &self,
+        connection_id: &ConnectionId,
+        message: String,
+    ) -> Result<(), String> {
         let connections = self.connections.read().await;
         if let Some(conn) = connections.get(connection_id) {
             conn.sender.send(message).map_err(|e| e.to_string())?;

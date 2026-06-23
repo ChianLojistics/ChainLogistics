@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/lib/state/providers";
-import { MonitoringBootstrap, PerformanceBudgetAlerts } from "@/components/analytics";
 import { Toaster } from "@/components/ui/sonner";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import { SkipToContentLink } from "@/components/SkipToContentLink";
@@ -53,6 +53,20 @@ export const metadata: Metadata = {
   },
 };
 
+const MonitoringBootstrap = dynamic(
+  () =>
+    import("@/components/analytics/MonitoringBootstrap").then((m) => ({
+      default: m.MonitoringBootstrap,
+    }))
+);
+
+const PerformanceBudgetAlerts = dynamic(
+  () =>
+    import("@/components/analytics/PerformanceBudgetAlerts").then((m) => ({
+      default: m.PerformanceBudgetAlerts,
+    }))
+);
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -60,6 +74,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://horizon-testnet.stellar.org" />
+        <link rel="preconnect" href="https://soroban-testnet.stellar.org" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

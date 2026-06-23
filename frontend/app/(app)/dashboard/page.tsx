@@ -22,6 +22,8 @@ import { formatNumber, formatTime } from "@/lib/i18n/format";
 import { useTranslation } from "react-i18next";
 
 import { StatCard } from "@/components/analytics/StatCard";
+import { AnomalyAlerts } from "@/components/analytics/AnomalyAlerts";
+import type { RoutingAlert } from "@/components/analytics/AnomalyAlerts";
 
 // ─── Lazy-loaded heavy components (recharts, etc.) ───────────────────────────
 // These are large chart/feed components that are only needed after the initial
@@ -92,6 +94,8 @@ export default function DashboardPage() {
 
   const [products, setProducts] = React.useState<Product[]>([]);
   const [events, setEvents] = React.useState<TimelineEvent[]>([]);
+  const [routingAlerts, setRoutingAlerts] = React.useState<RoutingAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<
     | null
@@ -173,16 +177,71 @@ export default function DashboardPage() {
     }
   }, [publicKey, t]);
 
+  // Fetch routing alerts independently so a failure doesn't block the rest of
+  // the dashboard.
+  const loadAlerts = React.useCallback(async () => {
+    setAlertsLoading(true);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const res = await fetch(`${apiBase}/api/v1/routing/alerts?limit=20`, {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_API_KEY ?? "" },
+      });
+      if (res.ok) {
+        const json = await res.json() as { data: { alerts: RoutingAlert[] } };
+        setRoutingAlerts(json.data?.alerts ?? []);
+      }
+    } catch {
+      // Non-critical: alerts panel will show empty state
+    } finally {
+      setAlertsLoading(false);
+    }
+  }, []);
+
+  const handleAcknowledge = React.useCallback(async (alertId: string) => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+      await fetch(`${apiBase}/api/v1/routing/alerts/${alertId}/acknowledge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": process.env.NEXT_PUBLIC_API_KEY ?? "",
+        },
+        body: JSON.stringify({ acknowledged_by: publicKey ?? "dashboard-user" }),
+      });
+      setRoutingAlerts((prev) =>
+        prev.map((a) =>
+          a.id === alertId ? { ...a, status: "acknowledged" as const } : a
+        )
+      );
+    } catch {
+      // Silent: user can retry
+    }
+  }, [publicKey]);
+
+  const handleResolve = React.useCallback(async (alertId: string) => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+      await fetch(`${apiBase}/api/v1/routing/alerts/${alertId}/resolve`, {
+        method: "POST",
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_API_KEY ?? "" },
+      });
+      setRoutingAlerts((prev) => prev.filter((a) => a.id !== alertId));
+    } catch {
+      // Silent: user can retry
+    }
+  }, []);
+
   React.useEffect(() => {
     if (status !== "connected" || !publicKey) return;
-    
+
     // Use setTimeout to avoid calling setState synchronously in effect
     const timeoutId = setTimeout(() => {
       load();
+      loadAlerts();
     }, 0);
-    
+
     return () => clearTimeout(timeoutId);
-  }, [status, publicKey, load]);
+  }, [status, publicKey, load, loadAlerts]);
 
   React.useEffect(() => {
     if (status !== "connected" || !publicKey) return;
@@ -435,6 +494,15 @@ export default function DashboardPage() {
 
         <ActivityFeed events={recentEvents} isLoading={isLoading} className="lg:col-span-2" />
       </div>
+
+      {/* Proactive routing anomaly alerts */}
+      <AnomalyAlerts
+        alerts={routingAlerts}
+        isLoading={alertsLoading}
+        onAcknowledge={handleAcknowledge}
+        onResolve={handleResolve}
+        className="mt-6"
+      />
     </main>
   );
 }

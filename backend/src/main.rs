@@ -11,6 +11,8 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 mod blockchain;
 mod compliance;
+#[cfg(test)]
+mod tests;
 mod config;
 mod database;
 mod docs;
@@ -27,15 +29,15 @@ mod websocket;
 
 use config::Config;
 use database::Database;
-use services::{
-    ProductService, EventService, UserService, ApiKeyService, SyncService, FinancialService,
-    AnalyticsService, CarbonService, RecallService, AuditService, BatchService, RegulatoryService,
-    IoTService, QualityService, SupplierService, CollaborationService, ContentAnchorService,
-    StorageConfig, StorageVerificationService,
-};
-use utils::CronService;
 use error::AppError;
 use monitoring::MonitoringSystem;
+use services::{
+    AnalyticsService, ApiKeyService, AuditService, BatchService, CarbonService,
+    CollaborationService, ContentAnchorService, EventService, FinancialService, IoTService,
+    PredictiveRoutingService, ProductService, QualityService, RecallService, RegulatoryService,
+    StorageConfig, StorageVerificationService, SupplierService, SyncService, UserService,
+};
+use utils::CronService;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -49,6 +51,14 @@ pub struct AppState {
     pub analytics_service: Arc<AnalyticsService>,
     pub carbon_service: Arc<CarbonService>,
     pub collaboration_service: Arc<CollaborationService>,
+    pub audit_service: Arc<AuditService>,
+    pub recall_service: Arc<RecallService>,
+    pub batch_service: Arc<BatchService>,
+    pub regulatory_service: Arc<RegulatoryService>,
+    pub iot_service: Arc<IoTService>,
+    pub quality_service: Arc<QualityService>,
+    pub supplier_service: Arc<SupplierService>,
+    pub predictive_routing_service: Arc<PredictiveRoutingService>,
     pub content_anchor_service: Arc<ContentAnchorService>,
     pub storage_verification_service: Arc<StorageVerificationService>,
     pub redis_client: redis::Client,
@@ -59,7 +69,6 @@ pub struct AppState {
 impl AppState {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let config = Config::from_env()?;
-
 
         // Initialize database
         let db = Database::new(&config.database).await?;
@@ -87,22 +96,30 @@ impl AppState {
         ));
         let carbon_service = Arc::new(CarbonService::new(db.pool().clone()));
         let collaboration_service = Arc::new(CollaborationService::new(db.pool().clone()));
-        let content_anchor_service = Arc::new(ContentAnchorService::new(db.pool().clone()));
-        let audit_service = AuditService::new(
+        let audit_service = Arc::new(AuditService::new(
             db.pool().clone(),
             config.audit.enabled,
             config.audit.hmac_key.clone(),
             config.audit.retention_days,
-        );
+        ));
+        let recall_service = Arc::new(RecallService::new(db.pool().clone()));
+        let batch_service = Arc::new(BatchService::new(db.pool().clone()));
+        let regulatory_service = Arc::new(RegulatoryService::new(db.pool().clone()));
+        let iot_service = Arc::new(IoTService::new(db.pool().clone()));
+        let quality_service = Arc::new(QualityService::new(db.pool().clone()));
+        let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
+        let predictive_routing_service =
+            Arc::new(PredictiveRoutingService::new(db.pool().clone()));
+        let content_anchor_service = Arc::new(ContentAnchorService::new(db.pool().clone()));
         let storage_verification_service = Arc::new(StorageVerificationService::new(
             db.pool().clone(),
             StorageConfig::default(),
-            audit_service,
+            (*audit_service).clone(),
         ));
-        
+
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
-        
+
         Ok(Self {
             db,
             product_service,
@@ -114,13 +131,20 @@ impl AppState {
             analytics_service,
             carbon_service,
             collaboration_service,
+            audit_service,
+            recall_service,
+            batch_service,
+            regulatory_service,
+            iot_service,
+            quality_service,
+            supplier_service,
+            predictive_routing_service,
             content_anchor_service,
             storage_verification_service,
             redis_client,
             config,
             monitoring_system,
         })
-
     }
 }
 

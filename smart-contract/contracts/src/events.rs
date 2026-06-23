@@ -195,6 +195,61 @@ pub struct ProposalExecuted {
     pub args: Vec<Val>,
 }
 
+// ─── State Channel Events ────────────────────────────────────────────────────
+
+/// Emitted when a new IoT tracking state channel is opened.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChannelOpened {
+    pub channel_id: u64,
+    pub product_id: soroban_sdk::String,
+    pub party_a: Address,
+    pub party_b: Address,
+    pub dispute_window: u64,
+}
+
+/// Emitted when a cooperatively-signed state is anchored on an open channel.
+/// `batch_count` is the cumulative number of off-chain updates folded in.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChannelStateAnchored {
+    pub channel_id: u64,
+    pub nonce: u64,
+    pub batch_count: u64,
+    pub state_root: BytesN<32>,
+}
+
+/// Emitted when a closing state is submitted and the dispute window starts.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChannelClosing {
+    pub channel_id: u64,
+    pub nonce: u64,
+    pub batch_count: u64,
+    pub dispute_deadline: u64,
+}
+
+/// Emitted when a higher-nonce state overrides a closing channel (fraud proof).
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChannelDisputed {
+    pub channel_id: u64,
+    pub challenger: Address,
+    pub old_nonce: u64,
+    pub new_nonce: u64,
+    pub dispute_deadline: u64,
+}
+
+/// Emitted when a channel is finalized and its last state is anchored.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChannelFinalized {
+    pub channel_id: u64,
+    pub nonce: u64,
+    pub batch_count: u64,
+    pub state_root: BytesN<32>,
+}
+
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContentAnchored {

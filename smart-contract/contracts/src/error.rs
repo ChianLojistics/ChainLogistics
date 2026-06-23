@@ -111,9 +111,23 @@ pub enum Error {
     InvalidCertification = 104,
     ReadingNotFound = 105,
 
-    // --- Integrity Anchor (130-140) ---
-    AnchorNotFound = 130,
-    InvalidContentSize = 131,
-    TooManyAnchors = 132,
-    CidTooLong = 133,
+    // --- State Channel (130-145) ---
+    ChannelNotFound = 130,
+    ChannelNotOpen = 131,
+    ChannelAlreadyClosed = 132,
+    ChannelNotClosing = 133,
+    StaleStateNonce = 134,
+    ChannelMismatch = 135,
+    DisputeWindowTooShort = 136,
+    DisputeWindowTooLong = 137,
+    DisputePeriodActive = 138,
+    DisputePeriodExpired = 139,
+    NotChannelParticipant = 140,
+    InvalidSignature = 141,
+
+    // --- Integrity Anchor (150-155) ---
+    AnchorNotFound = 150,
+    InvalidContentSize = 151,
+    TooManyAnchors = 152,
+    CidTooLong = 153,
 }

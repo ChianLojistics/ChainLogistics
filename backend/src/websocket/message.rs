@@ -8,7 +8,10 @@ pub enum MessageType {
     #[serde(rename = "unsubscribe")]
     Unsubscribe { channel: String },
     #[serde(rename = "event")]
-    Event { channel: String, data: serde_json::Value },
+    Event {
+        channel: String,
+        data: serde_json::Value,
+    },
     #[serde(rename = "ping")]
     Ping,
     #[serde(rename = "pong")]

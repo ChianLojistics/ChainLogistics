@@ -43,13 +43,6 @@ pub struct SecurityConfig {
     pub allowed_origins: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuditConfig {
-    pub enabled: bool,
-    pub hmac_key: String,
-    pub retention_days: i64,
-}
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -118,8 +111,9 @@ impl Default for Config {
                     .unwrap_or_else(|_| "true".to_string())
                     .parse()
                     .unwrap_or(true),
-                hmac_key: env::var("AUDIT_HMAC_KEY")
-                    .unwrap_or_else(|_| "default_audit_hmac_key_change_me_in_production".to_string()),
+                hmac_key: env::var("AUDIT_HMAC_KEY").unwrap_or_else(|_| {
+                    "default_audit_hmac_key_change_me_in_production".to_string()
+                }),
                 retention_days: env::var("AUDIT_RETENTION_DAYS")
                     .unwrap_or_else(|_| "365".to_string())
                     .parse()
@@ -136,7 +130,7 @@ impl Default for Config {
 impl Config {
     /// Loads configuration from environment variables and configuration files.
     /// Validates settings and logs configuration status.
-    /// 
+    ///
     /// # Errors
     /// Returns `ConfigError` if required variables are missing or invalid.
     pub fn from_env() -> Result<Self, ConfigError> {
@@ -159,24 +153,25 @@ impl Config {
 
         // Safe and strict validation of PORT variable
         match env::var("PORT") {
-            Ok(port_str) => {
-                match port_str.parse::<u16>() {
-                    Ok(port) => {
-                        if port == 0 {
-                            tracing::error!("Invalid PORT: 0 is not allowed");
-                            return Err(ConfigError::ValidationError("PORT cannot be 0".to_string()));
-                        }
-                        tracing::info!("Using PORT from environment: {}", port);
-                        config.server.port = port;
+            Ok(port_str) => match port_str.parse::<u16>() {
+                Ok(port) => {
+                    if port == 0 {
+                        tracing::error!("Invalid PORT: 0 is not allowed");
+                        return Err(ConfigError::ValidationError("PORT cannot be 0".to_string()));
                     }
-                    Err(_) => {
-                        tracing::error!("Invalid PORT value in environment: '{}'", port_str);
-                        return Err(ConfigError::InvalidPort(port_str));
-                    }
+                    tracing::info!("Using PORT from environment: {}", port);
+                    config.server.port = port;
                 }
-            }
+                Err(_) => {
+                    tracing::error!("Invalid PORT value in environment: '{}'", port_str);
+                    return Err(ConfigError::InvalidPort(port_str));
+                }
+            },
             Err(_) => {
-                tracing::info!("PORT not set in environment, using default: {}", config.server.port);
+                tracing::info!(
+                    "PORT not set in environment, using default: {}",
+                    config.server.port
+                );
             }
         }
 
@@ -184,7 +179,6 @@ impl Config {
         config.validate()?;
         Ok(config)
     }
-
 
     fn validate(&self) -> Result<(), ConfigError> {
         if self.database.url.trim().is_empty() {
@@ -264,4 +258,3 @@ mod tests {
         assert!(config.is_ok());
     }
 }
-

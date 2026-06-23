@@ -391,12 +391,6 @@ pub fn set_integrity_admin(env: &Env, admin: &Address) {
         .set(&IntegrityDataKey::IntegrityAdmin, admin);
 }
 
-pub fn get_integrity_admin(env: &Env) -> Option<Address> {
-    env.storage()
-        .persistent()
-        .get(&IntegrityDataKey::IntegrityAdmin)
-}
-
 pub fn set_integrity_registry(env: &Env, registry: &Address) {
     env.storage()
         .persistent()

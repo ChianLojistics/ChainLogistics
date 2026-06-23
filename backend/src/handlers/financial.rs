@@ -1,14 +1,14 @@
+use crate::error::AppError;
+use crate::middleware::auth::AuthContext;
+use crate::validation::{sanitize_input, validate_amount, validate_string};
+use crate::AppState;
 use axum::{
-    extract::{Path, State, Json},
+    extract::{Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use crate::AppState;
-use crate::validation::{validate_amount, validate_string, sanitize_input};
-use crate::middleware::auth::AuthContext;
-use crate::error::AppError;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateTransactionRequest {
@@ -56,12 +56,16 @@ pub async fn create_transaction(
 
     let user_id = auth.user_id.to_string();
 
-    let tx = state.financial_service.create_transaction(
-        &user_id,
-        &sanitize_input(&req.transaction_type),
-        &sanitize_input(&req.amount),
-        &sanitize_input(&req.currency),
-    ).await.map_err(AppError::DatabaseError)?;
+    let tx = state
+        .financial_service
+        .create_transaction(
+            &user_id,
+            &sanitize_input(&req.transaction_type),
+            &sanitize_input(&req.amount),
+            &sanitize_input(&req.currency),
+        )
+        .await
+        .map_err(AppError::DatabaseError)?;
 
     Ok((StatusCode::CREATED, Json(tx)))
 }
@@ -87,9 +91,12 @@ pub async fn get_transaction(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let tx = state.financial_service.get_transaction(&id).await
+    let tx = state
+        .financial_service
+        .get_transaction(&id)
+        .await
         .map_err(|_| AppError::NotFound("Transaction not found".to_string()))?;
-    
+
     Ok((StatusCode::OK, Json(tx)))
 }
 
@@ -112,9 +119,12 @@ pub async fn list_transactions(
 ) -> Result<impl IntoResponse, AppError> {
     let user_id = auth.user_id.to_string();
 
-    let txs = state.financial_service.list_user_transactions(&user_id).await
+    let txs = state
+        .financial_service
+        .list_user_transactions(&user_id)
+        .await
         .map_err(AppError::DatabaseError)?;
-    
+
     Ok((StatusCode::OK, Json(txs)))
 }
 
@@ -143,11 +153,15 @@ pub async fn create_invoice(
 
     let user_id = auth.user_id.to_string();
 
-    let invoice = state.financial_service.create_invoice(
-        &user_id, 
-        &sanitize_input(&req.amount), 
-        &sanitize_input(&req.due_date)
-    ).await.map_err(AppError::DatabaseError)?;
+    let invoice = state
+        .financial_service
+        .create_invoice(
+            &user_id,
+            &sanitize_input(&req.amount),
+            &sanitize_input(&req.due_date),
+        )
+        .await
+        .map_err(AppError::DatabaseError)?;
 
     Ok((StatusCode::CREATED, Json(invoice)))
 }
@@ -177,11 +191,15 @@ pub async fn request_financing(
 
     let user_id = auth.user_id.to_string();
 
-    let financing = state.financial_service.request_financing(
-        &user_id, 
-        &sanitize_input(&req.financing_type), 
-        &sanitize_input(&req.amount)
-    ).await.map_err(AppError::DatabaseError)?;
+    let financing = state
+        .financial_service
+        .request_financing(
+            &user_id,
+            &sanitize_input(&req.financing_type),
+            &sanitize_input(&req.amount),
+        )
+        .await
+        .map_err(AppError::DatabaseError)?;
 
     Ok((StatusCode::CREATED, Json(financing)))
 }
