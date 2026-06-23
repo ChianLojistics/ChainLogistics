@@ -29,6 +29,33 @@ jobs:
         --recursive
         ./
 
+  cargo-deny:
+    name: Cargo Deny Security Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      matrix:
+        component: [smart-contract, backend]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+
+      - name: Run cargo-deny check
+        working-directory: ./${{ matrix.component }}
+        run: |
+          cargo deny check advisories
+          cargo deny check bans
+          cargo deny check licenses
+          cargo deny check sources
+
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
