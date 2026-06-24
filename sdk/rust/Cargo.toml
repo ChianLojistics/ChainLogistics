@@ -18,12 +18,20 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 thiserror = "1.0"
 url = "2.0"
-tokio = { version = "1.0", features = ["rt-multi-thread"], optional = true }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"], optional = true }
+# Ring-signature signing (privacy-preserving audit trail). Optional so the HTTP
+# client stays dependency-light when the feature is unused.
+bls12_381 = { version = "0.8", optional = true }
+sha2 = { version = "0.10", optional = true }
+rand_core = { version = "0.6", features = ["getrandom"], optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
 mockito = "1.0"
+rand_chacha = "0.3"
 
 [features]
 default = ["client"]
 client = ["tokio"]
+# Enables the `ring_signature` module for anonymous audit attestations.
+ring-signatures = ["bls12_381", "sha2", "rand_core"]

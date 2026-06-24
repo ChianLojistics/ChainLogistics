@@ -320,6 +320,27 @@ isort src tests
 mypy src
 ```
 
+## Ring signatures (privacy-preserving audit trail)
+
+Sign audit attestations anonymously as one member of a ring of auditors
+(BLS12-381). The module is pure-stdlib (no extra dependencies) and produces
+signatures that verify on-chain via the `AuditTrailContract` /
+`RingSignatureVerifier` Soroban contracts unchanged.
+
+```python
+from chainlogistics_sdk.ring_signature import KeyPair, sign, verify
+
+auditors = [KeyPair.generate() for _ in range(8)]
+ring = [k.public_key() for k in auditors]
+
+msg = b"custody: warehouse-A -> truck-7"
+sig = sign(ring, 3, auditors[3], msg)   # auditor #3 signs anonymously
+assert verify(ring, msg, sig)
+```
+
+See `smart-contract/RING_SIGNATURE.md` for the full scheme, gas costs and
+linkability analysis.
+
 ## License
 
 MIT License - see LICENSE file for details.
