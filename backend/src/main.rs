@@ -33,7 +33,7 @@ use error::AppError;
 use monitoring::MonitoringSystem;
 use services::{
     AnalyticsService, ApiKeyService, AuditService, BatchService, CarbonService,
-    CollaborationService, EventService, FinancialService, IoTService, PredictiveRoutingService,
+    CollaborationService, EventService, FinancialService, IoTService, PhysicsModelService, PredictiveRoutingService,
     ProductService, QualityService, RecallService, RegulatoryService, SupplierService,
     SyncService, UserService,
 };
@@ -59,6 +59,7 @@ pub struct AppState {
     pub quality_service: Arc<QualityService>,
     pub supplier_service: Arc<SupplierService>,
     pub predictive_routing_service: Arc<PredictiveRoutingService>,
+    pub physics_model_service: Arc<PhysicsModelService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -103,6 +104,7 @@ impl AppState {
         let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
         let predictive_routing_service =
             Arc::new(PredictiveRoutingService::new(db.pool().clone()));
+        let physics_model_service = Arc::new(PhysicsModelService::new(db.pool().clone()));
 
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
@@ -126,6 +128,7 @@ impl AppState {
             quality_service,
             supplier_service,
             predictive_routing_service,
+            physics_model_service,
             redis_client,
             config,
             monitoring_system,
