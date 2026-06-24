@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 
 export function Navigation() {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,7 +20,7 @@ export function Navigation() {
       e.preventDefault();
       const element = document.querySelector(href);
       if (element) {
-        const offset = 80; // navbar height + padding
+        const offset = 80;
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - offset;
 
@@ -29,7 +30,10 @@ export function Navigation() {
         });
       }
     }
+    setMobileMenuOpen(false);
   };
+
+  const closeMenu = () => setMobileMenuOpen(false);
 
   return (
     <nav
@@ -45,6 +49,7 @@ export function Navigation() {
           <Link
             href="/"
             className="text-xl font-bold text-gray-900 hover:text-[#0066FF] transition-colors"
+            onClick={closeMenu}
           >
             ChainLojistic
           </Link>
@@ -79,8 +84,9 @@ export function Navigation() {
           </div>
           <button
             className="md:hidden text-[#1A1A1A]"
-            aria-label="Open menu"
-            aria-expanded="false"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
           >
             <svg
               className="h-6 w-6"
@@ -89,15 +95,47 @@ export function Navigation() {
               stroke="currentColor"
               aria-hidden="true"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
             </svg>
           </button>
         </div>
+
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 py-4 space-y-1">
+            <Link
+              href="#features"
+              onClick={(e) => handleNavClick(e, "#features")}
+              className="block px-3 py-2 text-sm font-medium text-gray-700 hover:text-[#0066FF] hover:bg-gray-50 rounded-md transition-colors"
+            >
+              Features
+            </Link>
+            <Link
+              href="#how-it-works"
+              onClick={(e) => handleNavClick(e, "#how-it-works")}
+              className="block px-3 py-2 text-sm font-medium text-gray-700 hover:text-[#0066FF] hover:bg-gray-50 rounded-md transition-colors"
+            >
+              How It Works
+            </Link>
+            <Link
+              href="#use-cases"
+              onClick={(e) => handleNavClick(e, "#use-cases")}
+              className="block px-3 py-2 text-sm font-medium text-gray-700 hover:text-[#0066FF] hover:bg-gray-50 rounded-md transition-colors"
+            >
+              Use Cases
+            </Link>
+            <Link
+              href="/register"
+              onClick={closeMenu}
+              className="block px-3 py-2 mt-3 text-sm font-semibold text-white bg-[#0066FF] rounded-lg text-center hover:bg-[#0052CC] transition-colors"
+            >
+              Get Started
+            </Link>
+          </div>
+        )}
       </div>
     </nav>
   );

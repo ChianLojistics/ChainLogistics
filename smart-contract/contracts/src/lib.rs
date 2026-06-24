@@ -47,6 +47,8 @@ mod product_registry;
 #[cfg(not(target_arch = "wasm32"))]
 mod product_transfer;
 #[cfg(not(target_arch = "wasm32"))]
+mod ring_signature;
+#[cfg(not(target_arch = "wasm32"))]
 mod state_channel;
 #[cfg(not(target_arch = "wasm32"))]
 mod stats;
@@ -101,6 +103,8 @@ pub use product_query::*;
 pub use product_registry::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use product_transfer::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use ring_signature::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use state_channel::*;
 #[cfg(not(target_arch = "wasm32"))]
