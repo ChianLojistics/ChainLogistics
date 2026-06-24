@@ -41,6 +41,14 @@ from .models import (
     EventListQuery,
     PaginationMeta,
 )
+from . import ring_signature
+from .ring_signature import (
+    KeyPair,
+    RingSignature,
+    sign,
+    verify,
+    aggregate_ring,
+)
 
 __version__ = "1.0.0"
 __author__ = "ChainLogistics Team"
@@ -83,4 +91,11 @@ __all__ = [
     "ProductListQuery",
     "EventListQuery",
     "PaginationMeta",
+    # Ring signatures (privacy-preserving audit trail)
+    "ring_signature",
+    "KeyPair",
+    "RingSignature",
+    "sign",
+    "verify",
+    "aggregate_ring",
 ]

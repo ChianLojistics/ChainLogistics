@@ -125,9 +125,14 @@ pub enum Error {
     NotChannelParticipant = 140,
     InvalidSignature = 141,
 
-    // --- Integrity Anchor (150-155) ---
-    AnchorNotFound = 150,
-    InvalidContentSize = 151,
-    TooManyAnchors = 152,
-    CidTooLong = 153,
+    // --- Ring Signature / Privacy Audit Trail (150-160) ---
+    RingTooSmall = 150,
+    RingTooLarge = 151,
+    RingSizeMismatch = 152,
+    InvalidRingMember = 153,
+    DuplicateRingMember = 154,
+    RingSignatureInvalid = 155,
+    AuditTrailNotInitialized = 156,
+    // Reserved for the linkable (LSAG) variant; see RING_SIGNATURE.md §5.
+    KeyImageAlreadyUsed = 157,
 }

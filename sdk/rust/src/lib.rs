@@ -32,6 +32,12 @@ pub mod stats;
 pub mod storage;
 pub mod storage_service;
 
+/// Privacy-preserving audit-trail ring signatures (BLS12-381). Enable with the
+/// `ring-signatures` feature. Interoperates with the Soroban
+/// `RingSignatureVerifier` / `AuditTrailContract` contracts.
+#[cfg(feature = "ring-signatures")]
+pub mod ring_signature;
+
 // Re-export main types for convenience
 pub use client::ChainLogisticsClient;
 pub use config::Config;
