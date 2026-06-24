@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use soroban_sdk::crypto::bn254::{Bn254G1Affine, Bn254G2Affine, Fr};
 use soroban_sdk::{contract, contractimpl, Bytes, Env, Vec};
 
@@ -5,10 +7,8 @@ use soroban_sdk::{contract, contractimpl, Bytes, Env, Vec};
 pub struct ComplianceVerifier;
 
 #[contractimpl]
-#[allow(clippy::too_many_arguments)]
 impl ComplianceVerifier {
     /// Verifies a Groth16 proof for the BN254 curve.
-    #[allow(clippy::too_many_arguments)]
     pub fn verify(
         env: Env,
         proof_a: Bytes,
