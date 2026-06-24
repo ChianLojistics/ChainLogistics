@@ -49,3 +49,6 @@ pub use quality_service::QualityService;
 
 pub mod regulatory_service;
 pub use regulatory_service::RegulatoryService;
+
+pub mod predictive_routing_service;
+pub use predictive_routing_service::PredictiveRoutingService;
