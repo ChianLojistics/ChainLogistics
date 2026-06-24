@@ -43,7 +43,7 @@ describe('ProductCard', () => {
 
   it('renders event count', () => {
     render(<ProductCard product={mockProduct} />);
-    expect(screen.getByText(/5/)).toBeInTheDocument();
+    expect(screen.getByText(/5\s*Events/)).toBeInTheDocument();
   });
 
   it('has a link to product details', () => {
