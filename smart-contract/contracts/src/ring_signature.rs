@@ -7,9 +7,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use soroban_sdk::crypto::bls12_381::{Bls12381G1Affine as G1, Fr};
-use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, String, Vec};
 
 use crate::error::Error;
 use crate::ChainLogisticsContractClient;
