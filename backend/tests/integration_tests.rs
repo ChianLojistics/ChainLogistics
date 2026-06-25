@@ -117,7 +117,7 @@ async fn test_product_service_filters() {
     let results = product_service.list_products(0, 10, Some(filters)).await.expect("Failed to filter by owner");
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].owner_address, "GOWNER1");
-    
+
     // Filter by category
     let filters = ProductFilters {
         owner_address: None,
@@ -126,11 +126,14 @@ async fn test_product_service_filters() {
         created_after: None,
         created_before: None,
     };
-    
-    let results = product_service.list_products(0, 10, Some(filters)).await.expect("Failed to filter by category");
+
+    let results = product_service
+        .list_products(0, 10, Some(filters))
+        .await
+        .expect("Failed to filter by category");
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].category, "Electronics");
-    
+
     // Cleanup
     product_service.delete_product("FILTER-001").await.unwrap();
     product_service.delete_product("FILTER-002").await.unwrap();

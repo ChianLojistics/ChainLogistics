@@ -146,7 +146,7 @@ jobs:
           npm install lightningcss-linux-x64-gnu --save-optional
 
       - name: Run npm audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=high
 
       # Fixed: was running `npm run build` here (type check) AND again below (build verification)
       # Use tsc --noEmit for type checking, keep the real build separate
