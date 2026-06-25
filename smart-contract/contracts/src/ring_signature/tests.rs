@@ -7,10 +7,7 @@ extern crate std;
 
 use super::*;
 use crate::{ChainLogisticsContract, ChainLogisticsContractClient};
-use soroban_sdk::{
-    testutils::Address as _,
-    Address, Bytes, BytesN, Env, String, Vec,
-};
+use soroban_sdk::{testutils::Address as _, Address, Bytes, BytesN, Env, String, Vec};
 
 // ─── Reference signer (mirrors the SDKs) ────────────────────────────────────
 
@@ -366,7 +363,10 @@ fn record_handover_stores_anonymous_record() {
     assert_eq!(record.product_id, product_id);
     assert_eq!(record.ring_size, 5);
     assert_eq!(record.ring_commitment, ring_commitment(&env, &ring));
-    assert_eq!(record.statement_hash, env.crypto().sha256(&statement).to_bytes());
+    assert_eq!(
+        record.statement_hash,
+        env.crypto().sha256(&statement).to_bytes()
+    );
 
     let ids = at.product_handovers(&product_id);
     assert_eq!(ids.len(), 1);
