@@ -19,6 +19,7 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/monitoring", monitoring_routes())
         .nest("/api/v1/collaboration", collaboration_routes())
         .nest("/api/v1/routing", routing_routes())
+        .nest("/api/v1/physics", physics_routes())
 }
 
 fn public_api_routes() -> Router<AppState> {
@@ -323,6 +324,54 @@ fn routing_routes() -> Router<AppState> {
         // Training data export (federated-learning compatible)
         .route("/export", post(pr::export_training_data))
         .layer(middleware::from_fn(api_key_auth))
+        .layer(middleware::from_fn(
+            crate::middleware::rate_limit::rate_limit_middleware,
+        ))
+}
+
+fn physics_routes() -> Router<AppState> {
+    use crate::handlers::physics_model as pm;
+    Router::new()
+        // Health scoring and decay models
+        .route(
+            "/twins/:twin_id/health-score",
+            post(pm::calculate_health_score),
+        )
+        .route(
+            "/twins/:twin_id/decay-model",
+            put(pm::update_decay_model),
+        )
+        // Monte Carlo simulation
+        .route(
+            "/twins/:twin_id/monte-carlo",
+            post(pm::run_monte_carlo),
+        )
+        // Accuracy auditing
+        .route(
+            "/twins/:twin_id/accuracy-audit",
+            post(pm::audit_prediction_accuracy),
+        )
+        .route(
+            "/twins/:twin_id/accuracy-stats",
+            get(pm::get_accuracy_statistics),
+        )
+        // Health metrics
+        .route(
+            "/twins/:twin_id/health-metrics",
+            get(pm::get_health_metrics),
+        )
+        // IoT integration
+        .route(
+            "/twins/:twin_id/iot-sync",
+            post(pm::configure_iot_sync),
+        )
+        .route(
+            "/twins/:twin_id/iot-sync",
+            get(pm::get_iot_syncs),
+        )
+        // Health check
+        .route("/health", get(pm::physics_model_health))
+        .layer(middleware::from_fn(jwt_auth))
         .layer(middleware::from_fn(
             crate::middleware::rate_limit::rate_limit_middleware,
         ))
