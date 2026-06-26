@@ -17,6 +17,10 @@ pub struct DigitalTwin {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub last_sync_at: Option<DateTime<Utc>>,
+    pub decay_model_params: Option<serde_json::Value>,
+    pub predicted_expiry_date: Option<DateTime<Utc>>,
+    pub current_health_score: Option<f64>,
+    pub health_history: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
@@ -44,6 +48,9 @@ pub struct Simulation {
     pub completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub created_by: String,
+    pub monte_carlo_runs: Option<i32>,
+    pub confidence_interval: Option<serde_json::Value>,
+    pub confidence_level: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
@@ -91,6 +98,9 @@ pub struct Prediction {
     pub valid_until: DateTime<Utc>,
     pub actual_value: Option<serde_json::Value>,
     pub accuracy_score: Option<f64>,
+    pub prediction_metadata: Option<serde_json::Value>,
+    pub calibration_data: Option<serde_json::Value>,
+    pub model_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
@@ -215,4 +225,78 @@ pub struct PredictionRequest {
     pub prediction_type: PredictionType,
     pub prediction_horizon: i32,
     pub input_features: serde_json::Value,
+}
+
+/// PredictionAccuracyAudit tracks prediction vs actual outcomes
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PredictionAccuracyAudit {
+    pub id: Uuid,
+    pub twin_id: Uuid,
+    pub prediction_id: Option<Uuid>,
+    pub prediction_type: String,
+    pub predicted_value: serde_json::Value,
+    pub actual_value: serde_json::Value,
+    pub accuracy_score: f64,
+    pub error_magnitude: Option<f64>,
+    pub timestamp: DateTime<Utc>,
+    pub metadata: serde_json::Value,
+}
+
+/// IoTTwinSync configures live IoT to digital twin synchronization
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct IoTTwinSync {
+    pub id: Uuid,
+    pub device_id: String,
+    pub twin_id: Uuid,
+    pub sync_type: String,
+    pub last_sync_at: DateTime<Utc>,
+    pub sync_frequency_seconds: i32,
+    pub is_active: bool,
+    pub sync_parameters: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// TwinHealthMetric stores detailed health metrics for visualization
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TwinHealthMetric {
+    pub id: Uuid,
+    pub twin_id: Uuid,
+    pub metric_type: String,
+    pub metric_value: f64,
+    pub threshold_min: Option<f64>,
+    pub threshold_max: Option<f64>,
+    pub severity: Option<String>,
+    pub calculated_at: DateTime<Utc>,
+    pub metadata: serde_json::Value,
+}
+
+/// DecayModelParameters for biology/decay physics simulation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecayModelParameters {
+    pub base_decay_rate: f64,
+    pub temperature_coefficient: f64,
+    pub humidity_coefficient: f64,
+    pub quality_threshold: f64,
+    pub calibration_factor: f64,
+    pub model_type: String,
+}
+
+/// HealthScoreResult from decay model calculation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthScoreResult {
+    pub health_score: f64,
+    pub decay_rate: f64,
+    pub predicted_expiry: DateTime<Utc>,
+    pub confidence_interval: Option<(f64, f64)>,
+    pub risk_factors: Vec<String>,
+    pub recommendations: Vec<String>,
+}
+
+/// MonteCarloSimulationConfig for confidence range calculations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonteCarloSimulationConfig {
+    pub num_runs: i32,
+    pub confidence_level: f64,
+    pub parameter_ranges: serde_json::Value,
 }

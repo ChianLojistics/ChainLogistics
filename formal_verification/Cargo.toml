@@ -1,0 +1,21 @@
+[package]
+name = "formal_verification"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prusti-contracts = "0.1.0"
+uuid = { version = "1.0", features = ["v4"] }
+
+[dev-dependencies]
+prusti = "0.1.0"
+
+[[bin]]
+name = "auth_verification"
+path = "auth_prusti.rs"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
