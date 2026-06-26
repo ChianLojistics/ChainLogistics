@@ -34,6 +34,17 @@ soroban-sdk = "21.0"
 # OpenAPI documentation
 utoipa = { version = "4.0", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
+# Streaming and WebSocket
+tokio-tungstenite = "0.21"
+futures = "0.3"
+# DSL/Rule Engine
+pest = "2.7"
+pest_derive = "2.7"
+# Tower utilities
+tower-layer = "0.3"
+tower-service = "0.3"
+# HTTP client for webhooks
+reqwest = { version = "0.11", features = ["json"] }
 
 [dev-dependencies]
 tower-test = "0.4"

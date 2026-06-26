@@ -113,6 +113,12 @@ pub enum AppError {
 
     #[error("Cryptography error")]
     Cryptography(String),
+
+    #[error("Streaming error")]
+    StreamingError(String),
+
+    #[error("Validation error")]
+    ValidationError(String),
 }
 
 /// Standardized error response structure
@@ -417,6 +423,36 @@ impl IntoResponse for AppError {
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ErrorCode::BusinessRuleViolation,
                     format!("Operation not allowed: {}", sanitize_message(msg)),
+                    None,
+                )
+            }
+
+            // Streaming Errors
+            AppError::StreamingError(ref msg) => {
+                tracing::error!(
+                    correlation_id = %correlation_id,
+                    error = %msg,
+                    "Streaming error"
+                );
+                (
+                    StatusCode::BAD_GATEWAY,
+                    ErrorCode::ExternalServiceError,
+                    "Streaming service error occurred. Please try again later.".to_string(),
+                    Some(msg.clone()),
+                )
+            }
+
+            // Validation Errors
+            AppError::ValidationError(ref msg) => {
+                tracing::debug!(
+                    correlation_id = %correlation_id,
+                    validation_error = %msg,
+                    "Validation error"
+                );
+                (
+                    StatusCode::BAD_REQUEST,
+                    ErrorCode::ValidationFailed,
+                    format!("Validation error: {}", sanitize_message(msg)),
                     None,
                 )
             }

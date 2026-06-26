@@ -19,6 +19,10 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/monitoring", monitoring_routes())
         .nest("/api/v1/collaboration", collaboration_routes())
         .nest("/api/v1/routing", routing_routes())
+        // .nest("/api/v1/iot", iot_routes()) // Temporarily disabled
+        // .nest("/api/v1/quality", quality_routes()) // Temporarily disabled
+        // .nest("/api/v1/regulatory", regulatory_routes()) // Temporarily disabled
+        // .nest("/api/v1/supplier", supplier_routes()) // Temporarily disabled
 }
 
 fn public_api_routes() -> Router<AppState> {
@@ -42,28 +46,28 @@ fn public_api_routes() -> Router<AppState> {
             "/transactions/:id",
             get(crate::handlers::financial::get_transaction),
         )
-        .route(
-            "/compliance/check",
-            post(crate::handlers::compliance::check_compliance).layer(middleware::from_fn(
-                require_role(vec![UserRole::Inspector, UserRole::Administrator]),
-            )),
-        )
-        .route(
-            "/compliance/prove",
-            post(crate::compliance::handler::generate_compliance_proof),
-        )
-        .route(
-            "/compliance/report/:product_id",
-            get(crate::handlers::compliance::get_compliance_report).layer(middleware::from_fn(
-                require_role(vec![UserRole::Auditor, UserRole::Administrator]),
-            )),
-        )
-        .route(
-            "/audit/report",
-            get(crate::handlers::compliance::generate_audit_report).layer(middleware::from_fn(
-                require_role(vec![UserRole::Auditor, UserRole::Administrator]),
-            )),
-        )
+        // .route(
+        //     "/compliance/check",
+        //     post(crate::handlers::compliance::check_compliance).layer(middleware::from_fn(
+        //         require_role(vec![UserRole::Inspector, UserRole::Administrator]),
+        //     )),
+        // )
+        // .route(
+        //     "/compliance/prove",
+        //     post(crate::compliance::handler::generate_compliance_proof),
+        // )
+        // .route(
+        //     "/compliance/report/:product_id",
+        //     get(crate::handlers::compliance::get_compliance_report).layer(middleware::from_fn(
+        //         require_role(vec![UserRole::Auditor, UserRole::Administrator]),
+        //     )),
+        // )
+        // .route(
+        //     "/audit/report",
+        //     get(crate::handlers::compliance::generate_audit_report).layer(middleware::from_fn(
+        //         require_role(vec![UserRole::Auditor, UserRole::Administrator]),
+        //     )),
+        // )
         .layer(middleware::from_fn(api_key_auth))
         .layer(middleware::from_fn(
             crate::middleware::rate_limit::rate_limit_middleware,

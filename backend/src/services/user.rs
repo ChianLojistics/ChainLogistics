@@ -1,5 +1,6 @@
 use crate::database::UserRepository;
-use crate::models::{AppError, NewUser, User, UserRole};
+use crate::error::AppError;
+use crate::models::{NewUser, User, UserRole};
 use async_trait::async_trait;
 use bcrypt::{hash, DEFAULT_COST};
 use sqlx::PgPool;
