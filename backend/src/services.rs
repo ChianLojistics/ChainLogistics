@@ -52,3 +52,9 @@ pub use batch_service::{BatchRepository, BatchService};
 
 pub mod predictive_routing_service;
 pub use predictive_routing_service::PredictiveRoutingService;
+
+pub mod physics_model_service;
+pub use physics_model_service::PhysicsModelService;
+
+pub mod iot_twin_sync_service;
+pub use iot_twin_sync_service::IoTTwinSyncService;

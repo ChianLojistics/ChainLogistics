@@ -20,3 +20,4 @@ pub mod batch;
 // pub mod regulatory; // Temporarily disabled
 // pub mod supplier; // Temporarily disabled
 pub mod predictive_routing;
+pub mod physics_model;

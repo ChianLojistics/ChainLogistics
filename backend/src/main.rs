@@ -42,6 +42,9 @@ use services::{
     AnalyticsService, ApiKeyService, AuditService, BatchService, CarbonService,
     CollaborationService, EventService, FinancialService, PredictiveRoutingService,
     ProductService, RecallService, SyncService, UserService,
+    CollaborationService, EventService, FinancialService, IoTService, PhysicsModelService, PredictiveRoutingService,
+    ProductService, QualityService, RecallService, RegulatoryService, SupplierService,
+    SyncService, UserService,
 };
 use streaming::mercury_client::MercuryConfig;
 use streaming::indexer::StreamIndexer;
@@ -65,6 +68,7 @@ pub struct AppState {
     pub recall_service: Arc<RecallService>,
     pub batch_service: Arc<BatchService>,
     pub predictive_routing_service: Arc<PredictiveRoutingService>,
+    pub physics_model_service: Arc<PhysicsModelService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
@@ -108,6 +112,7 @@ impl AppState {
         let batch_service = Arc::new(BatchService::new(db.pool().clone()));
         let predictive_routing_service =
             Arc::new(PredictiveRoutingService::new(db.pool().clone()));
+        let physics_model_service = Arc::new(PhysicsModelService::new(db.pool().clone()));
 
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
@@ -140,6 +145,7 @@ impl AppState {
             recall_service,
             batch_service,
             predictive_routing_service,
+            physics_model_service,
             redis_client,
             config,
             monitoring_system,
