@@ -64,3 +64,8 @@ pub use saga_manager::{SagaManager, SagaInstance, SagaState, SagaAction, get_pro
 
 pub mod redis_workers;
 pub use redis_workers::{RedisWorkerPool, WorkerTask, WorkerConfig, TaskHandler, EventProcessingHandler, RuleEvaluationHandler, NotificationHandler};
+pub mod physics_model_service;
+pub use physics_model_service::PhysicsModelService;
+
+pub mod iot_twin_sync_service;
+pub use iot_twin_sync_service::IoTTwinSyncService;

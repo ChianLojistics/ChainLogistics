@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use soroban_sdk::crypto::bn254::{Bn254G1Affine, Bn254G2Affine, Fr};
 use soroban_sdk::{contract, contractimpl, Bytes, Env, Vec};
 
