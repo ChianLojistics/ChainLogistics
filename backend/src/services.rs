@@ -53,6 +53,17 @@ pub use batch_service::{BatchRepository, BatchService};
 pub mod predictive_routing_service;
 pub use predictive_routing_service::PredictiveRoutingService;
 
+pub mod mercury_indexer;
+pub use mercury_indexer::{MercuryIndexer, MercuryConfig, EventProcessor, TrackingEventProcessor};
+
+pub mod rule_engine;
+pub use rule_engine::{RuleEngine, Rule, RuleContext, ActionHandler, AlertHandler, WebhookHandler, get_default_rules};
+
+pub mod saga_manager;
+pub use saga_manager::{SagaManager, SagaInstance, SagaState, SagaAction, get_product_registration_saga, NoopAction};
+
+pub mod redis_workers;
+pub use redis_workers::{RedisWorkerPool, WorkerTask, WorkerConfig, TaskHandler, EventProcessingHandler, RuleEvaluationHandler, NotificationHandler};
 pub mod physics_model_service;
 pub use physics_model_service::PhysicsModelService;
 
