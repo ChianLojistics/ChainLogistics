@@ -34,6 +34,8 @@ soroban-sdk = "21.0"
 # OpenAPI documentation
 utoipa = { version = "4.0", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
+# Streaming and event processing
+reqwest = { version = "0.11", features = ["json"] }
 
 [dev-dependencies]
 tower-test = "0.4"

@@ -35,7 +35,10 @@ use services::{
     AnalyticsService, ApiKeyService, AuditService, BatchService, CarbonService,
     CollaborationService, EventService, FinancialService, IoTService, PhysicsModelService, PredictiveRoutingService,
     ProductService, QualityService, RecallService, RegulatoryService, SupplierService,
-    SyncService, UserService,
+    SyncService, UserService, MercuryIndexer, MercuryConfig, RuleEngine, SagaManager,
+    RedisWorkerPool, WorkerConfig, TrackingEventProcessor, get_default_rules,
+    get_product_registration_saga, NoopAction, EventProcessingHandler, RuleEvaluationHandler,
+    NotificationHandler, AlertHandler, WebhookHandler,
 };
 use utils::CronService;
 
@@ -63,6 +66,10 @@ pub struct AppState {
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
+    pub mercury_indexer: Arc<MercuryIndexer>,
+    pub rule_engine: Arc<RuleEngine>,
+    pub saga_manager: Arc<SagaManager>,
+    pub worker_pool: Arc<RedisWorkerPool>,
 }
 
 impl AppState {
@@ -106,6 +113,36 @@ impl AppState {
             Arc::new(PredictiveRoutingService::new(db.pool().clone()));
         let physics_model_service = Arc::new(PhysicsModelService::new(db.pool().clone()));
 
+        // Initialize Mercury streaming indexer
+        let mercury_config = MercuryConfig::default();
+        let (mercury_indexer, _event_rx) =
+            MercuryIndexer::new(mercury_config, db.pool().clone(), redis_client.clone());
+        mercury_indexer.add_processor(Arc::new(TrackingEventProcessor::new(db.pool().clone())));
+        let mercury_indexer = Arc::new(mercury_indexer);
+
+        // Initialize rule engine with default rules
+        let mut rule_engine = RuleEngine::new();
+        for rule in get_default_rules() {
+            rule_engine.add_rule(rule);
+        }
+        rule_engine.register_handler("alert".to_string(), Arc::new(AlertHandler::new()));
+        rule_engine.register_handler("webhook".to_string(), Arc::new(WebhookHandler::new()));
+        let rule_engine = Arc::new(rule_engine);
+
+        // Initialize saga manager
+        let mut saga_manager = SagaManager::new(db.pool().clone(), redis_client.clone());
+        saga_manager.register_saga(get_product_registration_saga());
+        saga_manager.register_action("noop".to_string(), Arc::new(NoopAction));
+        let saga_manager = Arc::new(saga_manager);
+
+        // Initialize Redis worker pool
+        let worker_config = WorkerConfig::default();
+        let mut worker_pool = RedisWorkerPool::new(worker_config, redis_client.clone());
+        worker_pool.register_handler(Arc::new(EventProcessingHandler::new()));
+        worker_pool.register_handler(Arc::new(RuleEvaluationHandler::new()));
+        worker_pool.register_handler(Arc::new(NotificationHandler::new()));
+        let worker_pool = Arc::new(worker_pool);
+
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
 
@@ -132,6 +169,10 @@ impl AppState {
             redis_client,
             config,
             monitoring_system,
+            mercury_indexer,
+            rule_engine,
+            saga_manager,
+            worker_pool,
         })
     }
 }
@@ -158,6 +199,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cron_service =
         CronService::new(app_state.db.pool().clone(), app_state.redis_client.clone());
     cron_service.start_scheduler().await;
+
+    // Start Mercury streaming indexer
+    let mercury_indexer = app_state.mercury_indexer.clone();
+    tokio::spawn(async move {
+        if let Err(e) = mercury_indexer.start().await {
+            tracing::error!("Mercury indexer failed: {}", e);
+        }
+    });
+
+    // Recover any in-progress sagas
+    let saga_manager = app_state.saga_manager.clone();
+    tokio::spawn(async move {
+        if let Err(e) = saga_manager.recover_sagas().await {
+            tracing::error!("Saga recovery failed: {}", e);
+        }
+    });
+
+    // Start Redis worker pool
+    let worker_pool = app_state.worker_pool.clone();
+    tokio::spawn(async move {
+        if let Err(e) = worker_pool.start().await {
+            tracing::error!("Worker pool failed: {}", e);
+        }
+    });
 
     // Build router with security middleware
     let app = Router::new()
