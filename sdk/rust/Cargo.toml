@@ -11,27 +11,32 @@ keywords = ["blockchain", "supply-chain", "logistics", "api"]
 categories = ["api-bindings", "web-programming::http-client"]
 
 [dependencies]
-reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.11", features = ["json", "rustls-tls", "multipart"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 thiserror = "1.0"
 url = "2.0"
+hex = { version = "0.4", optional = true }
+bs58 = { version = "0.5", optional = true }
+sha2 = { version = "0.10", optional = true }
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"], optional = true }
 # Ring-signature signing (privacy-preserving audit trail). Optional so the HTTP
 # client stays dependency-light when the feature is unused.
 bls12_381 = { version = "0.8", optional = true }
-sha2 = { version = "0.10", optional = true }
 rand_core = { version = "0.6", features = ["getrandom"], optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
 mockito = "1.0"
 rand_chacha = "0.3"
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = ["client"]
 client = ["tokio"]
+# Direct IPFS / Arweave storage bridge with CAS dedup.
+decentralized-storage = ["tokio", "sha2", "hex", "bs58"]
 # Enables the `ring_signature` module for anonymous audit attestations.
 ring-signatures = ["bls12_381", "sha2", "rand_core"]

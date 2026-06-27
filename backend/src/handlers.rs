@@ -21,3 +21,4 @@ pub mod regulatory;
 pub mod supplier;
 pub mod predictive_routing;
 pub mod physics_model;
+pub mod storage;

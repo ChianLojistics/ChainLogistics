@@ -135,4 +135,11 @@ pub enum Error {
     AuditTrailNotInitialized = 156,
     // Reserved for the linkable (LSAG) variant; see RING_SIGNATURE.md §5.
     KeyImageAlreadyUsed = 157,
+
+    // --- Integrity Anchor / Decentralized Storage (160-169) ---
+    AnchorNotFound = 160,
+    AnchorHashMismatch = 161,
+    CidTooLong = 162,
+    FileTooLarge = 163,
+    InvalidStorageBackend = 164,
 }

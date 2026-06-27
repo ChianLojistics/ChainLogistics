@@ -183,6 +183,9 @@ pub enum DataKey {
     Channel(u64),            // Channel state by channel id
     ChannelSeq,              // Monotonic channel id counter
     ProductChannels(String), // Channel ids opened against a product
+    // ── Integrity Anchor (decentralized content) ─────────────────────────
+    ContentAnchor(BytesN<32>),      // Anchor keyed by SHA-256 content hash
+    ProductContentAnchors(String),  // Content hashes linked to a product
 }
 
 // ─── Event Types ───────────────────────────────────────────────────────────
@@ -352,6 +355,22 @@ pub struct SignedState {
     pub sig_a: BytesN<64>,
     /// Ed25519 signature by party B over the state tuple.
     pub sig_b: BytesN<64>,
+}
+
+/// On-chain anchor for content stored on IPFS or Arweave (manuals, PDFs, media).
+/// Keyed by SHA-256 content hash for CAS deduplication.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContentAnchor {
+    pub content_hash: BytesN<32>,
+    pub cid: String,
+    /// Storage backend: `ipfs` or `arweave`.
+    pub backend: Symbol,
+    pub product_id: String,
+    pub byte_size: u64,
+    pub anchored_at: u64,
+    pub anchored_by: Address,
+    pub tamper_detected: bool,
 }
 
 /// On-chain record of an IoT tracking state channel.

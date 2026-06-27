@@ -19,6 +19,7 @@ pub fn api_routes() -> Router<AppState> {
         .nest("/api/v1/monitoring", monitoring_routes())
         .nest("/api/v1/collaboration", collaboration_routes())
         .nest("/api/v1/routing", routing_routes())
+        .nest("/api/v1/storage", storage_routes())
         .nest("/api/v1/physics", physics_routes())
 }
 
@@ -372,6 +373,36 @@ fn physics_routes() -> Router<AppState> {
         // Health check
         .route("/health", get(pm::physics_model_health))
         .layer(middleware::from_fn(jwt_auth))
+        .layer(middleware::from_fn(
+            crate::middleware::rate_limit::rate_limit_middleware,
+        ))
+}
+
+fn storage_routes() -> Router<AppState> {
+    Router::new()
+        .route(
+            "/anchors",
+            post(crate::handlers::storage::register_anchor),
+        )
+        .route(
+            "/anchors/:content_hash",
+            get(crate::handlers::storage::get_anchor),
+        )
+        .route(
+            "/exists/:content_hash",
+            get(crate::handlers::storage::check_exists),
+        )
+        .route(
+            "/products/:product_id/anchors",
+            get(crate::handlers::storage::list_product_anchors),
+        )
+        .route(
+            "/verify",
+            post(crate::handlers::storage::trigger_verification).layer(middleware::from_fn(
+                require_role(vec![UserRole::Administrator, UserRole::Auditor]),
+            )),
+        )
+        .layer(middleware::from_fn(api_key_auth))
         .layer(middleware::from_fn(
             crate::middleware::rate_limit::rate_limit_middleware,
         ))

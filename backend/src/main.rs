@@ -34,7 +34,8 @@ use monitoring::MonitoringSystem;
 use services::{
     AnalyticsService, ApiKeyService, AuditService, BatchService, CarbonService,
     CollaborationService, EventService, FinancialService, IoTService, PhysicsModelService, PredictiveRoutingService,
-    ProductService, QualityService, RecallService, RegulatoryService, SupplierService,
+    ProductService, QualityService, RecallService, RegulatoryService, StorageConfig,
+    StorageIntegrityService, SupplierService,
     SyncService, UserService, MercuryIndexer, MercuryConfig, RuleEngine, SagaManager,
     RedisWorkerPool, WorkerConfig, TrackingEventProcessor, get_default_rules,
     get_product_registration_saga, NoopAction, EventProcessingHandler, RuleEvaluationHandler,
@@ -70,6 +71,7 @@ pub struct AppState {
     pub rule_engine: Arc<RuleEngine>,
     pub saga_manager: Arc<SagaManager>,
     pub worker_pool: Arc<RedisWorkerPool>,
+    pub storage_integrity_service: Arc<StorageIntegrityService>,
 }
 
 impl AppState {
@@ -112,6 +114,11 @@ impl AppState {
         let predictive_routing_service =
             Arc::new(PredictiveRoutingService::new(db.pool().clone()));
         let physics_model_service = Arc::new(PhysicsModelService::new(db.pool().clone()));
+        let storage_integrity_service = Arc::new(StorageIntegrityService::new(
+            db.pool().clone(),
+            redis_client.clone(),
+            StorageConfig::default(),
+        ));
 
         // Initialize Mercury streaming indexer
         let mercury_config = MercuryConfig::default();
@@ -173,6 +180,7 @@ impl AppState {
             rule_engine,
             saga_manager,
             worker_pool,
+            storage_integrity_service,
         })
     }
 }
