@@ -69,3 +69,9 @@ pub use physics_model_service::PhysicsModelService;
 
 pub mod iot_twin_sync_service;
 pub use iot_twin_sync_service::IoTTwinSyncService;
+
+pub mod storage_integrity_service;
+pub use storage_integrity_service::{
+    ContentAnchor, RegisterAnchorRequest, StorageBackend, StorageConfig,
+    StorageIntegrityService, TamperAlert, VerificationStatus, MAX_FILE_BYTES,
+};

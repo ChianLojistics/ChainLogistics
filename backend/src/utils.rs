@@ -1,4 +1,4 @@
-use crate::services::{ApiKeyService, EventService, ProductService, SyncService};
+use crate::services::{ApiKeyService, EventService, ProductService, StorageIntegrityService, SyncService};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::time::Duration;
@@ -100,15 +100,19 @@ pub struct CronService {
     redis_client: redis::Client,
     backup_service: BackupService,
     sync_service: SyncService,
+    storage_integrity_service: StorageIntegrityService,
 }
 
 impl CronService {
     pub fn new(pool: PgPool, redis_client: redis::Client) -> Self {
+        let storage_integrity_service =
+            StorageIntegrityService::new(pool.clone(), redis_client.clone(), Default::default());
         Self {
             pool: pool.clone(),
             redis_client: redis_client.clone(),
             backup_service: BackupService::new(pool.clone()),
             sync_service: SyncService::new(pool, redis_client),
+            storage_integrity_service,
         }
     }
 
@@ -166,6 +170,25 @@ impl CronService {
                     Ok(n) if n > 0 => tracing::info!("Disabled {} inactive API keys", n),
                     Ok(_) => {}
                     Err(e) => tracing::error!("Failed to disable inactive API keys: {}", e),
+                }
+            }
+        });
+
+        // Periodic decentralized storage integrity verification (every 15 minutes)
+        let storage_service = self.storage_integrity_service.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(900));
+            loop {
+                interval.tick().await;
+                match storage_service.verify_pending_anchors().await {
+                    Ok(tampered) if tampered > 0 => {
+                        tracing::warn!(
+                            "Storage verification detected {} tampered anchor(s)",
+                            tampered
+                        );
+                    }
+                    Ok(_) => tracing::debug!("Storage verification batch completed"),
+                    Err(e) => tracing::error!("Storage verification failed: {}", e),
                 }
             }
         });

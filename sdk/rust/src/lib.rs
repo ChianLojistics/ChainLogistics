@@ -30,6 +30,9 @@ pub mod products;
 pub mod events;
 pub mod stats;
 
+#[cfg(feature = "decentralized-storage")]
+pub mod storage;
+
 /// Privacy-preserving audit-trail ring signatures (BLS12-381). Enable with the
 /// `ring-signatures` feature. Interoperates with the Soroban
 /// `RingSignatureVerifier` / `AuditTrailContract` contracts.
@@ -41,6 +44,9 @@ pub use client::ChainLogisticsClient;
 pub use config::Config;
 pub use error::{Error, Result};
 pub use models::*;
+
+#[cfg(feature = "decentralized-storage")]
+pub use storage::{StorageBackend, StorageBridge, StorageBridgeConfig, UploadResult, MAX_FILE_BYTES};
 
 /// SDK version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -21,3 +21,4 @@ pub mod batch;
 // pub mod supplier; // Temporarily disabled
 pub mod predictive_routing;
 pub mod physics_model;
+pub mod storage;

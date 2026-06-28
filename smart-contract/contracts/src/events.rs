@@ -249,3 +249,25 @@ pub struct ChannelFinalized {
     pub batch_count: u64,
     pub state_root: BytesN<32>,
 }
+
+/// Emitted when decentralized content is anchored on-chain by content hash.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IntegrityAnchored {
+    pub content_hash: BytesN<32>,
+    pub cid: soroban_sdk::String,
+    pub backend: Symbol,
+    pub product_id: soroban_sdk::String,
+    pub byte_size: u64,
+    pub anchorer: Address,
+}
+
+/// Emitted when off-chain verification detects content tampering.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IntegrityTamperFlagged {
+    pub content_hash: BytesN<32>,
+    pub cid: soroban_sdk::String,
+    pub product_id: soroban_sdk::String,
+    pub reporter: Address,
+}

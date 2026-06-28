@@ -33,6 +33,13 @@ from .models import (
     PaginationMeta,
 )
 from . import ring_signature
+from .storage import (
+    MAX_FILE_BYTES,
+    StorageBackend,
+    StorageBridge,
+    StorageBridgeConfig,
+    UploadResult,
+)
 from .ring_signature import (
     KeyPair,
     RingSignature,
@@ -81,4 +88,10 @@ __all__ = [
     "sign",
     "verify",
     "aggregate_ring",
+    # Decentralized storage bridge
+    "MAX_FILE_BYTES",
+    "StorageBackend",
+    "StorageBridge",
+    "StorageBridgeConfig",
+    "UploadResult",
 ]
