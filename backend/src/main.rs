@@ -10,7 +10,7 @@ use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 mod blockchain;
-mod compliance;
+// mod compliance; // Temporarily disabled due to missing dependencies
 #[cfg(test)]
 mod tests;
 mod config;
@@ -22,17 +22,26 @@ mod middleware;
 mod models;
 mod monitoring;
 mod routes;
+mod rules;
+mod saga;
 mod services;
+mod streaming;
 mod utils;
 mod validation;
-mod websocket;
+// mod websocket; // Temporarily disabled due to missing warp dependency
+mod workers;
 
 use config::Config;
-use database::Database;
-use error::AppError;
+use database::{Database, ProductRepository, EventRepository};
 use monitoring::MonitoringSystem;
+use rules::actions::{ActionExecutor, ActionHandlerEnum, StateHandler, WebhookHandler};
+use rules::engine::RuleEngine;
+use saga::coordinator::SagaCoordinator;
+use saga::persistence::PostgresSagaPersistence;
 use services::{
     AnalyticsService, ApiKeyService, AuditService, BatchService, CarbonService,
+    CollaborationService, EventService, FinancialService, PredictiveRoutingService,
+    ProductService, RecallService, SyncService, UserService,
     CollaborationService, EventService, FinancialService, IoTService, PhysicsModelService, PredictiveRoutingService,
     ProductService, QualityService, RecallService, RegulatoryService, StorageConfig,
     StorageIntegrityService, SupplierService,
@@ -41,7 +50,11 @@ use services::{
     get_product_registration_saga, NoopAction, EventProcessingHandler, RuleEvaluationHandler,
     NotificationHandler, AlertHandler, WebhookHandler,
 };
+use streaming::mercury_client::MercuryConfig;
+use streaming::indexer::StreamIndexer;
 use utils::CronService;
+use workers::executor::TaskExecutor;
+use workers::pool::WorkerPool;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -58,15 +71,14 @@ pub struct AppState {
     pub audit_service: Arc<AuditService>,
     pub recall_service: Arc<RecallService>,
     pub batch_service: Arc<BatchService>,
-    pub regulatory_service: Arc<RegulatoryService>,
-    pub iot_service: Arc<IoTService>,
-    pub quality_service: Arc<QualityService>,
-    pub supplier_service: Arc<SupplierService>,
     pub predictive_routing_service: Arc<PredictiveRoutingService>,
     pub physics_model_service: Arc<PhysicsModelService>,
     pub redis_client: redis::Client,
     pub config: Config,
     pub monitoring_system: MonitoringSystem,
+    pub rule_engine: Arc<RuleEngine>,
+    pub saga_coordinator: Arc<SagaCoordinator>,
+    pub task_executor: TaskExecutor,
     pub mercury_indexer: Arc<MercuryIndexer>,
     pub rule_engine: Arc<RuleEngine>,
     pub saga_manager: Arc<SagaManager>,
@@ -107,10 +119,6 @@ impl AppState {
         let audit_service = Arc::new(AuditService::new(db.pool().clone()));
         let recall_service = Arc::new(RecallService::new(db.pool().clone()));
         let batch_service = Arc::new(BatchService::new(db.pool().clone()));
-        let regulatory_service = Arc::new(RegulatoryService::new(db.pool().clone()));
-        let iot_service = Arc::new(IoTService::new(db.pool().clone()));
-        let quality_service = Arc::new(QualityService::new(db.pool().clone()));
-        let supplier_service = Arc::new(SupplierService::new(db.pool().clone()));
         let predictive_routing_service =
             Arc::new(PredictiveRoutingService::new(db.pool().clone()));
         let physics_model_service = Arc::new(PhysicsModelService::new(db.pool().clone()));
@@ -153,6 +161,19 @@ impl AppState {
         // Initialize comprehensive monitoring system
         let monitoring_system = MonitoringSystem::new();
 
+        // Initialize Rule Engine
+        let action_executor = ActionExecutor::new();
+        action_executor.register_handler("send_webhook".to_string(), ActionHandlerEnum::Webhook(WebhookHandler::new()));
+        action_executor.register_handler("set_state".to_string(), ActionHandlerEnum::State(StateHandler::new()));
+        let rule_engine = Arc::new(RuleEngine::new(action_executor));
+
+        // Initialize Saga Coordinator
+        let saga_persistence = Arc::new(PostgresSagaPersistence::new(db.pool().clone()));
+        let saga_coordinator = Arc::new(SagaCoordinator::new(saga_persistence));
+
+        // Initialize Task Executor
+        let task_executor = TaskExecutor::new();
+
         Ok(Self {
             db,
             product_service,
@@ -167,15 +188,14 @@ impl AppState {
             audit_service,
             recall_service,
             batch_service,
-            regulatory_service,
-            iot_service,
-            quality_service,
-            supplier_service,
             predictive_routing_service,
             physics_model_service,
             redis_client,
             config,
             monitoring_system,
+            rule_engine,
+            saga_coordinator,
+            task_executor,
             mercury_indexer,
             rule_engine,
             saga_manager,
@@ -208,6 +228,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         CronService::new(app_state.db.pool().clone(), app_state.redis_client.clone());
     cron_service.start_scheduler().await;
 
+    // Start streaming indexer (Mercury integration)
+    let (product_tx, mut product_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
+    
+    let mercury_config = MercuryConfig {
+        websocket_url: std::env::var("MERCURY_WEBSOCKET_URL")
+            .unwrap_or_else(|_| "wss://stream.mercurydata.app/v1/stream".to_string()),
+        contract_ids: vec![
+            std::env::var("CONTRACT_ID").unwrap_or_else(|_| "default".to_string())
+        ],
+        reconnect_interval: std::time::Duration::from_secs(5),
+    };
+    
+    let stream_indexer = StreamIndexer::new(mercury_config, product_tx, event_tx);
+    tracing::info!("Started Mercury streaming indexer");
+
+    // Start Redis-based worker pool
+    let mut worker_pool = WorkerPool::new(
+        app_state.redis_client.clone(),
+        TaskExecutor::new(),
+        "worker-1".to_string(),
+        "events".to_string(),
+    );
+    worker_pool.start(4).await?;
+    tracing::info!("Started Redis worker pool with 4 workers");
+
+    // Spawn task to handle products from streaming indexer
+    let product_service = app_state.product_service.clone();
+    tokio::spawn(async move {
+        while let Some(product) = product_rx.recv().await {
+            if let Err(e) = product_service.create_product(product).await {
+                tracing::error!("Failed to create product from stream: {}", e);
+            }
+        }
+    });
+
+    // Spawn task to handle events from streaming indexer
+    let event_service = app_state.event_service.clone();
+    tokio::spawn(async move {
+        while let Some(event) = event_rx.recv().await {
+            if let Err(e) = event_service.create_event(event).await {
+                tracing::error!("Failed to create event from stream: {}", e);
+            }
     // Start Mercury streaming indexer
     let mercury_indexer = app_state.mercury_indexer.clone();
     tokio::spawn(async move {

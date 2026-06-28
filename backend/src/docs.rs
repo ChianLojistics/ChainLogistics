@@ -4,7 +4,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::handlers::{
     api_keys::{ApiKeyCreatedResponse, ApiKeyResponse, CreateApiKeyRequest},
     auth::{AuthResponse, LoginRequest, RegisterRequest},
-    compliance::{ComplianceCheckRequest, ComplianceReportResponse},
+    // compliance::{ComplianceCheckRequest, ComplianceReportResponse}, // Temporarily disabled
     event::{CreateEventRequest, EventResponse, ListEventsQuery, PaginatedEventsResponse},
     financial::{CreateInvoiceRequest, CreateTransactionRequest, FinancingRequestBody},
     product::{
@@ -73,10 +73,10 @@ use crate::handlers::{
         crate::handlers::financial::list_transactions,
         crate::handlers::financial::create_invoice,
         crate::handlers::financial::request_financing,
-        // Compliance endpoints
-        crate::handlers::compliance::check_compliance,
-        crate::handlers::compliance::get_compliance_report,
-        crate::handlers::compliance::generate_audit_report,
+        // Compliance endpoints (temporarily disabled)
+        // crate::handlers::compliance::check_compliance,
+        // crate::handlers::compliance::get_compliance_report,
+        // crate::handlers::compliance::generate_audit_report,
         // API Key endpoints
         crate::handlers::api_keys::create_key,
         crate::handlers::api_keys::list_keys,

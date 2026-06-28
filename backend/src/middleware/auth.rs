@@ -5,7 +5,7 @@ use axum::{
     response::Response,
 };
 use std::sync::Arc;
-use tower::ServiceExt;
+// use tower::ServiceExt; // Temporarily disabled
 
 use crate::middleware::audit::{correlation_id_from_headers, spawn_http_audit};
 use crate::{
