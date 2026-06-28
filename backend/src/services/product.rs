@@ -1,5 +1,6 @@
 use crate::database::{ProductFilters, ProductRepository};
-use crate::models::{AppError, NewProduct, Product};
+use crate::error::AppError;
+use crate::models::{NewProduct, Product};
 use async_trait::async_trait;
 use redis::AsyncCommands;
 use sqlx::PgPool;

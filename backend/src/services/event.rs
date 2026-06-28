@@ -1,5 +1,6 @@
 use crate::database::{EventRepository, GlobalStats};
-use crate::models::{AppError, NewTrackingEvent, ProductStats, TrackingEvent};
+use crate::error::AppError;
+use crate::models::{NewTrackingEvent, ProductStats, TrackingEvent};
 use async_trait::async_trait;
 use redis::AsyncCommands;
 use sqlx::{PgPool, Row};

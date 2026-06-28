@@ -29,8 +29,8 @@ pub use carbon::CarbonService;
 pub mod audit_service;
 pub use audit_service::AuditService;
 
-pub mod digital_twin_service;
-pub use digital_twin_service::DigitalTwinService;
+// pub mod digital_twin_service;
+// pub use digital_twin_service::DigitalTwinService;
 
 pub mod collaboration;
 pub use collaboration::CollaborationService;
@@ -38,17 +38,17 @@ pub use collaboration::CollaborationService;
 pub mod batch_service;
 pub use batch_service::{BatchRepository, BatchService};
 
-pub mod supplier_service;
-pub use supplier_service::SupplierService;
+// pub mod supplier_service;
+// pub use supplier_service::SupplierService;
 
-pub mod iot_service;
-pub use iot_service::IoTService;
+// pub mod iot_service;
+// pub use iot_service::IoTService;
 
-pub mod quality_service;
-pub use quality_service::QualityService;
+// pub mod quality_service;
+// pub use quality_service::QualityService;
 
-pub mod regulatory_service;
-pub use regulatory_service::RegulatoryService;
+// pub mod regulatory_service;
+// pub use regulatory_service::RegulatoryService;
 
 pub mod predictive_routing_service;
 pub use predictive_routing_service::PredictiveRoutingService;
