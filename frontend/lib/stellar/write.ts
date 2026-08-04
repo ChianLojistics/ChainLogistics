@@ -5,7 +5,6 @@ import {
   rpc,
   TransactionBuilder,
   Networks,
-  Address,
   BASE_FEE,
 } from "@stellar/stellar-sdk";
 import { CONTRACT_CONFIG, validateContractConfig } from "@/lib/contract/config";

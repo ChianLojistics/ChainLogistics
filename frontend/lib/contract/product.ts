@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { xdr, Address, nativeToScVal } from "@stellar/stellar-sdk";
 import { invokeContractWrite } from "@/lib/stellar/write";
 

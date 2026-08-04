@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import EventTypeSelector, { EventType } from './EventTypeSelector';
 import { LocationInput } from "./LocationInput";
 import { sanitizeInput, apiRateLimiter, eventTrackingSchema, EVENT_NOTE_MAX_LEN } from "@/lib/validation";
-import { EVENT_TRACKING_SUBMIT_DELAY_MS } from "@/lib/constants";
+import { useWalletStore } from "@/lib/state/wallet.store";
+import { addTrackingEventOnChain } from "@/lib/contract/event";
 
 export default function EventTrackingForm() {
     const [eventType, setEventType] = useState<EventType | ''>('');
@@ -14,16 +15,28 @@ export default function EventTrackingForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
+    const [txHash, setTxHash] = useState('');
+    const [eventId, setEventId] = useState<number | null>(null);
 
-    // Expected normally fetched from API/Stellar
-    const products = [
-        { id: 'PRD-1001-XYZ', name: 'Premium Arabica Coffee Beans' },
-        { id: 'PRD-2034-ABC', name: 'Organic Cotton T-Shirt' },
-        { id: 'PRD-5099-LMN', name: 'Fair Trade Chocolate' },
-    ];
+    const { publicKey, status: walletStatus } = useWalletStore();
+    const isConnected = walletStatus === "connected" && !!publicKey;
+
+    const resetForm = () => {
+        setEventType('');
+        setNote('');
+        setLocation('');
+        setProductId('');
+        setError('');
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
+
+        if (!isConnected || !publicKey) {
+            setError('Please connect your wallet before submitting an event.');
+            return;
+        }
 
         const result = eventTrackingSchema.safeParse({
             productId,
@@ -52,16 +65,22 @@ export default function EventTrackingForm() {
         }
 
         setIsSubmitting(true);
-        setError('');
 
         try {
-            setLocation(sanitizedLocation);
-            setNote(sanitizedNote);
-            // Dummy transaction delay mirroring freighter confirm
-            await new Promise((resolve) => setTimeout(resolve, EVENT_TRACKING_SUBMIT_DELAY_MS));
+            const { hash, eventId: newEventId } = await addTrackingEventOnChain(publicKey, {
+                productId,
+                eventType: eventType as EventType,
+                location: sanitizedLocation,
+                note: sanitizedNote || undefined,
+            });
+            setTxHash(hash);
+            setEventId(newEventId);
             setSuccess(true);
         } catch (err) {
-            setError((err as Error).message || 'Failed to submit transaction');
+            const message =
+                (err as { userMessage?: string })?.userMessage ||
+                (err instanceof Error ? err.message : 'Failed to submit transaction');
+            setError(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -74,30 +93,50 @@ export default function EventTrackingForm() {
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">Event Recorded!</h2>
-                <p className="text-gray-600 text-lg mb-8">The tracking event has been immutably recorded.</p>
+                <p className="text-gray-600 text-lg mb-8">The tracking event has been immutably recorded on Stellar.</p>
 
-                <div className="bg-gray-50 rounded-2xl p-6 text-left mb-8 font-mono text-sm max-w-sm mx-auto space-y-3 border border-gray-200 shadow-inner">
+                <div className="bg-gray-50 rounded-2xl p-6 text-left mb-8 font-mono text-sm max-w-md mx-auto space-y-3 border border-gray-200 shadow-inner">
                     <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                         <span className="text-gray-500 uppercase text-xs tracking-wider">Product ID</span>
                         <span className="text-gray-900 font-bold bg-white px-2 py-1 rounded shadow-sm">{productId}</span>
                     </div>
-                    <div className="flex justify-between items-center pt-1">
+                    <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                         <span className="text-gray-500 uppercase text-xs tracking-wider">Event Action</span>
                         <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-1 rounded shadow-sm">{eventType}</span>
                     </div>
+                    {eventId !== null && (
+                        <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                            <span className="text-gray-500 uppercase text-xs tracking-wider">Event ID</span>
+                            <span className="text-gray-900 font-bold bg-white px-2 py-1 rounded shadow-sm">{eventId}</span>
+                        </div>
+                    )}
+                    <div className="pt-1">
+                        <span className="text-gray-500 uppercase text-xs tracking-wider block mb-1">Transaction</span>
+                        <span className="text-gray-900 break-all block">{txHash}</span>
+                    </div>
                 </div>
 
-                <button
-                    onClick={() => {
-                        setSuccess(false);
-                        setEventType('');
-                        setNote('');
-                        setLocation('');
-                    }}
-                    className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-md hover:shadow-lg w-full sm:w-auto"
-                >
-                    Track Another Event
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <a
+                        href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-8 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition shadow-sm w-full sm:w-auto"
+                    >
+                        View on Explorer
+                    </a>
+                    <button
+                        onClick={() => {
+                            setSuccess(false);
+                            setTxHash('');
+                            setEventId(null);
+                            resetForm();
+                        }}
+                        className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-md hover:shadow-lg w-full sm:w-auto"
+                    >
+                        Track Another Event
+                    </button>
+                </div>
             </div>
         );
     }
@@ -109,6 +148,12 @@ export default function EventTrackingForm() {
                 <p className="text-gray-500 mt-2">Record a new step in the product&apos;s journey. Submit to ledger via wallet signature.</p>
             </div>
 
+            {!isConnected && (
+                <div role="alert" className="mb-8 p-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl text-sm">
+                    Connect your wallet to sign and submit tracking events. You must be the product owner or an authorized actor.
+                </div>
+            )}
+
             {error && (
                 <div role="alert" className="mb-8 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex gap-3 items-center">
                     <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -118,19 +163,21 @@ export default function EventTrackingForm() {
 
             <form onSubmit={handleSubmit} className="space-y-10">
                 <div className="space-y-3">
-                    <label htmlFor="product" className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">1. Select Product *</label>
-                    <select
+                    <label htmlFor="product" className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">1. Product ID *</label>
+                    <input
                         id="product"
+                        type="text"
                         value={productId}
-                        onChange={(e) => setProductId(e.target.value)}
-                        className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50 border p-4 text-base"
+                        onChange={(e) => {
+                            setProductId(e.target.value);
+                            setError('');
+                        }}
+                        placeholder="e.g. PROD-SMOKE-1"
+                        autoComplete="off"
+                        className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50 border p-4 text-base font-mono"
                         required
-                    >
-                        <option value="">-- Choose a product acting on --</option>
-                        {products.map(p => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
-                        ))}
-                    </select>
+                    />
+                    <p className="text-sm text-gray-500">Enter the on-chain ID of a product you own or are authorized to update.</p>
                 </div>
 
                 <div className="space-y-3">
@@ -176,13 +223,14 @@ export default function EventTrackingForm() {
                 <div className="pt-8 border-t border-gray-200 mt-10 flex flex-col sm:flex-row items-center justify-end gap-4">
                     <button
                         type="button"
+                        onClick={resetForm}
                         className="px-8 py-4 w-full sm:w-auto text-gray-600 font-semibold hover:bg-gray-100 rounded-xl transition"
                     >
                         Clear Form
                     </button>
                     <button
                         type="submit"
-                        disabled={isSubmitting || !productId || !eventType || !location}
+                        disabled={isSubmitting || !isConnected || !productId || !eventType || !location}
                         className="px-8 py-4 w-full sm:w-auto bg-gray-900 border border-transparent text-white font-bold rounded-xl hover:bg-black transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                     >
                         {isSubmitting ? (
