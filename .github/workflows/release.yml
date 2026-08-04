@@ -24,8 +24,9 @@ jobs:
           node-version: "20"
 
       # Install Rust
+      # Pinned to 1.96.0: Rust 1.97+ breaks the transitive ethnum 1.5.2 crate (E0512).
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.96.0
 
       # Add WASM target
       - name: Add wasm target

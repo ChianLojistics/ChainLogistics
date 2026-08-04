@@ -22,9 +22,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Pinned to 1.96.0: Rust 1.97 changed the size of core::num::TryFromIntError,
+      # which breaks the (unmaintained, transitive) ethnum 1.5.2 crate with E0512
+      # ("cannot transmute between types of different sizes"). No fixed ethnum
+      # release exists yet, so pin below 1.97 until soroban's dep tree drops it.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
+          components: rustfmt, clippy
           targets: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Ensure wasm32v1-none target is available

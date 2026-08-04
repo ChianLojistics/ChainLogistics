@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +14,7 @@ interface HealthMetric {
   threshold_max?: number;
   severity?: string;
   calculated_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 interface HealthGaugeProps {
@@ -27,13 +27,7 @@ export function HealthGauge({ twinId, className = '' }: HealthGaugeProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchHealthMetrics();
-    const interval = setInterval(fetchHealthMetrics, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
-  }, [twinId]);
-
-  const fetchHealthMetrics = async () => {
+  const fetchHealthMetrics = useCallback(async () => {
     try {
       const response = await fetch(`/api/v1/physics/twins/${twinId}/health-metrics`);
       if (!response.ok) throw new Error('Failed to fetch health metrics');
@@ -44,20 +38,16 @@ export function HealthGauge({ twinId, className = '' }: HealthGaugeProps) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setLoading(false);
     }
-  };
+  }, [twinId]);
 
-  const getSeverityColor = (severity?: string) => {
-    switch (severity) {
-      case 'normal':
-        return 'bg-green-500';
-      case 'warning':
-        return 'bg-yellow-500';
-      case 'critical':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
+  useEffect(() => {
+    // setState happens only after an await inside fetchHealthMetrics, so this is
+    // an async data fetch, not a synchronous cascading render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchHealthMetrics();
+    const interval = setInterval(fetchHealthMetrics, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, [fetchHealthMetrics]);
 
   const getSeverityIcon = (severity?: string) => {
     switch (severity) {

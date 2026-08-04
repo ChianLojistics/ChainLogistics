@@ -36,8 +36,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Pinned to 1.96.0: Rust 1.97 changed core::num::TryFromIntError's size,
+      # breaking the transitive ethnum 1.5.2 crate (E0512). Keep below 1.97 until
+      # soroban's dependency tree no longer pulls the broken ethnum.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
           targets: wasm32-unknown-unknown
 

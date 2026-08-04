@@ -1,17 +1,34 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
-import { Activity, TrendingUp, Calendar, Clock, AlertTriangle, Play, Thermometer } from 'lucide-react';
+import { Activity, Calendar, Clock, AlertTriangle, Play, Thermometer } from 'lucide-react';
+
+interface TwinStateData {
+  temperature?: number;
+  humidity?: number;
+}
+
+interface TwinMetrics {
+  health_score?: number;
+  decay_rate?: number;
+  temperature_stress?: number;
+  humidity_stress?: number;
+}
+
+interface HealthHistoryEntry {
+  timestamp: string;
+  score: number;
+}
 
 interface TwinState {
   id: string;
-  state_data: any;
-  metrics: any;
+  state_data: TwinStateData;
+  metrics: TwinMetrics;
   timestamp: string;
   source: string;
 }
@@ -19,10 +36,10 @@ interface TwinState {
 interface DigitalTwin {
   id: string;
   name: string;
-  current_state: any;
+  current_state: TwinStateData;
   current_health_score?: number;
   predicted_expiry_date?: string;
-  health_history?: any[];
+  health_history?: HealthHistoryEntry[];
 }
 
 interface TwinViewProps {
@@ -37,13 +54,7 @@ export function TwinView({ twinId, className = '' }: TwinViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'health' | 'temperature' | 'decay' | 'metrics'>('health');
 
-  useEffect(() => {
-    fetchTwinData();
-    const interval = setInterval(fetchTwinData, 15000); // Refresh every 15s
-    return () => clearInterval(interval);
-  }, [twinId]);
-
-  const fetchTwinData = async () => {
+  const fetchTwinData = useCallback(async () => {
     try {
       const [twinRes, historyRes] = await Promise.all([
         fetch(`/api/v1/digital-twins/${twinId}`),
@@ -62,12 +73,21 @@ export function TwinView({ twinId, className = '' }: TwinViewProps) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setLoading(false);
     }
-  };
+  }, [twinId]);
+
+  useEffect(() => {
+    // setState happens only after an await inside fetchTwinData, so this is an
+    // async data fetch, not a synchronous cascading render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTwinData();
+    const interval = setInterval(fetchTwinData, 15000); // Refresh every 15s
+    return () => clearInterval(interval);
+  }, [fetchTwinData]);
 
   const getHealthChartData = () => {
     if (!twin?.health_history) return [];
-    
-    return twin.health_history.map((entry: any) => ({
+
+    return twin.health_history.map((entry) => ({
       timestamp: new Date(entry.timestamp).toLocaleTimeString(),
       score: Math.round(entry.score * 100),
     }));
