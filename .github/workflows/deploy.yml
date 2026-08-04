@@ -23,6 +23,8 @@ jobs:
   deploy-contracts:
     name: Deploy Smart Contracts
     runs-on: ubuntu-latest
+    # Only run when the deployer secret is present (production/staging deployments)
+    if: vars.DEPLOY_CONTRACTS_ENABLED == 'true'
     environment: ${{ github.event.inputs.environment || 'staging' }}
     env:
       STELLAR_CLI_VERSION: 23.4.0

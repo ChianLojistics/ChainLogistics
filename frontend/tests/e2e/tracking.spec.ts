@@ -5,7 +5,7 @@ test("Add event flow", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Supply Chain Operations" })).toBeVisible();
 
-  await page.locator("#product").selectOption("PRD-1001-XYZ");
+  await page.locator("#product").fill("PRD-1001-XYZ");
   await page.getByRole("radio").filter({ hasText: "Ship" }).first().click();
   await page.locator("#location").fill("E2E Facility");
 

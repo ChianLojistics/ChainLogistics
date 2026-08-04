@@ -2,6 +2,8 @@
 import { xdr, Address, scValToNative } from "@stellar/stellar-sdk";
 import { invokeContractWrite } from "@/lib/stellar/write";
 
+const E2E_MOCKS_ENABLED = process.env.NEXT_PUBLIC_E2E_MOCKS === "true";
+
 export type TrackingEventData = {
   productId: string;
   /** Short symbol, e.g. "shipped", "received", "processed" (<= 32 chars). */
@@ -75,6 +77,16 @@ export async function addTrackingEventOnChain(
 ): Promise<{ hash: string; eventId: number | null }> {
   if (!publicKey || !data.productId || !data.eventType) {
     throw new Error("Invalid tracking event parameters");
+  }
+
+  // E2E mode has no chain/Freighter behind it; return a deterministic fake
+  // hash/eventId so the tracking flow reaches "Event Recorded!" without a
+  // live network.
+  if (E2E_MOCKS_ENABLED) {
+    return {
+      hash: `e2e-mock-tx-${data.productId}`.padEnd(64, "0").slice(0, 64),
+      eventId: 1,
+    };
   }
 
   const dataHash = data.dataHashHex

@@ -1,6 +1,8 @@
 import { xdr, Address, nativeToScVal } from "@stellar/stellar-sdk";
 import { invokeContractWrite } from "@/lib/stellar/write";
 
+const E2E_MOCKS_ENABLED = process.env.NEXT_PUBLIC_E2E_MOCKS === "true";
+
 export type ProductData = {
   id: string;
   name: string;
@@ -69,6 +71,12 @@ export async function registerProductOnChain(
 ): Promise<string> {
   if (!publicKey || !data.id) {
     throw new Error("Invalid contract parameters");
+  }
+
+  // E2E mode has no chain/Freighter behind it; return a deterministic fake hash
+  // so the registration flow reaches its success state without a live network.
+  if (E2E_MOCKS_ENABLED) {
+    return `e2e-mock-tx-${data.id}`.padEnd(64, "0").slice(0, 64);
   }
 
   const ownerScVal = new Address(publicKey).toScVal();

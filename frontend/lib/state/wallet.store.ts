@@ -28,6 +28,10 @@ let _accountWatcher: ReturnType<typeof setInterval> | null = null;
 type SetSlice = (partial: Partial<Pick<WalletState, "status" | "publicKey" | "error">>) => void;
 
 function startAccountWatcher(getState: () => WalletState, setState: SetSlice) {
+  // In E2E mode the wallet is a static mock with no Freighter behind it; polling
+  // the real getCurrentAddress() would return null and disconnect the mock
+  // mid-test. Skip the watcher so the mock connection stays put.
+  if (E2E_MOCKS_ENABLED) return;
   if (_accountWatcher !== null) return; // already running
   _accountWatcher = setInterval(async () => {
     const { status, publicKey } = getState();

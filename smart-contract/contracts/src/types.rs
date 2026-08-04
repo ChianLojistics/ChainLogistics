@@ -184,8 +184,8 @@ pub enum DataKey {
     ChannelSeq,              // Monotonic channel id counter
     ProductChannels(String), // Channel ids opened against a product
     // ── Integrity Anchor (decentralized content) ─────────────────────────
-    ContentAnchor(BytesN<32>),      // Anchor keyed by SHA-256 content hash
-    ProductContentAnchors(String),  // Content hashes linked to a product
+    ContentAnchor(BytesN<32>),     // Anchor keyed by SHA-256 content hash
+    ProductContentAnchors(String), // Content hashes linked to a product
 }
 
 // ─── Event Types ───────────────────────────────────────────────────────────

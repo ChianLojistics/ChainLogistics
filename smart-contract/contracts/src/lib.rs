@@ -37,6 +37,8 @@ mod admin;
 mod circuit_breaker;
 #[cfg(not(target_arch = "wasm32"))]
 mod event_query;
+#[cfg(not(target_arch = "wasm32"))]
+mod integrity_anchor;
 #[cfg(test)]
 mod load_tests;
 #[cfg(not(target_arch = "wasm32"))]
@@ -48,8 +50,6 @@ mod product_registry;
 mod product_transfer;
 #[cfg(not(target_arch = "wasm32"))]
 mod ring_signature;
-#[cfg(not(target_arch = "wasm32"))]
-mod integrity_anchor;
 #[cfg(not(target_arch = "wasm32"))]
 mod state_channel;
 #[cfg(not(target_arch = "wasm32"))]
@@ -98,6 +98,8 @@ pub use circuit_breaker::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use event_query::*;
 #[cfg(not(target_arch = "wasm32"))]
+pub use integrity_anchor::*;
+#[cfg(not(target_arch = "wasm32"))]
 pub use oracle::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use product_query::*;
@@ -107,8 +109,6 @@ pub use product_registry::*;
 pub use product_transfer::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use ring_signature::*;
-#[cfg(not(target_arch = "wasm32"))]
-pub use integrity_anchor::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use state_channel::*;
 #[cfg(not(target_arch = "wasm32"))]

@@ -180,11 +180,7 @@ impl IntegrityAnchorContract {
     }
 
     /// Record that off-chain verification detected tampering.
-    pub fn flag_tamper(
-        env: Env,
-        reporter: Address,
-        content_hash: BytesN<32>,
-    ) -> Result<(), Error> {
+    pub fn flag_tamper(env: Env, reporter: Address, content_hash: BytesN<32>) -> Result<(), Error> {
         require_init(&env)?;
         reporter.require_auth();
 
@@ -242,14 +238,7 @@ mod test_integrity_anchor {
         let backend = Symbol::new(&env, "ipfs");
         let product_id = String::from_str(&env, "PROD-001");
 
-        client.anchor_content(
-            &anchorer,
-            &hash,
-            &cid,
-            &backend,
-            &product_id,
-            &1024,
-        );
+        client.anchor_content(&anchorer, &hash, &cid, &backend, &product_id, &1024);
 
         assert!(client.is_anchored(&hash));
         let anchor = client.get_anchor(&hash);
@@ -257,14 +246,7 @@ mod test_integrity_anchor {
         assert_eq!(anchor.byte_size, 1024);
 
         // Idempotent re-anchor with same hash + CID
-        client.anchor_content(
-            &anchorer,
-            &hash,
-            &cid,
-            &backend,
-            &product_id,
-            &1024,
-        );
+        client.anchor_content(&anchorer, &hash, &cid, &backend, &product_id, &1024);
 
         let anchors = client.get_product_anchors(&product_id);
         assert_eq!(anchors.len(), 1);
@@ -303,14 +285,7 @@ mod test_integrity_anchor {
         let backend = Symbol::new(&env, "arweave");
         let product_id = String::from_str(&env, "PROD-003");
 
-        client.anchor_content(
-            &anchorer,
-            &hash,
-            &cid,
-            &backend,
-            &product_id,
-            &4096,
-        );
+        client.anchor_content(&anchorer, &hash, &cid, &backend, &product_id, &4096);
 
         client.flag_tamper(&anchorer, &hash);
         let anchor = client.get_anchor(&hash);

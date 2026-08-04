@@ -97,26 +97,13 @@ jobs:
       # Create GitHub Release
       - name: Create GitHub Release
         id: create_release
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
-          body: ${{ steps.changelog.outputs.changelog }}
-          draft: false
-          prerelease: false
-
-      # Upload release asset
-      - name: Upload release assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./chainlogistics-${{ steps.get_version.outputs.version }}.zip
-          asset_name: chainlogistics-${{ steps.get_version.outputs.version }}.zip
-          asset_content_type: application/zip
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            chainlogistics-${{ steps.get_version.outputs.version }}.zip \
+            --title "Release ${{ steps.get_version.outputs.version }}" \
+            --notes "${{ steps.changelog.outputs.changelog }}"
 
 
   publish-frontend:
@@ -145,7 +132,7 @@ jobs:
 
       # Deploy to Vercel
       - name: Deploy to Vercel
-        if: secrets.VERCEL_TOKEN != ''
+        if: vars.USE_VERCEL == 'true'
         run: |
           npm install -g vercel
           cd frontend
