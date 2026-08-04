@@ -1,4 +1,12 @@
 #!/bin/bash
+#
+# DEPRECATED for full deployments — this deploys a SINGLE contract instance only.
+# ChainLogistics is a multi-contract system (MAIN + AUTH) that must be wired
+# together after deploy. For a complete, wired testnet deployment use:
+#
+#     ./scripts/deploy-testnet.sh
+#
+# This script is kept for one-off single-instance deploys / debugging.
 
 set -e
 
@@ -10,7 +18,7 @@ NC='\033[0m' # No Color
 
 # Default values
 NETWORK="testnet"
-CONTRACT_NAME="hello_world"
+CONTRACT_NAME="chainlogistics"
 WASM_PATH="target/wasm32v1-none/release/${CONTRACT_NAME}.wasm"
 
 # Parse arguments
@@ -78,7 +86,7 @@ echo -e "${GREEN}Deploying to ${NETWORK}...${NC}"
 
 # Deploy the contract
 echo -e "${YELLOW}Deploying contract...${NC}"
-DEPLOY_OUTPUT=$(soroban contract deploy \
+DEPLOY_OUTPUT=$(stellar contract deploy \
   --wasm "../${WASM_PATH}" \
   --source-account "$SOURCE_KEY" \
   --network "$NETWORK" 2>&1)

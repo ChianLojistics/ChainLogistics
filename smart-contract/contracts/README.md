@@ -193,7 +193,7 @@ cargo test -p chainlogistics
 ### Production
 ```bash
 # Build optimized WASM for deployment
-cargo build --release --target wasm32-unknown-unknown -p chainlogistics
+cargo build --release --target wasm32v1-none -p chainlogistics
 ```
 
 ## Code Quality Metrics

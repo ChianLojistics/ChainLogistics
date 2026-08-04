@@ -70,8 +70,11 @@ export function ProductRegistrationForm() {
             const hash = await registerProductOnChain(publicKey, sanitizedData);
             setTxHash(hash);
             setStep(4); // Success step
-        } catch {
-            alert("Failed to register product");
+        } catch (err) {
+            const message =
+                (err as { userMessage?: string })?.userMessage ||
+                (err instanceof Error ? err.message : "Failed to register product");
+            alert(message);
         } finally {
             setIsSubmitting(false);
         }

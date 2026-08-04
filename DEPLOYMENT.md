@@ -45,10 +45,10 @@ ChainLogistics consists of three main components:
 ### Software Requirements
 
 - **Docker**: 20.10+ and Docker Compose 2.0+
-- **Rust**: 1.70+ (for manual builds)
+- **Rust**: 1.84+ (soroban-sdk 25 requires the `wasm32v1-none` target)
 - **Node.js**: 18+ (for manual frontend builds)
 - **PostgreSQL Client**: 14+ (for manual database setup)
-- **Soroban CLI**: Latest version (for smart contract deployment)
+- **Stellar CLI**: >= 27 (`stellar` CLI; soroban-sdk 25 targets protocol 27)
 
 ### Required Accounts
 
@@ -446,74 +446,86 @@ sudo systemctl reload nginx
 
 ## Smart Contract Deployment
 
+ChainLogistics is a **multi-contract** system. The MVP "core trio" is built from a
+single WASM and deployed as two wired instances:
+
+- **MAIN** — ProductRegistry + ChainLogistics + Validation (shared storage). This is
+  the address the frontend and backend use (`NEXT_PUBLIC_CONTRACT_ID` / `CONTRACT_ID`).
+- **AUTH** — AuthorizationContract (ownership + authorized actors).
+
 ### Prerequisites
 
 ```bash
-# Install Soroban CLI
-cargo install --locked soroban-cli --features opt
+# Install the Stellar CLI (>= 27; soroban-sdk 25.3.1 targets protocol 27).
+# The legacy `soroban` CLI and older `stellar` versions cannot parse SDK 25 metadata.
+curl --proto '=https' --tlsv1.2 -sSf https://stellar.org/install.sh | sh
+stellar version   # expect >= 27
 
-# Add WASM target
-rustup target add wasm32-unknown-unknown
+# Add the WASM target. NOTE: use wasm32v1-none, NOT wasm32v1-none —
+# the latter is unsupported by soroban-sdk 25 on Rust 1.82+.
+rustup target add wasm32v1-none
 ```
 
-### Get Testnet Account
+### One-command deploy (recommended)
 
 ```bash
-# Generate keypair
-soroban keys generate --global testnet-key
-
-# Fund account with friendbot
-soroban keys fund testnet-key --network testnet
-
-# Verify balance
-soroban keys address testnet-key
+cd smart-contract
+./scripts/deploy-testnet.sh
 ```
 
-### Deploy Contract
+This creates/funds a testnet identity if needed, builds the WASM, uploads it once,
+instantiates MAIN + AUTH, wires them, and writes the resulting IDs into
+`smart-contract/.env` and `frontend/.env.local`.
+
+### Manual deploy (what the script does)
 
 ```bash
-cd smart-contract/contracts
+cd smart-contract
+cargo build --target wasm32v1-none --release
+WASM=target/wasm32v1-none/release/chainlogistics.wasm
 
-# Build WASM
-cargo build --target wasm32-unknown-unknown --release
+# Identity
+stellar keys generate chainlog-deployer --network testnet --fund
+ADMIN=$(stellar keys address chainlog-deployer)
 
-# Deploy to testnet
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/chainlogistics.wasm \
-  --source testnet-key \
-  --network testnet
+# Upload once, instantiate twice
+HASH=$(stellar contract upload --wasm "$WASM" --source chainlog-deployer --network testnet)
+MAIN=$(stellar contract deploy --wasm-hash "$HASH" --source chainlog-deployer --network testnet)
+AUTH=$(stellar contract deploy --wasm-hash "$HASH" --source chainlog-deployer --network testnet)
 
-# Save the contract ID output
+# Wire
+stellar contract invoke --id "$AUTH" --source chainlog-deployer --network testnet --send=yes \
+  -- configure_initializer --initializer "$MAIN"
+stellar contract invoke --id "$MAIN" --source chainlog-deployer --network testnet --send=yes \
+  -- init --admin "$ADMIN" --auth_contract "$AUTH"
+stellar contract invoke --id "$MAIN" --source chainlog-deployer --network testnet --send=yes \
+  -- configure_auth_contract --auth_contract "$AUTH"
 ```
 
 ### Verify Deployment
 
 ```bash
-# Test contract invocation
-soroban contract invoke \
-  --id YOUR_CONTRACT_ID \
-  --source testnet-key \
-  --network testnet \
-  -- ping
+# Read-only calls used by the frontend timeline:
+stellar contract invoke --id "$MAIN" --source chainlog-deployer --network testnet \
+  -- get_product_event_ids --id "PROD-1"
+stellar contract invoke --id "$MAIN" --source chainlog-deployer --network testnet \
+  -- get_event --event_id 1
 ```
+
+### Current testnet deployment
+
+| Role  | Contract ID |
+|-------|-------------|
+| MAIN (`NEXT_PUBLIC_CONTRACT_ID`) | `CDN45LYNJLEHVWLYAN34CFSBUT4RWTFWKG5I7LMDJS2QNC2L6RLLEZWR` |
+| AUTH  | `CCAPPFD5PERFZ6T66XPU74NZBZXHJBSQIFST4GOVMYIDZR4D54VYRXHQ` |
+| Network | testnet (protocol 27) |
 
 ### Mainnet Deployment
 
 **WARNING:** Mainnet deployment involves real XLM costs. Test thoroughly on testnet first.
+Use the same flow against `--network mainnet` with a funded mainnet identity, then update
+`CONTRACT_ID` / `NEXT_PUBLIC_CONTRACT_ID` to the mainnet MAIN address.
 
-```bash
-# Use mainnet network
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/chainlogistics.wasm \
-  --source mainnet-key \
-  --network pubnet
-
-# Update environment variables
-echo "CONTRACT_ID=YOUR_MAINNET_CONTRACT_ID" >> backend/.env
-echo "NEXT_PUBLIC_CONTRACT_ID=YOUR_MAINNET_CONTRACT_ID" >> frontend/.env.local
-echo "STELLAR_NETWORK=mainnet" >> backend/.env
-echo "NEXT_PUBLIC_STELLAR_NETWORK=mainnet" >> frontend/.env.local
-```
 
 ---
 
@@ -836,31 +848,31 @@ docker-compose up -d
 
 ```bash
 # Check account balance
-soroban keys address testnet-key
-soroban keys fund testnet-key --network testnet
+stellar keys address testnet-key
+stellar keys fund testnet-key --network testnet
 
 # Check network connectivity
 curl https://soroban-testnet.stellar.org
 
 # Verify WASM file
-ls -lh target/wasm32-unknown-unknown/release/chainlogistics.wasm
+ls -lh target/wasm32v1-none/release/chainlogistics.wasm
 ```
 
 #### Transaction Failed
 
 ```bash
 # Check transaction status
-soroban contract tx-status YOUR_TRANSACTION_ID --network testnet
+stellar contract tx-status YOUR_TRANSACTION_ID --network testnet
 
 # Check gas fees
-soroban contract fee \
-  --wasm target/wasm32-unknown-unknown/release/chainlogistics.wasm \
+stellar contract fee \
+  --wasm target/wasm32v1-none/release/chainlogistics.wasm \
   --source testnet-key \
   --network testnet
 
 # Retry with higher fee
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/chainlogistics.wasm \
+stellar contract deploy \
+  --wasm target/wasm32v1-none/release/chainlogistics.wasm \
   --source testnet-key \
   --network testnet \
   --fee 100000

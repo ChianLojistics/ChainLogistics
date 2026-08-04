@@ -4,11 +4,22 @@
 
 ChainLojistic is an open-source, blockchain-based supply chain provenance tracker built on Stellar's Soroban platform. It enables transparent, tamper-proof tracking of products from origin to consumer, solving trust and verification issues in global supply chains.
 
-## Contract Address
+## Contract Address (Testnet)
 
-CBUWSKT2UGOAXK4ZREVDJV5XHSYB42PZ3CERU2ZFUTUMAZLJEHNZIECA
-NEXT_PUBLIC_CONTRACT_ID=CBUWSKT2UGOAXK4ZREVDJV5XHSYB42PZ3CERU2ZFUTUMAZLJEHNZIECA
+The MVP is deployed as two wired instances built from one WASM. The frontend/backend
+point at **MAIN**:
+
+```
+# MAIN — ProductRegistry + ChainLogistics (this is NEXT_PUBLIC_CONTRACT_ID)
+CDN45LYNJLEHVWLYAN34CFSBUT4RWTFWKG5I7LMDJS2QNC2L6RLLEZWR
+# AUTH — AuthorizationContract
+CCAPPFD5PERFZ6T66XPU74NZBZXHJBSQIFST4GOVMYIDZR4D54VYRXHQ
+
+NEXT_PUBLIC_CONTRACT_ID=CDN45LYNJLEHVWLYAN34CFSBUT4RWTFWKG5I7LMDJS2QNC2L6RLLEZWR
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
+```
+
+Redeploy with `smart-contract/scripts/deploy-testnet.sh` (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 
 ## 🎯 The Problem
@@ -294,9 +305,9 @@ If you're a new contributor looking to run the project locally, follow these ste
 
 ### Prerequisites
 
-- **Rust 1.70+**: Required for both smart contracts and backend. `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- **Soroban CLI**: `cargo install --locked soroban-cli --features opt`
-- **WASM Target**: `rustup target add wasm32-unknown-unknown`
+- **Rust 1.84+**: Required for both smart contracts and backend (soroban-sdk 25 needs the `wasm32v1-none` target). `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- **Soroban CLI**: `stellar` CLI >= 27 (soroban-sdk 25 targets protocol 27). Install: `curl --proto '=https' --tlsv1.2 -sSf https://stellar.org/install.sh | sh`
+- **WASM Target**: `rustup target add wasm32v1-none` (NOT `wasm32-unknown-unknown`, which soroban-sdk 25 rejects on Rust 1.82+)
 - **Node.js 18+ & npm/yarn**: For the frontend.
 - **PostgreSQL 14+ & Redis 6+**: For the backend database and caching.
 
@@ -308,8 +319,8 @@ git clone https://github.com/ChainLojistics/ChainLogistics.git
 cd ChainLogistics
 
 # 2. Build Smart Contracts
-cd contracts
-cargo build --target wasm32-unknown-unknown --release
+cd smart-contract
+cargo build --target wasm32v1-none --release
 cargo test
 
 # 3. Start Frontend

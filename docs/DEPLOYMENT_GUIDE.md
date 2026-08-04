@@ -560,11 +560,11 @@ spec:
 cd smart-contract
 
 # Build contract
-cargo build --target wasm32-unknown-unknown --release
+cargo build --target wasm32v1-none --release
 
 # Deploy to testnet
 soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/chainlogistics.wasm \
+  --wasm target/wasm32v1-none/release/chainlogistics.wasm \
   --source-account YOUR_SECRET_KEY \
   --network testnet
 
@@ -576,15 +576,15 @@ echo "CONTRACT_ID=<output-contract-id>" >> ../.env
 
 ```bash
 # Build optimized contract
-cargo build --target wasm32-unknown-unknown --release --features mainnet
+cargo build --target wasm32v1-none --release --features mainnet
 
 # Optimize WASM
 soroban contract optimize \
-  --wasm target/wasm32-unknown-unknown/release/chainlogistics.wasm
+  --wasm target/wasm32v1-none/release/chainlogistics.wasm
 
 # Deploy to mainnet
 soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/chainlogistics_optimized.wasm \
+  --wasm target/wasm32v1-none/release/chainlogistics_optimized.wasm \
   --source-account YOUR_MAINNET_SECRET_KEY \
   --network mainnet
 
