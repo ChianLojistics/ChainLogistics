@@ -60,6 +60,19 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: vi.fn() },
 }));
 
+// Mock i18n format utilities
+vi.mock("@/lib/i18n/format", () => ({
+  formatNumber: (value: number) => value.toString(),
+  formatDate: (value: number | Date, options?: Intl.DateTimeFormatOptions) => {
+    const date = value instanceof Date ? value : new Date(value);
+    return date.toLocaleDateString("en-US", options);
+  },
+  formatTime: (value: number | Date, options?: Intl.DateTimeFormatOptions) => {
+    const date = value instanceof Date ? value : new Date(value);
+    return date.toLocaleTimeString("en-US", options);
+  },
+}));
+
 // Mock Stellar SDK
 vi.mock("@stellar/stellar-sdk", () => ({
   default: {},
