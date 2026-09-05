@@ -1,556 +1,967 @@
-# ChainLojistic - Decentralized Supply Chain Tracking
+# ChainLogistics
 
-## 🌍 Project Overview
+### Blockchain-backed supply chain provenance built on Stellar Soroban
 
-ChainLojistic is an open-source, blockchain-based supply chain provenance tracker built on Stellar's Soroban platform. It enables transparent, tamper-proof tracking of products from origin to consumer, solving trust and verification issues in global supply chains.
+**Track. Verify. Prove.**
 
-## Contract Address (Testnet)
+ChainLogistics is an open-source supply chain provenance platform that records critical product events on **Stellar's Soroban smart contract platform**, giving producers, processors, logistics providers, retailers, and consumers a shared and verifiable history of a product.
 
-The MVP is deployed as two wired instances built from one WASM. The frontend/backend
-point at **MAIN**:
+The goal is simple: **make it possible to verify where a product came from, what happened to it along the way, and who recorded each step.**
 
+---
+
+## The Problem
+
+Supply chains are usually fragmented.
+
+A producer may have one database, a processor another, a logistics company its own records, and a retailer yet another system. Documents can be lost, duplicated, altered, or difficult to verify.
+
+This creates problems such as:
+
+* Limited visibility across supply-chain participants
+* Difficult product provenance verification
+* Counterfeit and fraudulent products
+* Fragmented records between organizations
+* Manual verification and paperwork
+* Difficulty tracing products back to their source
+* Unverified claims about product origin and handling
+
+The problem is not simply a lack of data.
+
+**The problem is a lack of shared trust in the data.**
+
+---
+
+# Our Solution
+
+ChainLogistics creates a shared provenance layer for supply chains.
+
+Instead of asking every participant to trust a single organization's database, important supply-chain events can be recorded and verified through Stellar Soroban.
+
+A typical product journey looks like this:
+
+```text
+Producer
+   │
+   │ Register product
+   ▼
+Stellar / Soroban
+   │
+   │ Record provenance
+   ▼
+Processor
+   │
+   │ Add processing event
+   ▼
+Logistics Provider
+   │
+   │ Add shipment event
+   ▼
+Retailer
+   │
+   │ Confirm receipt
+   ▼
+Consumer
+   │
+   │ Scan QR code
+   ▼
+Verified Product History
 ```
-# MAIN — ProductRegistry + ChainLogistics (this is NEXT_PUBLIC_CONTRACT_ID)
+
+Each participant contributes to the product's history while access controls determine who is authorized to record events.
+
+---
+
+# Why Blockchain?
+
+A traditional database is useful for storing and querying information.
+
+But supply chains involve **multiple organizations that do not necessarily share the same systems or trust relationships**.
+
+ChainLogistics uses a hybrid architecture:
+
+### Off-chain
+
+Used for data that benefits from traditional application infrastructure:
+
+* Search
+* Analytics
+* API requests
+* Caching
+* Application metadata
+* Integrations
+* Operational data
+
+### On-chain
+
+Used for information where shared verification and tamper resistance matter:
+
+* Product registration
+* Product ownership
+* Provenance events
+* Authorized actors
+* Verification records
+* Critical state transitions
+
+This gives ChainLogistics the performance and flexibility of conventional infrastructure while using Soroban as the shared trust layer.
+
+---
+
+# Why Stellar Soroban?
+
+ChainLogistics is built on Stellar Soroban because the platform fits the requirements of a global supply-chain application:
+
+* Low transaction costs
+* Fast transaction finality
+* Smart contracts written in Rust
+* Native support for account-based authorization
+* A network designed for global financial and cross-border applications
+* A developer ecosystem that makes it practical to build secure, verifiable applications
+
+Most importantly, **Soroban is not being used simply because the project is a blockchain project.**
+
+It is used where multiple supply-chain participants need a shared record that can be independently verified.
+
+---
+
+# Core Product Flow
+
+## 1. Register a Product
+
+A producer registers a product or batch.
+
+Example:
+
+```text
+Product:
+Ethiopian Coffee
+
+Batch:
+COFFEE-2026-001
+
+Origin:
+Sidamo, Ethiopia
+
+Owner:
+Producer wallet address
+```
+
+The product receives a unique identifier that can be used throughout its lifecycle.
+
+---
+
+## 2. Add Supply-Chain Events
+
+Authorized participants can add events as the product moves through the supply chain.
+
+Examples include:
+
+```text
+HARVEST
+PROCESSING
+QUALITY_CHECK
+PACKAGING
+SHIPPING
+WAREHOUSE_RECEIPT
+RETAIL
+```
+
+Each event can contain information such as:
+
+* Product ID
+* Location
+* Actor
+* Timestamp
+* Event type
+* Additional metadata
+
+---
+
+## 3. Verify the Product
+
+A consumer or supply-chain participant can retrieve the product's history and verify its recorded journey.
+
+The frontend supports QR-based product verification so that a physical product can be connected to its digital provenance record.
+
+```text
+Scan QR
+   ↓
+Find Product
+   ↓
+Verify Product Identity
+   ↓
+Retrieve Provenance Events
+   ↓
+Display Product Journey
+```
+
+---
+
+# Key Features
+
+### Product Registration
+
+* Register products and batches
+* Assign unique product identifiers
+* Record origin information
+* Establish product ownership
+
+### Provenance Tracking
+
+* Record supply-chain events
+* Track locations and timestamps
+* Maintain product history
+* Associate events with authorized actors
+
+### Multi-party Authorization
+
+Supply-chain participants should not have unrestricted access to every product.
+
+ChainLogistics includes authorization mechanisms that allow specific actors to be permitted to interact with a product's provenance record.
+
+### Product Verification
+
+* QR code generation
+* Product lookup
+* Provenance history
+* Verification interface
+
+### API
+
+The backend provides an API layer for applications and integrations that need to interact with ChainLogistics.
+
+### SDK
+
+The project includes SDK components intended to make integration with ChainLogistics easier for external applications.
+
+### Analytics
+
+Application-level analytics and reporting provide visibility into tracked products and supply-chain activity.
+
+### Security
+
+The project includes:
+
+* Contract-level authorization
+* Automated tests
+* Security-focused development
+* Formal verification work
+* Separation of on-chain and off-chain responsibilities
+
+---
+
+# Architecture
+
+```text
+                         ┌─────────────────────┐
+                         │      Users          │
+                         │                     │
+                         │ Producers           │
+                         │ Processors          │
+                         │ Logistics           │
+                         │ Retailers           │
+                         │ Consumers           │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │      Frontend       │
+                         │                     │
+                         │ Next.js             │
+                         │ React               │
+                         │ TypeScript          │
+                         │ Freighter Wallet    │
+                         │ QR Verification     │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │       Backend       │
+                         │                     │
+                         │ Rust / Axum         │
+                         │ REST API            │
+                         │ PostgreSQL          │
+                         │ Redis               │
+                         │ Webhooks            │
+                         └──────────┬──────────┘
+                                    │
+                       ┌────────────┴────────────┐
+                       │                         │
+                       ▼                         ▼
+              ┌─────────────────┐       ┌─────────────────┐
+              │  SDK / External │       │ Stellar Soroban │
+              │   Integrations  │       │ Smart Contracts │
+              └─────────────────┘       └────────┬────────┘
+                                                  │
+                                                  ▼
+                                      ┌─────────────────────┐
+                                      │ Product Provenance  │
+                                      │ Authorization       │
+                                      │ Ownership            │
+                                      │ Tracking Events      │
+                                      └─────────────────────┘
+```
+
+---
+
+# Technology Stack
+
+## Smart Contracts
+
+* Rust
+* Soroban SDK
+* Stellar
+* WASM
+* Contract-level authorization
+* Provenance and event storage
+
+## Backend
+
+* Rust
+* Axum
+* Tokio
+* SQLx
+* PostgreSQL
+* Redis
+* REST APIs
+* Webhooks
+* Caching
+* Rate limiting
+
+## Frontend
+
+* Next.js
+* React
+* TypeScript
+* Freighter wallet integration
+* QR code generation
+* Product dashboards
+* Provenance timeline
+* Search and analytics
+
+## SDK
+
+* Rust SDK
+* Python bindings / integration work
+* API and contract integration utilities
+
+## Development & Infrastructure
+
+* Docker
+* GitHub Actions
+* Automated testing
+* Formal verification
+* Deployment scripts
+
+---
+
+# Smart Contract Interface
+
+The core contract exposes functionality for managing products and their provenance.
+
+### Register a Product
+
+```text
+register_product(
+    id,
+    name,
+    origin,
+    owner
+) -> Product
+```
+
+### Add a Tracking Event
+
+```text
+add_tracking_event(
+    product_id,
+    location,
+    event_type,
+    metadata
+) -> Event
+```
+
+### Get Product
+
+```text
+get_product(
+    id
+) -> Product
+```
+
+### Get Product History
+
+```text
+get_tracking_events(
+    product_id
+) -> Vec<Event>
+```
+
+### Transfer Ownership
+
+```text
+transfer_ownership(
+    product_id,
+    new_owner
+) -> Success
+```
+
+### Authorize an Actor
+
+```text
+add_authorized_actor(
+    product_id,
+    actor_address
+) -> Success
+```
+
+The exact contract interface may evolve as the protocol develops. Refer to the smart-contract source and tests for the authoritative implementation.
+
+---
+
+# Data Model
+
+A product is represented conceptually as:
+
+```text
+Product
+├── ID
+├── Name
+├── Origin
+├── Owner
+├── Registration timestamp
+└── Authorized actors
+```
+
+A provenance event contains:
+
+```text
+TrackingEvent
+├── Product ID
+├── Location
+├── Actor
+├── Timestamp
+├── Event type
+└── Metadata
+```
+
+This allows a product to build a chronological history throughout its lifecycle.
+
+---
+
+# Example: Agricultural Supply Chain
+
+Agriculture is one of the clearest applications for ChainLogistics because products can pass through many independent actors before reaching the consumer.
+
+For example:
+
+```text
+Farm
+ │
+ │ Harvest
+ ▼
+Processing Facility
+ │
+ │ Processing + Quality Check
+ ▼
+Export Warehouse
+ │
+ │ Packaging
+ ▼
+Logistics Provider
+ │
+ │ Shipment
+ ▼
+Roaster / Distributor
+ │
+ │ Final Processing
+ ▼
+Retailer
+ │
+ │ Product Sold
+ ▼
+Consumer
+```
+
+At each stage, authorized participants can contribute a provenance event.
+
+The consumer can then scan the product's QR code and view the recorded journey.
+
+---
+
+# Other Potential Applications
+
+The underlying provenance architecture can also support other industries.
+
+### Pharmaceuticals
+
+Track:
+
+* Manufacturing batches
+* Quality checks
+* Distribution checkpoints
+* Cold-chain events
+* Pharmacy receipt
+
+### Fashion & Textiles
+
+Track:
+
+* Raw material origin
+* Manufacturing
+* Certifications
+* Distribution
+* Recycling
+
+### Electronics
+
+Track:
+
+* Component origin
+* Manufacturing
+* Assembly
+* Distribution
+* Recycling
+
+### Luxury Goods
+
+Track:
+
+* Product identity
+* Ownership transfers
+* Authentication records
+* Resale history
+
+These are potential expansion areas. The initial product focus is provenance and verification rather than trying to solve every supply-chain problem simultaneously.
+
+---
+
+# Security & Privacy
+
+Supply-chain systems contain both public and sensitive information.
+
+ChainLogistics follows a separation-of-concerns approach.
+
+### On-chain
+
+Only information that benefits from shared verification should be stored on-chain.
+
+### Off-chain
+
+Sensitive or operational information can remain within traditional application infrastructure.
+
+### Authorization
+
+Only authorized actors should be able to modify the provenance state associated with a product.
+
+### Verification
+
+Cryptographic signatures and blockchain state provide a mechanism for verifying that recorded events were submitted by the expected account.
+
+### Formal Verification
+
+The repository includes formal verification work for critical contract behavior.
+
+Security remains an ongoing part of the project's development process rather than a one-time feature.
+
+---
+
+# Current Deployment
+
+ChainLogistics currently has a Stellar testnet deployment for its MVP.
+
+### Network
+
+```text
+Stellar Testnet
+```
+
+### Main Contract
+
+```text
 CDN45LYNJLEHVWLYAN34CFSBUT4RWTFWKG5I7LMDJS2QNC2L6RLLEZWR
-# AUTH — AuthorizationContract
+```
+
+### Authorization Contract
+
+```text
 CCAPPFD5PERFZ6T66XPU74NZBZXHJBSQIFST4GOVMYIDZR4D54VYRXHQ
-
-NEXT_PUBLIC_CONTRACT_ID=CDN45LYNJLEHVWLYAN34CFSBUT4RWTFWKG5I7LMDJS2QNC2L6RLLEZWR
-NEXT_PUBLIC_STELLAR_NETWORK=testnet
 ```
 
-Redeploy with `smart-contract/scripts/deploy-testnet.sh` (see [DEPLOYMENT.md](DEPLOYMENT.md)).
+The frontend/backend configuration points to the main product registry contract.
 
+For deployment instructions, see:
 
-## 🎯 The Problem
-
-Modern supply chains face critical trust challenges:
-
-- **No Transparency**: Consumers can't verify product claims (organic, fair-trade, sustainable)
-- **Counterfeit Products**: $4.5 trillion lost annually to fake goods
-- **Broken Trust**: 73% of consumers don't trust company sustainability claims
-- **Paper Trail Failures**: Documents are easily forged, lost, or altered
-- **Data Silos**: Each party maintains separate records, creating inconsistencies
-- **Fraud & Waste**: $40+ billion lost annually in supply chain fraud
-
-**Real Examples:**
-- Coffee labeled "fair trade" but farmers received standard prices
-- "Organic" produce treated with pesticides
-- Electronics with conflict minerals despite "ethical sourcing" claims
-- Counterfeit medications killing 250,000+ people annually
-
-## 💡 The Solution
-
-ChainLojistic provides a decentralized, immutable ledger for supply chain tracking:
-
-### Core Features
-
-**1. Product Registration**
-- Register products at origin with complete details
-- Cryptographic proof of authenticity
-- Unique blockchain ID for each item
-
-**2. Event Tracking**
-- Record every step: harvest, processing, shipping, quality checks
-- Timestamp and location data
-- Multi-party authorization (farmers, processors, shippers, retailers)
-
-**3. Verification**
-- QR code scanning for instant verification
-- Complete product journey visible to consumers
-- Tamper-proof records on blockchain
-
-**4. Transparency**
-- All stakeholders see the same data
-- No single point of control
-- Immutable audit trail
-
-## 🏗️ Architecture
-
-### Technology Stack
-
-**Smart Contracts** (Rust + Soroban)
-- Product registration and storage
-- Event tracking and indexing
-- Access control and authorization
-- Deployed on Stellar blockchain
-
-**Frontend** (Next.js 15 + React 19 + TypeScript)
-- User-friendly web interface
-- Wallet integration (Freighter)
-- Product registration forms
-- Visual timeline of product journey
-- QR code generation
-- Search and analytics
-
-**Backend** (Rust + Axum + SQLx) - High-Performance API Server
-- REST API for integrations with 3-10x performance improvement
-- Async webhook system with Tokio runtime
-- PostgreSQL database with SQLx for type-safe queries
-- Real-time analytics and reporting
-- Third-party SDKs (Rust + Python via PyO3)
-- Comprehensive caching and rate limiting
-
-### Data Flow
-
-```
-Producer → Register Product → Blockchain
-    ↓
-Processor → Add Event → Blockchain
-    ↓
-Shipper → Add Event → Blockchain
-    ↓
-Retailer → Add Event → Blockchain
-    ↓
-Consumer → Scan QR → View Full History
+```text
+DEPLOYMENT.md
 ```
 
-## 🎨 User Interface
+> Testnet deployments are for development and demonstration. Contract addresses may change as the protocol evolves.
 
-### For Producers
-- Simple product registration form
-- Bulk import capabilities
-- Dashboard showing registered products
-- QR code generation and printing
+---
 
-### For Supply Chain Partners
-- Add tracking events (location, timestamp, metadata)
-- Upload supporting documents/photos
-- View product history
-- Manage authorized actors
+# Project Structure
 
-### For Consumers
-- Scan QR code with phone camera
-- View complete product journey
-- Verify authenticity claims
-- Report issues or concerns
-
-### For Administrators
-- Analytics dashboard
-- Search and filter products
-- Export data for compliance
-- Manage access permissions
-
-## 🌟 Key Benefits
-
-### For Producers
-- **Build Trust**: Prove your claims with blockchain evidence
-- **Premium Pricing**: Verified products command higher prices
-- **Brand Protection**: Combat counterfeits
-- **Compliance**: Automated regulatory reporting
-
-### For Consumers
-- **Transparency**: See exactly where products come from
-- **Safety**: Verify authenticity, especially for medications
-- **Values Alignment**: Support truly ethical/sustainable products
-- **Empowerment**: Make informed purchasing decisions
-
-### For Supply Chains
-- **Efficiency**: Reduce paperwork and manual verification
-- **Traceability**: Quickly trace issues back to source
-- **Collaboration**: Shared truth across all parties
-- **Innovation**: Enable new business models
-
-## 📊 Use Cases
-
-### 1. Food & Agriculture
-**Problem**: Organic/fair-trade fraud is rampant
-**Solution**: Track coffee beans from Ethiopian farm to Seattle café
-
-**Example Flow:**
-```
-Farm (Ethiopia) → Harvest event + GPS + Organic cert
-    ↓
-Processing Plant → Washing/drying event + Quality check
-    ↓
-Export Warehouse → Packaging event + Fair-trade verification
-    ↓
-Shipping → Transit event + Temperature monitoring
-    ↓
-Roaster (USA) → Roasting event + Batch details
-    ↓
-Café → Final event
-    ↓
-Consumer → Scans QR code, sees entire journey
+```text
+ChainLogistics/
+│
+├── .github/
+│   └── workflows/
+│
+├── backend/
+│   ├── API
+│   ├── database
+│   ├── caching
+│   └── webhooks
+│
+├── docker/
+│
+├── docs/
+│   └── project documentation
+│
+├── formal_verification/
+│   └── verification work
+│
+├── frontend/
+│   ├── dashboards
+│   ├── product registration
+│   ├── QR verification
+│   └── wallet integration
+│
+├── sdk/
+│   └── integration libraries
+│
+├── smart-contract/
+│   ├── contracts
+│   ├── tests
+│   └── deployment scripts
+│
+├── docker-compose.yml
+├── DEPLOYMENT.md
+├── Contributing.md
+└── Readme.md
 ```
 
-### 2. Pharmaceuticals
-**Problem**: Counterfeit drugs kill 250,000+ annually
-**Solution**: Verify medication authenticity from factory to pharmacy
+---
 
-**Tracking:**
-- Manufacturing batch number
-- Quality control tests
-- Cold chain compliance (temperature logs)
-- Distribution checkpoints
-- Pharmacy receipt verification
+# Getting Started
 
-### 3. Fashion & Textiles
-**Problem**: "Sustainable" claims often unverified
-**Solution**: Prove ethical sourcing and manufacturing
+## Prerequisites
 
-**Verification:**
-- Organic cotton certification at farm
-- Fair wage documentation at factory
-- Carbon footprint calculations
-- Recycling/circular economy tracking
+You will need:
 
-### 4. Electronics
-**Problem**: Conflict minerals funding violence
-**Solution**: Verify conflict-free sourcing
+* Rust 1.84+
+* Stellar CLI
+* `wasm32v1-none` Rust target
+* Node.js 18+
+* npm or yarn
+* PostgreSQL 14+
+* Redis 6+
 
-**Tracking:**
-- Mine origin documentation
-- Smelter certifications
-- Component manufacturing
-- Assembly plant compliance
-- E-waste recycling
-
-### 5. Luxury Goods
-**Problem**: $450B+ lost to counterfeits annually
-**Solution**: Authenticate high-value items
-
-**Features:**
-- Unique blockchain ID per item
-- Transfer of ownership tracking
-- Authentication certificates
-- Resale value protection
-
-## 🔐 Security & Privacy
-
-### Blockchain Security
-- Immutable records (can't be altered or deleted)
-- Cryptographic signatures for authenticity
-- Decentralized storage (no single point of failure)
-- Transparent audit trail
-
-### Access Control
-- Role-based permissions
-- Only authorized actors can add events
-- Private data encryption options
-- Selective disclosure (show only what's needed)
-
-### Privacy Features
-- Personal data kept off-chain
-- Zero-knowledge proofs for sensitive info
-- GDPR compliant design
-- Consumer privacy protected
-
-## 🌍 Impact
-
-### Environmental
-- Reduce fraud in carbon offset markets
-- Enable circular economy tracking
-- Verify sustainable sourcing claims
-- Reduce waste through better traceability
-
-### Social
-- Protect workers through fair-trade verification
-- Combat child labor with supply chain visibility
-- Empower small producers
-- Build consumer trust
-
-### Economic
-- Reduce supply chain fraud ($40B+ annually)
-- Enable premium pricing for verified products
-- Lower insurance costs through traceability
-- Create new verification business models
-
-## 🚀 Project Status
-
-### Current Phase: MVP Development
-- ✅ Smart contract architecture designed
-- ✅ Frontend scaffolded
-- ✅ Project documentation complete
-- 🔄 Core features in development
-- 📅 Beta launch: Q2 2024
-- 📅 Mainnet deployment: Q3 2024
-
-### Roadmap
-
-**Phase 1 - MVP (Q1 2024)**
-- Product registration
-- Event tracking
-- Basic UI
-- Wallet integration
-- QR code generation
-
-**Phase 2 - Security (Q2 2024)**
-- Access control implementation
-- Security audit
-- E2E testing
-- Rate limiting
-
-**Phase 3 - User Experience (Q2-Q3 2024)**
-- Timeline visualization
-- Search and filters
-- Analytics dashboard
-- Mobile app
-
-**Phase 4 - Integrations (Q3 2024)**
-- REST API
-- Webhooks
-- Third-party integrations
-- SDK development
-
-**Phase 5 - Scale (Q4 2024)**
-- Performance optimization
-- Multi-language support
-- Enterprise features
-- Mainnet launch
-
-## 🚀 Project Startup
-
-If you're a new contributor looking to run the project locally, follow these steps to get started:
-
-### Prerequisites
-
-- **Rust 1.84+**: Required for both smart contracts and backend (soroban-sdk 25 needs the `wasm32v1-none` target). `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- **Soroban CLI**: `stellar` CLI >= 27 (soroban-sdk 25 targets protocol 27). Install: `curl --proto '=https' --tlsv1.2 -sSf https://stellar.org/install.sh | sh`
-- **WASM Target**: `rustup target add wasm32v1-none` (NOT `wasm32-unknown-unknown`, which soroban-sdk 25 rejects on Rust 1.82+)
-- **Node.js 18+ & npm/yarn**: For the frontend.
-- **PostgreSQL 14+ & Redis 6+**: For the backend database and caching.
-
-### Quick Start Guide
+### Install Rust
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/ChainLojistics/ChainLogistics.git
-cd ChainLogistics
-
-# 2. Build Smart Contracts
-cd smart-contract
-cargo build --target wasm32v1-none --release
-cargo test
-
-# 3. Start Frontend
-cd ../frontend
-npm install
-npm run dev  # Runs on http://localhost:3000
-
-# 4. Start Backend Server
-cd ../backend
-cp .env.example .env
-cargo build
-cargo run  # Runs on http://localhost:3001
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-For more comprehensive guidelines on contributing to this project, including detailed workflows and issue labels, see our [CONTRIBUTING.md](CONTRIBUTING.md).
+### Install the Stellar CLI
 
-## 🤝 Contributing
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://stellar.org/install.sh | sh
+```
 
-We welcome contributors of all skill levels! This project offers opportunities to:
-- Learn blockchain development (Soroban/Stellar)
-- Build modern web applications (Next.js/React)
-- Solve real-world problems
-- Join a growing community
+### Add the WASM target
 
-**Ways to Contribute:**
-- Code (smart contracts, frontend, backend - Rust/Axum)
-- Documentation
-- Design (UI/UX)
-- Testing
-- Community support
-- Translations
+```bash
+rustup target add wasm32v1-none
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guide.
+---
 
-## 📈 Success Metrics
+# Run the Smart Contracts
+
+```bash
+cd smart-contract
+
+cargo build --target wasm32v1-none --release
+
+cargo test
+```
+
+---
+
+# Run the Frontend
+
+```bash
+cd frontend
+
+npm install
+
+npm run dev
+```
+
+The frontend runs locally on:
+
+```text
+http://localhost:3000
+```
+
+---
+
+# Run the Backend
+
+```bash
+cd backend
+
+cp .env.example .env
+
+cargo build
+
+cargo run
+```
+
+The backend runs locally on:
+
+```text
+http://localhost:3001
+```
+
+For the complete deployment process, see:
+
+```text
+DEPLOYMENT.md
+```
+
+---
+
+# API
+
+The backend exposes REST endpoints for interacting with products and provenance data.
+
+Examples include:
+
+```text
+GET    /api/products
+POST   /api/products
+
+GET    /api/products/:id
+GET    /api/products/:id/events
+POST   /api/products/:id/events
+
+GET    /api/analytics
+```
+
+The API is designed to provide a conventional integration layer while the blockchain remains responsible for the verifiable provenance state.
+
+---
+
+# Testing
+
+The project contains testing across the smart-contract and application layers.
+
+Smart-contract tests can be run with:
+
+```bash
+cd smart-contract
+cargo test
+```
+
+When contributing, new functionality should include appropriate tests covering:
+
+* Expected behavior
+* Authorization
+* Invalid input
+* State transitions
+* Edge cases
+* Integration behavior where applicable
+
+---
+
+# Development Status
+
+## Current
+
+ChainLogistics is an actively developed **Stellar testnet MVP**.
+
+The repository currently includes:
+
+* Smart-contract implementation
+* Product registration
+* Provenance event tracking
+* Authorization
+* Frontend application
+* QR-based verification
+* Rust backend
+* PostgreSQL integration
+* Redis-backed infrastructure
+* SDK work
+* Automated testing
+* Formal verification work
+* Deployment tooling
+
+## Next Priorities
+
+The next stage of development is focused on turning the existing technical foundation into a more complete production-ready provenance platform.
+
+### Product
+
+* Improve the end-to-end producer-to-consumer experience
+* Improve product verification
+* Improve supply-chain participant workflows
+* Improve onboarding
+
+### Infrastructure
+
+* Improve indexing and query performance
+* Strengthen API integrations
+* Improve observability
+* Improve deployment reliability
+
+### Security
+
+* Expand contract test coverage
+* Continue formal verification
+* Conduct deeper security review
+* Strengthen authorization boundaries
 
 ### Adoption
-- Products tracked: Target 10,000 by EOY 2024
-- Active supply chain partners: Target 100
-- Consumer verifications: Target 50,000/month
 
-### Technical
-- Transaction throughput: >1000 TPS
-- API uptime: 99.9%
-- Response time: <2 seconds
-- Test coverage: >80%
-
-### Community
-- Contributors: 50+
-- GitHub stars: 1000+
-- Active users: 5000+
-
-## 🏆 Why Stellar/Soroban?
-
-We chose Stellar's Soroban platform because:
-
-1. **Fast**: 3-5 second finality (perfect for supply chain)
-2. **Cheap**: Fractions of a cent per transaction
-3. **Scalable**: Thousands of TPS
-4. **Sustainable**: Energy-efficient consensus
-5. **Global**: Built for cross-border use cases
-6. **Developer-Friendly**: Rust + modern tooling
-
-## 🔄 Comparison to Alternatives
-
-### vs. Paper-Based Systems
-- ✅ Tamper-proof vs ❌ Easy to forge
-- ✅ Instant verification vs ❌ Slow manual checks
-- ✅ Always available vs ❌ Can be lost
-- ✅ Transparent vs ❌ Opaque
-
-### vs. Centralized Databases
-- ✅ No single point of failure vs ❌ Vendor lock-in
-- ✅ Multi-party trust vs ❌ Single authority
-- ✅ Transparent vs ❌ Black box
-- ✅ Immutable vs ❌ Can be altered
-
-### vs. Other Blockchains
-- ✅ Fast (3-5s) vs ❌ Slow (minutes/hours on Bitcoin/Ethereum)
-- ✅ Cheap ($0.00001) vs ❌ Expensive ($10-100 on Ethereum)
-- ✅ Sustainable vs ❌ Energy-intensive
-- ✅ Built for payments vs ❌ General purpose
-
-## 📚 Technical Details
-
-### Smart Contract Functions
-
-```rust
-// Register a new product
-register_product(id, name, origin, owner) -> Product
-
-// Add tracking event
-add_tracking_event(product_id, location, event_type, metadata) -> Event
-
-// Get product details
-get_product(id) -> Product
-
-// Get all events for a product
-get_tracking_events(product_id) -> Vec<Event>
-
-// Transfer ownership
-transfer_ownership(product_id, new_owner) -> Success
-
-// Authorize actor to add events
-add_authorized_actor(product_id, actor_address) -> Success
-```
-
-### API Endpoints
-
-```
-GET    /api/products              # List products
-POST   /api/products              # Register product
-GET    /api/products/:id          # Get product
-GET    /api/products/:id/events   # Get events
-POST   /api/products/:id/events   # Add event
-GET    /api/analytics             # Analytics data
-```
-
-### Data Models
-
-**Product**
-```typescript
-{
-  id: string;              // Unique identifier
-  name: string;            // Product name
-  origin: string;          // Origin location
-  owner: Address;          // Current owner
-  timestamp: number;       // Registration time
-  authorized_actors: Address[];  // Who can update
-}
-```
-
-**TrackingEvent**
-```typescript
-{
-  product_id: string;      // Product reference
-  location: string;        // Current location
-  actor: Address;          // Who created event
-  timestamp: number;       // Event time
-  event_type: string;      // HARVEST, SHIPPING, etc.
-  metadata: string;        // Additional info (JSON)
-}
-```
-
-## 🎓 Educational Value
-
-This project is excellent for learning:
-
-**Blockchain Development**
-- Smart contract patterns
-- Soroban SDK
-- Stellar network
-- Cryptographic verification
-
-**Web3 Frontend**
-- Wallet integration
-- Transaction signing
-- Blockchain data queries
-- Real-time updates
-
-**Full-Stack Development**
-- Rust REST API design with Axum
-- PostgreSQL optimization with SQLx
-- Redis caching strategies
-- Async security best practices
-
-**System Design**
-- Distributed systems
-- Data modeling
-- Access control
-- Scalability patterns
-
-## 💰 Sustainability Model
-
-### Open Source First
-- Core platform: Free and open source
-- Community-driven development
-- Transparent governance
-
-### Revenue Streams (Optional)
-- Hosted SaaS version for enterprises
-- White-label solutions
-- Premium features (advanced analytics, integrations)
-- Consulting and support services
-- Grant funding from Stellar Foundation
-
-## 🔗 Links & Resources
-
-- **GitHub**: [github.com/ChainLojistics/ChainLogistics](https://github.com)
-- **Website**: [chainlojistic.com](https://chainlojistic.com) (coming soon)
-- **Demo**: [demo.chainlojistic.com](https://demo.chainlojistic.com) (coming soon)
-- **Docs**: [docs.chainlojistic.com](https://docs.chainlojistic.com) (coming soon)
-- **Discord**: [Join our community](https://discord.gg/chainlojistic)
-- **Twitter**: [@ChainLojistic](https://x.com/chainlojistics)
-
-## 📧 Contact
-
-- **Email**: hello@chainlojistic.com
-- **Issues**: GitHub Issues for bugs/features
-- **Discussions**: GitHub Discussions for questions
-- **Security**: security@chainlojistic.com (for vulnerabilities)
-
-## 📄 License
-
-MIT License - Free to use, modify, and distribute
+* Focus the initial use case on a specific supply-chain vertical
+* Develop pilot workflows
+* Gather feedback from real supply-chain participants
+* Measure verification and provenance usage
 
 ---
 
-## 🌟 Vision Statement
+# Roadmap
 
-**"Making supply chains transparent, trustworthy, and traceable for everyone."**
+Rather than attaching arbitrary dates to features, development is organized around product maturity.
 
-We envision a world where:
-- Consumers know exactly what they're buying
-- Producers are rewarded for ethical practices
-- Fraud and counterfeits are eliminated
-- Trust is built through transparency, not marketing
-- Supply chains benefit everyone, not just corporations
+## Phase 1 — Provenance MVP
 
-Join us in building the future of transparent commerce! 🚀
+* [x] Product registration
+* [x] Provenance events
+* [x] Actor authorization
+* [x] Ownership management
+* [x] QR verification foundation
+* [x] Stellar testnet deployment
+
+## Phase 2 — Product Readiness
+
+* [x] Backend API foundation
+* [x] Frontend application
+* [x] SDK development
+* [x] Automated testing
+* [x] Caching and rate limiting
+* [x] Formal verification work
+
+## Phase 3 — Pilot Readiness
+
+* [ ] Complete end-to-end supply-chain demonstration
+* [ ] Improve participant onboarding
+* [ ] Improve consumer verification experience
+* [ ] Expand integration documentation
+* [ ] Strengthen monitoring and observability
+
+## Phase 4 — Production
+
+* [ ] Production security review
+* [ ] Mainnet deployment
+* [ ] Production infrastructure
+* [ ] External integrations
+* [ ] Initial supply-chain pilot
+* [ ] Production monitoring
 
 ---
 
-## ⭐ Star This Project
+# What We Are Building Toward
 
-If you find ChainLojistic valuable, please give us a star on GitHub! It helps others discover the project and motivates our community.
+The long-term goal is not to replace every existing supply-chain system.
 
-**[⭐ Star on GitHub](https://github.com/ChainLojistics/ChainLojistics)**
+It is to provide a **shared provenance and verification layer** that existing systems can integrate with.
+
+```text
+Existing Business Systems
+        │
+        │
+        ▼
+┌─────────────────────────┐
+│      ChainLogistics     │
+│                         │
+│ Provenance + Verification│
+└────────────┬────────────┘
+             │
+             ▼
+       Stellar Soroban
+```
+
+This approach allows organizations to continue using their existing operational tools while sharing critical provenance information through a common verification layer.
 
 ---
 
-*Built with ❤️ by the ChainLojistic community*
-*Powered by Stellar & Soroban*
+# Open Source
+
+ChainLogistics is open source and welcomes contributions from developers, designers, researchers, supply-chain professionals, and anyone interested in building better infrastructure for product provenance.
+
+You can contribute through:
+
+* Smart-contract development
+* Backend development
+* Frontend development
+* SDK development
+* Testing
+* Security research
+* Documentation
+* UI/UX
+* Supply-chain research
+* Product feedback
+
+Please read:
+
+```text
+Contributing.md
+```
+
+before submitting a contribution.
+
+---
+
+# Security
+
+If you discover a security vulnerability, please avoid publicly disclosing sensitive details through a GitHub issue.
+
+Follow the project's security reporting process where available.
+
+Security is especially important because ChainLogistics deals with provenance records, authorization, and potentially valuable business information.
+
+---
+
+# License
+
+ChainLogistics is released under the MIT License.
+
+See:
+
+```text
+LICENSE
+```
+
+for the full license text.
+
+---
+
+# Vision
+
+Supply chains should not require consumers to blindly trust a label, a document, or a company's database.
+
+They should be able to verify the journey.
+
+**ChainLogistics is building the infrastructure that makes that possible.**
+
+```text
+Track what happened.
+Verify who recorded it.
+Prove the product's journey.
+```
+
+**Built with Rust, Stellar Soroban, and open-source technology.**
