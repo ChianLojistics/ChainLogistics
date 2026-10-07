@@ -3,9 +3,16 @@
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Symbol, Vec};
 
 use crate::error::Error;
-use crate::types::{DataKey, OracleFeedConfig, OracleReport, OracleSnapshot, OracleSource};
+use crate::types::{
+    DataKey, OracleData, OracleFeedConfig, OracleReport, OracleSnapshot, OracleSource,
+};
 
-const SOURCE_SLASH_PENALTY: i128 = 1;
+pub const SOURCE_SLASH_PENALTY: i128 = 1;
+/// Default maximum stale age for oracle readings (1 hour / 3600 seconds)
+pub const MAX_STALE_AGE: u64 = 3600;
+/// Sensitive reading expiry (5 minutes / 300 seconds, e.g. cold-chain temperature)
+pub const MAX_STALE_AGE_TEMPERATURE: u64 = 300;
+
 
 fn has_admin(env: &Env) -> bool {
     env.storage().persistent().has(&DataKey::Admin)
@@ -116,6 +123,19 @@ fn store_circuit_broken(env: &Env, feed_id: &Symbol, broken: bool) {
         .persistent()
         .set(&DataKey::OracleCircuitBreaker(feed_id.clone()), &broken);
 }
+
+fn load_oracle_data(env: &Env, feed_id: &Symbol) -> Option<OracleData> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::OracleData(feed_id.clone()))
+}
+
+fn store_oracle_data(env: &Env, data: &OracleData) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::OracleData(data.feed_id.clone()), data);
+}
+
 
 fn require_controller(env: &Env, caller: &Address) -> Result<(), Error> {
     let admin = get_admin(env).ok_or(Error::NotInitialized)?;
@@ -468,6 +488,14 @@ impl OracleSecurityContract {
         store_report(&env, &feed_id, &report);
 
         let snapshot = recompute_snapshot(&env, &feed_id)?;
+        store_oracle_data(
+            &env,
+            &OracleData {
+                feed_id: feed_id.clone(),
+                value: snapshot.value,
+                timestamp: snapshot.observed_at,
+            },
+        );
         env.events().publish(
             (
                 Symbol::new(&env, "oracle_report_accepted"),
@@ -477,6 +505,108 @@ impl OracleSecurityContract {
             snapshot.clone(),
         );
         Ok(snapshot)
+    }
+
+    pub fn record_oracle_data(
+        env: Env,
+        caller: Address,
+        feed_id: Symbol,
+        value: i128,
+    ) -> Result<OracleData, Error> {
+        caller.require_auth();
+
+        if let Some(config) = load_feed_config(&env, &feed_id) {
+            if value < config.min_value || value > config.max_value {
+                return Err(Error::OracleValueOutOfRange);
+            }
+        }
+
+        let data = OracleData {
+            feed_id: feed_id.clone(),
+            value,
+            timestamp: env.ledger().timestamp(),
+        };
+        store_oracle_data(&env, &data);
+
+        env.events().publish(
+            (Symbol::new(&env, "oracle_data_recorded"), feed_id),
+            data.clone(),
+        );
+        Ok(data)
+    }
+
+    pub fn get_oracle_data(env: Env, feed_id: Symbol) -> Result<OracleData, Error> {
+        load_oracle_data(&env, &feed_id).ok_or(Error::OracleFeedNotConfigured)
+    }
+
+    pub fn verify_condition(
+        env: Env,
+        feed_id: Symbol,
+        min_condition: i128,
+        max_condition: i128,
+    ) -> Result<bool, Error> {
+        let data = load_oracle_data(&env, &feed_id).ok_or(Error::OracleFeedNotConfigured)?;
+        let now = env.ledger().timestamp();
+        let max_age = if let Some(config) = load_feed_config(&env, &feed_id) {
+            config.max_age_seconds
+        } else {
+            MAX_STALE_AGE
+        };
+
+        if data.timestamp > now || now.saturating_sub(data.timestamp) > max_age {
+            return Err(Error::StaleData);
+        }
+
+        let in_range = data.value >= min_condition && data.value <= max_condition;
+        env.events().publish(
+            (Symbol::new(&env, "oracle_condition_verified"), feed_id),
+            in_range,
+        );
+        Ok(in_range)
+    }
+
+    pub fn verify_data_condition(
+        env: Env,
+        data: OracleData,
+        min_condition: i128,
+        max_condition: i128,
+        custom_max_age: Option<u64>,
+    ) -> Result<bool, Error> {
+        let now = env.ledger().timestamp();
+        let max_age = custom_max_age.unwrap_or(MAX_STALE_AGE);
+
+        if data.timestamp > now || now.saturating_sub(data.timestamp) > max_age {
+            return Err(Error::StaleData);
+        }
+
+        let in_range = data.value >= min_condition && data.value <= max_condition;
+        env.events().publish(
+            (Symbol::new(&env, "oracle_condition_verified"), data.feed_id),
+            in_range,
+        );
+        Ok(in_range)
+    }
+
+    pub fn verify_temperature_condition(
+        env: Env,
+        feed_id: Symbol,
+        min_temp: i128,
+        max_temp: i128,
+    ) -> Result<bool, Error> {
+        let data = load_oracle_data(&env, &feed_id).ok_or(Error::OracleFeedNotConfigured)?;
+        let now = env.ledger().timestamp();
+        let max_age = MAX_STALE_AGE_TEMPERATURE;
+
+        if data.timestamp > now || now.saturating_sub(data.timestamp) > max_age {
+            return Err(Error::StaleData);
+        }
+
+        let in_range = data.value >= min_temp && data.value <= max_temp;
+        env.events().publish(
+            (Symbol::new(&env, "temperature_condition_verified"), feed_id),
+            in_range,
+        );
+        Ok(in_range)
     }
 
     pub fn get_feed_config(env: Env, feed_id: Symbol) -> Result<OracleFeedConfig, Error> {
@@ -685,5 +815,177 @@ mod test_oracle_security {
             &BytesN::from_array(&env, &[8; 32]),
         );
         assert_eq!(res, Err(Ok(Error::OracleReportStale)));
+    }
+
+    #[test]
+    fn test_record_and_get_oracle_data() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(1_000);
+
+        let (client, _admin) = setup(&env);
+        let caller = Address::generate(&env);
+        let feed_id = Symbol::new(&env, "temp");
+
+        let recorded = client.record_oracle_data(&caller, &feed_id, &250);
+        assert_eq!(recorded.feed_id, feed_id);
+        assert_eq!(recorded.value, 250);
+        assert_eq!(recorded.timestamp, 1_000);
+
+        let retrieved = client.get_oracle_data(&feed_id);
+        assert_eq!(retrieved, recorded);
+    }
+
+    #[test]
+    fn test_verify_condition_fresh_and_in_range() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(1_000);
+
+        let (client, _admin) = setup(&env);
+        let caller = Address::generate(&env);
+        let feed_id = Symbol::new(&env, "humidity");
+
+        client.record_oracle_data(&caller, &feed_id, &55);
+
+        // Still within MAX_STALE_AGE (e.g. 500s later)
+        env.ledger().set_timestamp(1_500);
+
+        let in_range = client.verify_condition(&feed_id, &40, &60);
+        assert_eq!(in_range, true);
+
+        let out_of_range = client.verify_condition(&feed_id, &60, &80);
+        assert_eq!(out_of_range, false);
+    }
+
+    #[test]
+    fn test_verify_condition_rejects_stale_data() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(1_000);
+
+        let (client, _admin) = setup(&env);
+        let caller = Address::generate(&env);
+        let feed_id = Symbol::new(&env, "pressure");
+
+        client.record_oracle_data(&caller, &feed_id, &1013);
+
+        // Advance ledger beyond MAX_STALE_AGE (3600s)
+        env.ledger().set_timestamp(1_000 + MAX_STALE_AGE + 1);
+
+        let res = client.try_verify_condition(&feed_id, &1000, &1020);
+        assert_eq!(res, Err(Ok(Error::StaleData)));
+    }
+
+    #[test]
+    fn test_verify_condition_respects_feed_max_age_seconds() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(1_000);
+
+        let (client, admin) = setup(&env);
+        let feed_id = Symbol::new(&env, "temp");
+        let mut config = temperature_config(&env, &feed_id);
+        config.max_age_seconds = 120; // 2 minutes custom feed expiry
+        client.configure_feed(&admin, &config);
+
+        let caller = Address::generate(&env);
+        client.record_oracle_data(&caller, &feed_id, &200);
+
+        // At 120 seconds, still fresh
+        env.ledger().set_timestamp(1_120);
+        assert_eq!(client.verify_condition(&feed_id, &100, &300), true);
+
+        // At 121 seconds, stale
+        env.ledger().set_timestamp(1_121);
+        let res = client.try_verify_condition(&feed_id, &100, &300);
+        assert_eq!(res, Err(Ok(Error::StaleData)));
+    }
+
+    #[test]
+    fn test_verify_temperature_condition_tight_window() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(1_000);
+
+        let (client, _admin) = setup(&env);
+        let caller = Address::generate(&env);
+        let feed_id = Symbol::new(&env, "cold_chain");
+
+        client.record_oracle_data(&caller, &feed_id, &4); // 4 degrees C
+
+        // At 299s (within MAX_STALE_AGE_TEMPERATURE = 300s)
+        env.ledger().set_timestamp(1_299);
+        assert_eq!(client.verify_temperature_condition(&feed_id, &2, &8), true);
+
+        // At 301s (past MAX_STALE_AGE_TEMPERATURE)
+        env.ledger().set_timestamp(1_301);
+        let res = client.try_verify_temperature_condition(&feed_id, &2, &8);
+        assert_eq!(res, Err(Ok(Error::StaleData)));
+    }
+
+    #[test]
+    fn test_verify_data_condition_custom_max_age() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(1_000);
+        let (client, _admin) = setup(&env);
+
+        let feed_id = Symbol::new(&env, "custom");
+        let data = OracleData {
+            feed_id,
+            value: 50,
+            timestamp: 1_000,
+        };
+
+        // Advance 40 seconds
+        env.ledger().set_timestamp(1_040);
+
+        // Allowed window is 60s
+        assert_eq!(
+            client.verify_data_condition(&data, &0, &100, &Some(60)),
+            true
+        );
+
+        // Allowed window is 30s -> StaleData
+        let res = client.try_verify_data_condition(&data, &0, &100, &Some(30));
+        assert_eq!(res, Err(Ok(Error::StaleData)));
+    }
+
+    #[test]
+    fn test_submit_report_updates_oracle_data() {
+        let env = Env::default();
+        env.mock_all_auths();
+        env.ledger().set_timestamp(100);
+
+        let (client, admin) = setup(&env);
+        let feed_id = Symbol::new(&env, "temp");
+        client.configure_feed(&admin, &temperature_config(&env, &feed_id));
+        client.set_fallback_value(&admin, &feed_id, &400, &90);
+
+        let source_a = Address::generate(&env);
+        let source_b = Address::generate(&env);
+        client.register_source(&admin, &feed_id, &source_a, &10);
+        client.register_source(&admin, &feed_id, &source_b, &10);
+
+        client.submit_report(
+            &source_a,
+            &feed_id,
+            &390,
+            &100,
+            &BytesN::from_array(&env, &[1; 32]),
+        );
+        client.submit_report(
+            &source_b,
+            &feed_id,
+            &410,
+            &100,
+            &BytesN::from_array(&env, &[2; 32]),
+        );
+
+        let data = client.get_oracle_data(&feed_id);
+        assert_eq!(data.value, 400);
+        assert_eq!(data.timestamp, 100);
+        assert_eq!(client.verify_condition(&feed_id, &350, &450), true);
     }
 }

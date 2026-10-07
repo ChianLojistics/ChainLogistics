@@ -16,14 +16,11 @@ frontend/out/
 frontend/.cache/
 
 # Environment files
-.env
-.env.local
 .env.*.local
 backend/.env
 frontend/.env.local
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -55,3 +52,4 @@ pr.md
 # Frontend Testing
 playwright-report/
 test-results/
+config.bat
