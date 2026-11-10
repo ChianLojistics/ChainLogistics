@@ -167,6 +167,7 @@ pub enum DataKey {
     OracleSnapshot(Symbol),
     OracleFallback(Symbol),
     OracleCircuitBreaker(Symbol),
+    OracleData(Symbol),
     TimelockConfig,
     TimelockOperation(u64),
     NextTimelockOperationId,
@@ -466,6 +467,15 @@ pub struct OracleSnapshot {
     pub using_fallback: bool,
     pub circuit_broken: bool,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleData {
+    pub feed_id: Symbol,
+    pub value: i128,
+    pub timestamp: u64,
+}
+
 
 // ─── Gas Handling Types ──────────────────────────────────────────────────────
 

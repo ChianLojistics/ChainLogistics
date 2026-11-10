@@ -142,4 +142,7 @@ pub enum Error {
     CidTooLong = 162,
     FileTooLarge = 163,
     InvalidStorageBackend = 164,
+
+    // --- Oracle Expiry / Stale Data (170) ---
+    StaleData = 170,
 }
